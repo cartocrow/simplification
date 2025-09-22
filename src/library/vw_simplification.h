@@ -4,16 +4,16 @@
 
 namespace cartocrow::simplification {
 
-template <typename K> struct VisvalingamWhyattTraits {
-	using Kernel = K;
+template <typename G> struct VisvalingamWhyattTraits {
+	using Kernel = G::Kernel;
 
-	static Number<K> getCost(VRVertex<K>* v) {
+	static Number<Kernel> getCost(typename G::Vertex* v) {
 		return CGAL::abs(
 		    CGAL::area(v->getPoint(), v->neighbor(0)->getPoint(), v->neighbor(1)->getPoint()));
 	}
 };
 
-template <typename K>
-using VisvalingamWhyatt = VertexRemoval<ObliviousGraph<VRGraph<K>>, VisvalingamWhyattTraits<K>>;
+template <typename G> 
+using VisvalingamWhyatt = VertexRemoval<G, VisvalingamWhyattTraits<G>>;
 
 } // namespace cartocrow::simplification

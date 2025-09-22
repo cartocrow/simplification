@@ -1,8 +1,8 @@
-#include "cartocrow/core/point_quad_tree.h"
-#include "cartocrow/core/segment_quad_tree.h"
-#include "cartocrow/core/straight_graph.h"
-#include "cartocrow/simplification/vw_simplification.h"
-#include "cartocrow/simplification/ksbb_simplification.h"
+#include "library/point_quad_tree.h"
+#include "library/segment_quad_tree.h"
+#include "library/straight_graph.h"
+
+#include "library/vw_simplification.h"
 
 #include <iostream>
 
@@ -17,12 +17,11 @@ void testVW() {
 	using MyRectangle = Rectangle<MyKernel>;
 	using MyPoint = Point<MyKernel>;
 	// datastructures
-	using MyGraph = VRGraph<MyKernel>;
-	using MyModGraph = ObliviousGraph<MyGraph>;
-	using MyVertex = VRVertex<MyKernel>;
-	using MyPQT = PointQuadTree<VRVertex<MyKernel>, MyKernel>;
+	using MyGraph = VertexRemovalGraph<MyKernel>;
+	using MyVertex = MyGraph::Vertex;
+	using MyPQT = PointQuadTree<MyVertex, MyKernel>;
 	// algorithms
-	using MyAlgorithm = VisvalingamWhyatt<MyKernel>;
+	using MyAlgorithm = VisvalingamWhyatt<MyGraph>;
 
 	MyRectangle box(0, 0, 100, 100);
 	MyPQT* pqt = new MyPQT(box, 3);
@@ -48,9 +47,7 @@ void testVW() {
 		          << "\n";
 	}
 
-	MyModGraph* mg = new MyModGraph(*g);
-
-	MyAlgorithm* vw = new MyAlgorithm(*mg, *pqt);
+	MyAlgorithm* vw = new MyAlgorithm(*g, *pqt);
 	vw->initialize(true); // true signals that the pqt hasnt been filled yet
 
 	vw->runToComplexity(3);
@@ -63,32 +60,30 @@ void testVW() {
 
 	delete vw;
 	delete pqt;
-	delete mg;
 	delete g;
 
 	std::cout << "done VW test\n";
 }
 
-void testKSBB() {
-	std::cout << "started KSBB test\n";
+void testHistoricVW() {
+	std::cout << "started Historic VW test\n";
 
-	using MyKernel = Inexact;
+	using MyKernel = Exact;
 	// geometries
 	using MyRectangle = Rectangle<MyKernel>;
 	using MyPoint = Point<MyKernel>;
 	// datastructures
-	using MyGraph = ECGraph<MyKernel>;
-	using MyVertex = ECVertex<MyKernel>;
-	using MyPQT = PointQuadTree<ECVertex<MyKernel>, MyKernel>;
-	using MySQT = SegmentQuadTree<ECEdge<MyKernel>, MyKernel>;
+	using MyGraph = HistoricVertexRemovalGraph<MyKernel>;
+	using MyBaseGraph = HVRGraph<MyKernel>;
+	using MyVertex = HVRGraph<MyKernel>::Vertex;
+	using MyPQT = PointQuadTree<MyVertex, MyKernel>;
 	// algorithms
-	using MyAlgorithm = KronenfeldEtAl<MyKernel>;
+	using MyAlgorithm = VisvalingamWhyatt<MyGraph>;
 
 	MyRectangle box(0, 0, 100, 100);
 	MyPQT* pqt = new MyPQT(box, 3);
-	MySQT* sqt = new MySQT(box, 3, 0.05);
 
-	MyGraph* g = new MyGraph();
+	MyBaseGraph* g = new MyBaseGraph();
 
 	MyVertex* a = g->addVertex(MyPoint(51, 51));
 	MyVertex* b = g->addVertex(MyPoint(10, 40));
@@ -106,31 +101,94 @@ void testKSBB() {
 	std::cout << "PRE " << g->getVertexCount() << "\n";
 	for (MyVertex* v : g->getVertices()) {
 		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
-		          << "\n";
+			<< "\n";
 	}
 
-	MyAlgorithm* ksbb = new MyAlgorithm(*g, *sqt, *pqt);
+	MyGraph* hg = new MyGraph(*g);
 
-	ksbb->initialize(true, true); // true signals that the sqt & pqt havent been filled yet
+	MyAlgorithm* vw = new MyAlgorithm(*hg, *pqt);
+	vw->initialize(true); // true signals that the pqt hasnt been filled yet
 
-	ksbb->runToComplexity(3);
+	vw->runToComplexity(3);
 
 	std::cout << "POST " << g->getVertexCount() << "\n";
 	for (MyVertex* v : g->getVertices()) {
 		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
-		          << "\n";
+			<< "\n";
 	}
 
-	delete ksbb;
+	delete vw;
 	delete pqt;
+	delete hg;
 	delete g;
 
-	std::cout << "done KSBB test\n";
+	std::cout << "done VW test\n";
 }
+
+//void testKSBB() {
+//	std::cout << "started KSBB test\n";
+//
+//	using MyKernel = Inexact;
+//	// geometries
+//	using MyRectangle = Rectangle<MyKernel>;
+//	using MyPoint = Point<MyKernel>;
+//	// datastructures
+//	using MyGraph = ECGraph<MyKernel>;
+//	using MyVertex = ECVertex<MyKernel>;
+//	using MyPQT = PointQuadTree<ECVertex<MyKernel>, MyKernel>;
+//	using MySQT = SegmentQuadTree<ECEdge<MyKernel>, MyKernel>;
+//	// algorithms
+//	using MyAlgorithm = KronenfeldEtAl<MyKernel>;
+//
+//	MyRectangle box(0, 0, 100, 100);
+//	MyPQT* pqt = new MyPQT(box, 3);
+//	MySQT* sqt = new MySQT(box, 3, 0.05);
+//
+//	MyGraph* g = new MyGraph();
+//
+//	MyVertex* a = g->addVertex(MyPoint(51, 51));
+//	MyVertex* b = g->addVertex(MyPoint(10, 40));
+//	MyVertex* c = g->addVertex(MyPoint(10, 90));
+//	MyVertex* d = g->addVertex(MyPoint(55, 55));
+//	MyVertex* e = g->addVertex(MyPoint(90, 10));
+//	MyVertex* f = g->addVertex(MyPoint(40, 10));
+//	g->addEdge(a, b);
+//	g->addEdge(b, c);
+//	g->addEdge(c, d);
+//	g->addEdge(d, e);
+//	g->addEdge(e, f);
+//	g->addEdge(f, a);
+//
+//	std::cout << "PRE " << g->getVertexCount() << "\n";
+//	for (MyVertex* v : g->getVertices()) {
+//		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
+//		          << "\n";
+//	}
+//
+//	MyAlgorithm* ksbb = new MyAlgorithm(*g, *sqt, *pqt);
+//
+//	ksbb->initialize(true, true); // true signals that the sqt & pqt havent been filled yet
+//
+//	ksbb->runToComplexity(3);
+//
+//	std::cout << "POST " << g->getVertexCount() << "\n";
+//	for (MyVertex* v : g->getVertices()) {
+//		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
+//		          << "\n";
+//	}
+//
+//	delete ksbb;
+//	delete pqt;
+//	delete g;
+//
+//	std::cout << "done KSBB test\n";
+//}
 
 int main(int argc, char** argv) {
 
 	testVW();
+
+	testHistoricVW();
 
 	//testKSBB();
 	

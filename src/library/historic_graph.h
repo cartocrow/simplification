@@ -1,6 +1,6 @@
 #pragma once
 
-#include "cartocrow/core/core.h"
+#include <cartocrow/core/core.h>
 
 namespace cartocrow::simplification {
 
@@ -8,55 +8,50 @@ template <class G> struct Operation;
 
 // edges store the last operation that has been performed on them
 
-template <class G> concept EdgeStoredHistory = requires(typename G::Edge e, Operation<G>* h) {
+template <class Graph> struct Operation {
 
-	/// Sets the data for a \ref HistoricArrangement
-	{e::setHistory(h)};
-	/// Retrieves the data for a \ref HistoricArrangement
-	{
-		e->getHistory()
-	} -> std::same_as<Operation<G>*>;
-};
-
-template <class G> struct Operation {
-
-	using Graph = G;
-	using Edge = G::Edge;
-	using Vertex = G::Vertex;
-	using HistGraph = HistoricGraph<G>;
-	using Op = Operation<G>;
+	using Edge = Graph::Edge;
+	using Vertex = Graph::Vertex;
+	using Op = Operation<Graph>;
 
 	Edge* pre_edge;
 	Op* past;
 
 	Operation(Edge* e) : pre_edge(e) {
-		past = e->getHistory();
-		e->setHistory(this);
+		past = e->data().hist;
+		e->data().hist = this;
 	}
 
-	virtual void undo(Graph& hg) = 0;
-	virtual void redo(Graph& hg) = 0;
+	virtual void undo(Graph& g) = 0;
+	virtual void redo(Graph& g) = 0;
 };
 
-template <class G> SplitOperation : public Operation<G> {
+template <class Graph> struct SplitOperation : public Operation<Graph> {
 
-	SplitOperation(Edge * e, Point<typename G::Kernel> pt) : Operation<G>(e), post_loc(pt) {}
+	using Edge = Graph::Edge;
+	using Vertex = Graph::Vertex;
+	using Op = Operation<Graph>;
+
+	SplitOperation(Edge* e, Point<typename Graph::Kernel> pt) : Operation<Graph>(e), post_loc(pt) {
+		post_edge_1 = nullptr;
+		post_edge_2 = nullptr;
+		future_1 = nullptr;
+		future_2 = nullptr;
+	}
 
 	// Result of the split
-	Edge* post_edge_1 = nullptr;
-	Edge* post_edge_2 = nullptr;
-	Point<typename G::Kernel> post_loc;
+	Edge* post_edge_1;
+	Edge* post_edge_2;
+	Point<typename Graph::Kernel> post_loc;
 
-	// edge histories of the input
-	Op* past = nullptr;
 	// edge histories of the result
-	Op* future_1 = nullptr;
-	Op* future_2 = nullptr;
+	Op* future_1;
+	Op* future_2;
 
 	virtual void undo(Graph& g) {
 
-		future_1 = post_edge_1->getHistory();
-		future_2 = post_edge_2->getHistory();
+		future_1 = post_edge_1->data().hist;
+		future_2 = post_edge_2->data().hist
 
 		Vertex* v = post_edge_1->commonVertex(post_edge_2);
 
@@ -65,34 +60,39 @@ template <class G> SplitOperation : public Operation<G> {
 		if (v->edge(0)->getTarget() == v) {
 			u = v->neighbor(0);
 			w = v->neighbor(1);
-		} else {
+		}
+		else {
 			u = v->neighbor(1);
 			w = v->neighbor(0);
 		}
 
 		g.removeVertex(v);
-		pre_edge = g.addEdge(u, w);
+		this->pre_edge = g.addEdge(u, w);
 
-		if (past != nullptr) {
-			pre_edge.setHistory(past);
+		if (this->past != nullptr) {
+			this->pre_edge->data().hist = this->past;
 		}
 	}
 
-	virtual void redo(Graph& hg) {}
-}
+	virtual void redo(Graph& g) {}
+};
 
-template <class G> EraseOperation : public Operation<G> {
+template <class Graph> struct EraseOperation : public Operation<Graph> {
 
-	EraseOperation(Vertex* v) : Operation<G>(v->edge(0)) {
-		target = v == pre_edge->getTarget();
+	using Edge = Graph::Edge;
+	using Vertex = Graph::Vertex;
+	using Op = Operation<Graph>;
+
+	EraseOperation(Vertex* v) : Operation<Graph>(v->edge(0)) {
+		target = v == this->pre_edge->getTarget();
 		pre_loc = v->getPoint();
 		target_2 = v == v->edge(1)->getTarget();
-		past_2 = v->edge(1)->getHistory();
+		past_2 = v->edge(1)->data().hist;
 	}
 
 	bool target;
 	bool target_2;
-	Point<typename G::Kernel> pre_loc;
+	Point<typename Graph::Kernel> pre_loc;
 
 	// edge histories of the input
 	Op* past_2 = nullptr;
@@ -101,79 +101,85 @@ template <class G> EraseOperation : public Operation<G> {
 
 	virtual void undo(Graph& g) {
 
-		Vertex* u = edge->getSource();
-		Vertex* w = edge->getTarget();
+		Vertex* u = this->pre_edge->getSource();
+		Vertex* w = this->pre_edge->getTarget();
 
-		g.removeEdge(edge);
+		g.removeEdge(this->pre_edge);
 
 		Vertex* v = g.addVertex(pre_loc);
 		if (target) {
-			edge = g.addEdge(u, v);
-		} else {
-			edge = g.addEdge(v, u);
+			this->pre_edge = g.addEdge(u, v);
+		}
+		else {
+			this->pre_edge = g.addEdge(v, u);
 		}
 
 		Edge* edge_2;
 		if (target_2) {
 			edge_2 = g.addEdge(w, v);
-		} else {
+		}
+		else {
 			edge_2 = g.addEdge(v, w);
 		}
 
-		if (past != null) {
-			past->edge = edge;
+		if (this->past != nullptr) {
+			this->past->pre_edge = this->pre_edge;
 		}
 
-		if (past_2 != null) {
-			past->edge = edge_2;
+		if (past_2 != nullptr) {
+			this->past->pre_edge = edge_2;
 		}
 	}
 
 	virtual void redo(Graph& g) {
-	
-		Vertex* u = target ? edge->getSource() : edge->getTarget();
-		Vertex* w = target ? edge->walkTargetNeighbor() : edge->walkSourceNeighbor();
+
+		Vertex* u = target ? this->pre_edge->getSource() : this->pre_edge->getTarget();
+		Vertex* v = target ? this->pre_edge->getTarget() : this->pre_edge->getSource();
+		Vertex* w = target ? this->pre_edge->targetWalkNeighbor() : this->pre_edge->sourceWalkNeighbor();
 
 		g.removeVertex(v);
-		edge = g.addEdge(u, w);
+		this->pre_edge = g.addEdge(u, w);
 	}
-}
+};
 
-template <class G> ShiftOperation : public Operation<G> {
+template <class Graph> struct ShiftOperation : public Operation<Graph> {
 
-	ShiftOperation(Vertex * v, Point<typename G::Kernel> pt) : Operation<G>(v.edge(0)) {
-		target = v == edge->getTarget();
+	using Edge = Graph::Edge;
+	using Vertex = Graph::Vertex;
+	using Op = Operation<Graph>;
+
+	ShiftOperation(Vertex* v, Point<typename Graph::Kernel> pt) : Operation<Graph>(v.edge(0)) {
+		target = v == this->pre_edge->getTarget();
 		pre_loc = v->getPoint();
 		post_loc = pt;
 	}
 
 	// Input to the split
 	bool target;
-	Point<typename G::Kernel> pre_loc;
+	Point<typename Graph::Kernel> pre_loc;
 	// Result of the split
-	Point<typename G::Kernel> post_loc;
+	Point<typename Graph::Kernel> post_loc;
 
 	virtual void undo(Graph& g) {
 
-		Vertex* v = target ? pre_edge->target() : pre_edge->source();
+		Vertex* v = target ? this->pre_edge->target() : this->pre_edge->source();
 		v->setPoint(pre_loc);
 
-		if (past != null) {
-			past->pre_edge = pre_edge;
+		if (this->past != nullptr) {
+			this->past->pre_edge = this->pre_edge;
 		}
 	}
 
 	virtual void redo(Graph& g) {
 
-		Vertex* v = target ? pre_edge->target() : pre_edge->source();
+		Vertex* v = target ? this->pre_edge->target() : this->pre_edge->source();
 		v->setPoint(post_loc);
 	}
-}
+};
 
-template <class G> struct OperationBatch {
+template <class Graph> struct OperationBatch {
 
-	using Op = Operation<G>;
-	using HistGraph = HistoricGraph<G>;
+	using Op = Operation<Graph>;
 
 	~OperationBatch() {
 		for (Op* op : operations) {
@@ -186,32 +192,42 @@ template <class G> struct OperationBatch {
 	/// Number of edges in the map after this operation
 	int post_complexity;
 	/// Maximum cost of operations up to this one
-	Number<typename G::Kernel> post_maxcost;
+	Number<typename Graph::Kernel> post_maxcost;
 
-	void undo(HistGraph& hg) {
+	void undo(Graph& g) {
 		// NB: reverse
 		for (auto it = operations.rbegin(); it != operations.rend(); it++) {
 
 			Op* op = *it;
-			op->undo(hg);
+			op->undo(g);
 		}
 	}
-	void redo(HistGraph& hg) {
+	void redo(Graph& g) {
 		for (Op* op : operations) {
-			op->redo(hg);
+			op->redo(g);
 		}
 	}
 };
 
-template <class G> class HistoricGraph {
+template <class Graph> 
+concept EdgeStoredOperations = requires(typename Graph::Edge::Data d) {
+	
+	{
+		d.hist
+	} -> std::same_as<Operation<Graph>*&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
+};
+
+template <class Graph> 
+	requires EdgeStoredOperations<Graph>
+class HistoricGraph {
   public:
-	using Graph = G;
-	using Vertex = G::Vertex;
-	using Edge = G::Edge;
-	using Kernel = G::Kernel;
+	using Vertex = Graph::Vertex;
+	using Edge = Graph::Edge;
+	using Kernel = Graph::Kernel;
+	using BaseGraph = Graph;
 
   private:
-	using Batch = OperationBatch<G>;
+	using Batch = OperationBatch<Graph>;
 
 	Graph& graph;
 
@@ -237,26 +253,38 @@ template <class G> class HistoricGraph {
 		}
 	}
 
-	Graph& getGraph() {
+	Graph& getBaseGraph() {
 		return graph;
 	}
 
-	Edge* erase(Vertex* v) {
-
-		assert(v->degree() == 2);
-		assert(building_batch != null_ptr);
-
-		EraseOperation<G>* op = new EraseOperation<G>(v);
-		op->redo(map);
-		building_batch->operations.push_back(op);
-
-		return op->post_edge;
+	std::vector<Vertex*>& getVertices() {
+		return graph.getVertices();
 	}
 
-	Vertex* split(Edge* e, Point<Kernel> p) {
+	std::vector<Edge*>& getEdges() {
+		return graph.getEdges();
+	}
 
-		ShiftOperation<G>* op = new ShiftOperation<G>(v, p);
-		op->redo(map);
+	int getEdgeCount() {
+		return graph.getEdgeCount();
+	}
+
+	Edge* mergeVertex(Vertex* v) {
+
+		assert(v->degree() == 2);
+		assert(building_batch != nullptr);
+
+		EraseOperation<Graph>* op = new EraseOperation<Graph>(v);
+		op->redo(graph);
+		building_batch->operations.push_back(op);
+
+		return op->pre_edge;
+	}
+
+	Vertex* splitEdge(Edge* e, Point<Kernel> p) {
+
+		SplitOperation<Graph>* op = new SplitOperation<Graph>(e, p);
+		op->redo(graph);
 		building_batch->operations.push_back(op);
 
 		return op->post_edge_1->commonVertex(op->post_edge_2);
@@ -265,16 +293,16 @@ template <class G> class HistoricGraph {
 	void shiftVertex(Vertex* v, Point<Kernel> p) {
 
 		assert(v->degree() > 0);
-		assert(building_batch != null_ptr);
+		assert(building_batch != nullptr);
 
-		ShiftOperation<G>* op = new ShiftOperation<G>(v, p);
-		op->redo(map);
+		ShiftOperation<Graph>* op = new ShiftOperation<Graph>(v, p);
+		op->redo(graph);
 		building_batch->operations.push_back(op);
 	}
 
 	void recallComplexity(int c) {
 
-		assert(building_batch == null_ptr);
+		assert(building_batch == nullptr);
 
 		while ( // if history is a single element, check input complexity
 		    (history.size() >= 1 && in_complexity <= c)
@@ -282,14 +310,14 @@ template <class G> class HistoricGraph {
 		    || (history.size() > 1 && history[history.size() - 2]->post_complexity <= c)) {
 			backInTime();
 		}
-		while (!undone.empty() && map.number_of_edges() > c) {
+		while (!undone.empty() && graph.getEdgeCount() > c) {
 			forwardInTime();
 		}
 	}
 
 	void recallThreshold(Number<Kernel> t) {
 
-		assert(building_batch == null_ptr);
+		assert(building_batch == nullptr);
 
 		while (history.size() >= 1 && history.last()->post_maxcost > t) {
 			backInTime();
@@ -301,24 +329,24 @@ template <class G> class HistoricGraph {
 
 	void backInTime() {
 
-		assert(building_batch == null_ptr);
+		assert(building_batch == nullptr);
 
 		Batch* batch = history.back();
 		history.pop_back();
 		undone.push_back(batch);
 
-		batch->undo(map);
+		batch->undo(graph);
 	}
 
 	void forwardInTime() {
 
-		assert(building_batch == null_ptr);
+		assert(building_batch == nullptr);
 
 		Batch* batch = undone.back();
 		undone.pop_back();
 		history.push_back(batch);
 
-		batch->redo(map);
+		batch->redo(graph);
 	}
 
 	void goToPresent() {
@@ -332,21 +360,21 @@ template <class G> class HistoricGraph {
 	}
 
 	void startBatch(Number<Kernel> c) {
-		assert(building_batch == null_ptr);
+		assert(building_batch == nullptr);
 		assert(atPresent());
 
 		building_batch = new Batch();
 		history.push_back(building_batch);
 
-		if (max_cost < cost) {
-			max_cost = cost;
+		if (max_cost < c) {
+			max_cost = c;
 		}
 
 		building_batch->post_maxcost = max_cost;
 	}
 
 	void endBatch() {
-		assert(building_batch != null_ptr);
+		assert(building_batch != nullptr);
 
 		building_batch->post_complexity = graph.getEdgeCount();
 		building_batch = nullptr;

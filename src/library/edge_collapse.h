@@ -1,6 +1,7 @@
 #pragma once
 
-#include "cartocrow/core/core.h"
+#include <cartocrow/core/core.h>
+
 #include "indexed_priority_queue.h"
 
 namespace cartocrow::simplification {

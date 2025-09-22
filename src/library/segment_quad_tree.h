@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core.h"
+#include <cartocrow/core/core.h>
 
 namespace cartocrow {
 
