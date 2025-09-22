@@ -2,6 +2,7 @@
 
 #include <cartocrow/core/core.h>
 
+#include "utils.h"
 #include "point_quad_tree.h"
 #include "straight_graph.h"
 #include "indexed_priority_queue.h"
@@ -11,6 +12,35 @@
 namespace cartocrow::simplification {
 
 	namespace detail {
+
+		template <class MG, class VRT>
+		concept VRSetup = requires(MG::Vertex * v) {
+			requires ModifiableGraph<MG>;
+
+			requires std::same_as<typename MG::Kernel, typename VRT::Kernel>;
+
+		{
+			v->data().cost
+		} -> std::same_as<Number<typename MG::Kernel>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
+
+		{
+			v->data().blocked_by
+		} -> std::same_as<std::vector<typename MG::Vertex*>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
+
+		{
+			v->data().blocking
+		} -> std::same_as<std::vector<typename MG::Vertex*>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
+
+		{
+			v->data().qid
+		} -> std::same_as<int&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
+
+
+		{
+			VRT::getCost(v)
+		} -> std::same_as<Number<typename VRT::Kernel>>;
+		};
+
 		template <typename K> struct VRData;
 
 		template <typename K> struct HVRData;
@@ -19,17 +49,6 @@ namespace cartocrow::simplification {
 
 		template<typename K>
 		using HVRGraph = StraightGraph<HVRData<K>, HVREdge<K>, K>;
-
-		template <class MG, class VRT>
-		concept VRSetup = requires(MG::Vertex * v) {
-			requires ModifiableGraph<MG>;
-
-			requires std::same_as<typename MG::Kernel, typename VRT::Kernel>;
-		//requires std::is_base_of<typename VRData<typename MG::Kernel>, typename MG::Edge::Data>;
-		{
-			VRT::getCost(v)
-		} -> std::same_as<Number<typename VRT::Kernel>>;
-		};
 
 		template<class Vertex, class Kernel>
 		struct VRQueueTraits;
@@ -64,10 +83,9 @@ namespace cartocrow::simplification {
 		private:
 			MG& graph;
 			PointQuadTree<Vertex, Kernel>& pqt;
-			IndexedPriorityQueue<Vertex, detail::VRQueueTraits<Vertex,Kernel>> queue;
+			IndexedPriorityQueue<Vertex, detail::VRQueueTraits<Vertex, Kernel>> queue;
 
 			void update(Vertex* v);
-			Rectangle<Kernel> boxOf(Point<Kernel>& a, Point<Kernel>& b, Point<Kernel>& c);
 
 		public:
 			VertexRemoval(MG& g, PointQuadTree<Vertex, Kernel>& qt) : graph(g), pqt(qt) {}

@@ -97,7 +97,7 @@ namespace cartocrow::simplification {
 			Point<Kernel>& wp = w->getPoint();
 			Triangle<Kernel> T(up, vp, wp);
 
-			Rectangle<Kernel> rect = boxOf(up, vp, wp);
+			Rectangle<Kernel> rect = utils::boxOf<Kernel>(up, vp, wp);
 
 			pqt.findContained(rect, [&T, &u, &v, &w](Vertex& b) {
 				if (&b != u && &b != v && &b != w && !T.has_on_unbounded_side(b.getPoint())) {
@@ -191,13 +191,4 @@ namespace cartocrow::simplification {
 		}
 	}
 
-	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
-	Rectangle<typename MG::Kernel> VertexRemoval<MG, VRT>::boxOf(Point<Kernel>& a, Point<Kernel>& b, Point<Kernel>& c) {
-		Number<Kernel> left = CGAL::min(a.x(), CGAL::min(b.x(), c.x()));
-		Number<Kernel> right = CGAL::max(a.x(), CGAL::max(b.x(), c.x()));
-		Number<Kernel> bottom = CGAL::min(a.y(), CGAL::min(b.y(), c.y()));
-		Number<Kernel> top = CGAL::max(a.y(), CGAL::max(b.y(), c.y()));
-
-		return Rectangle<Kernel>(left, bottom, right, top);
-	}
 }

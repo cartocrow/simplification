@@ -2,6 +2,7 @@ set(SOURCES
 
 )
 set(HEADERS
+	utils.h
 	indexed_priority_queue.h
 	straight_graph.h
 	point_quad_tree.h
