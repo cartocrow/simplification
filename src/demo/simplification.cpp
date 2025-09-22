@@ -109,7 +109,7 @@ void testHistoricVW() {
 	MyAlgorithm* vw = new MyAlgorithm(*hg, *pqt);
 	vw->initialize(true); // true signals that the pqt hasnt been filled yet
 
-	vw->runToComplexity(3);
+	vw->runToComplexity(4);
 
 	std::cout << "POST " << g->getVertexCount() << "\n";
 	for (MyVertex* v : g->getVertices()) {
@@ -120,6 +120,18 @@ void testHistoricVW() {
 	hg->backInTime();
 
 	std::cout << "BACK " << g->getVertexCount() << "\n";
+	for (MyVertex* v : g->getVertices()) {
+		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
+			<< "\n";
+	}
+
+	// meddling with past, so to continue, reinitialize the algorithm
+	hg->goToPresent();
+	vw->initialize(true);
+
+	vw->runToComplexity(3);
+
+	std::cout << "POST " << g->getVertexCount() << "\n";
 	for (MyVertex* v : g->getVertices()) {
 		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
 			<< "\n";

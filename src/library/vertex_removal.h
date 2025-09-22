@@ -144,6 +144,7 @@ namespace cartocrow::simplification {
 			void initialize(bool initQuadTree) {
 
 				if (initQuadTree) {
+					pqt.clear();
 					for (Vertex* v : graph.getVertices()) {
 						pqt.insert(*v);
 					}
