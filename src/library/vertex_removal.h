@@ -10,34 +10,16 @@
 
 namespace cartocrow::simplification {
 
-	//-------------- NO HISTORY --------------------------------------------------
-
 	namespace detail {
 		template <typename K> struct VRData;
-	}
 
-	template<typename K>
-	using VertexRemovalGraph = StraightGraph<detail::VRData<K>, VoidData, K>;
-
-
-	//-------------- WITH HISTORY ------------------------------------------------
-
-
-	namespace detail {
 		template <typename K> struct HVRData;
 
 		template <typename K> struct HVREdge;
 
 		template<typename K>
 		using HVRGraph = StraightGraph<HVRData<K>, HVREdge<K>, K>;
-	}
 
-	template<typename K>
-	using HistoricVertexRemovalGraph = HistoricGraph<detail::HVRGraph<K>>;
-
-	//-------------- VERTEX REMOVAL ----------------------------------------------
-
-	namespace detail {
 		template <class MG, class VRT>
 		concept VRSetup = requires(MG::Vertex * v) {
 			requires ModifiableGraph<MG>;
@@ -48,8 +30,30 @@ namespace cartocrow::simplification {
 			VRT::getCost(v)
 		} -> std::same_as<Number<typename VRT::Kernel>>;
 		};
+
+		template<class Vertex, class Kernel>
+		struct VRQueueTraits;
 	}
 
+	/// <summary>
+	/// Graph type that can be used with the VertexRemoval implementation. This variant is oblivious: changes made to the graph are not recoverable.
+	/// </summary>
+	/// <typeparam name="K">Desired CGAL kernel</typeparam>
+	template<typename K>
+	using VertexRemovalGraph = StraightGraph<detail::VRData<K>, VoidData, K>;
+
+	/// <summary>
+	/// Graph type that can be used with the VertexRemoval implementation. This variant is historic: changes made to the graph can be undone and redone to retrieve intermediate steps.
+	/// </summary>
+	/// <typeparam name="K">Desired CGAL kernel</typeparam>
+	template<typename K>
+	using HistoricVertexRemovalGraph = HistoricGraph<detail::HVRGraph<K>>;
+
+	/// <summary>
+	/// The Vertex Removal algorithm. It is topologically safe, ensuring that vertices are only erased if they have degree 2 and the triangle spanned with its neighbors is empty. Can be configured with custom cost function, via the VertexRemovalTraits.
+	/// </summary>
+	/// <typeparam name="MG">Modifiable Graph type to be used; typically, will be one of VertexRemovalGraph or HistoricVertexRemovalGraph</typeparam>
+	/// <typeparam name="VRT">VertexRemovalTraits, specifying the desired cost function</typeparam>
 	template <class MG, class VRT>
 		requires detail::VRSetup<MG, VRT> class VertexRemoval {
 
@@ -58,34 +62,9 @@ namespace cartocrow::simplification {
 			using Kernel = MG::Kernel;
 
 		private:
-			struct VRQueueTraits {
-
-				static void setIndex(Vertex* elt, int index) {
-					elt->data().qid = index;
-				}
-
-				static int getIndex(Vertex* elt) {
-					return elt->data().qid;
-				}
-
-				static int compare(Vertex* a, Vertex* b) {
-					Number<Kernel> ac = a->data().cost;
-					Number<Kernel> bc = b->data().cost;
-					if (ac < bc) {
-						return -1;
-					}
-					else if (ac > bc) {
-						return 1;
-					}
-					else {
-						return 0;
-					}
-				}
-			};
-
 			MG& graph;
 			PointQuadTree<Vertex, Kernel>& pqt;
-			IndexedPriorityQueue<Vertex, VRQueueTraits> queue;
+			IndexedPriorityQueue<Vertex, detail::VRQueueTraits<Vertex,Kernel>> queue;
 
 			void update(Vertex* v);
 			Rectangle<Kernel> boxOf(Point<Kernel>& a, Point<Kernel>& b, Point<Kernel>& c);

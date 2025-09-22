@@ -24,6 +24,33 @@ namespace cartocrow::simplification {
 		template <typename K> struct HVREdge {
 			Operation<HVRGraph<K>>* hist;
 		};
+
+
+		template<class Vertex, class Kernel>
+		struct VRQueueTraits {
+
+			static void setIndex(Vertex * elt, int index) {
+				elt->data().qid = index;
+			}
+
+			static int getIndex(Vertex * elt) {
+				return elt->data().qid;
+			}
+
+			static int compare(Vertex * a, Vertex * b) {
+				Number<Kernel> ac = a->data().cost;
+				Number<Kernel> bc = b->data().cost;
+				if (ac < bc) {
+					return -1;
+				}
+				else if (ac > bc) {
+					return 1;
+				}
+				else {
+					return 0;
+				}
+			}
+		};
 	}
 
 	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>

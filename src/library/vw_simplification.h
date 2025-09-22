@@ -4,6 +4,10 @@
 
 namespace cartocrow::simplification {
 
+/// <summary>
+/// Traits for running VisvalingamWhyatt vertex-removal algorithms. The cost is equal to the area of the spanned triangle.
+/// </summary>
+/// <typeparam name="G">The graph type for the algorithm</typeparam>
 template <typename G> struct VisvalingamWhyattTraits {
 	using Kernel = G::Kernel;
 
@@ -13,6 +17,10 @@ template <typename G> struct VisvalingamWhyattTraits {
 	}
 };
 
+/// <summary>
+/// Shorthand for the VisvalingamWhyatt vertex-removal algorithm.
+/// </summary>
+/// <typeparam name="G">The graph type for the algorithm</typeparam>
 template <typename G> 
 using VisvalingamWhyatt = VertexRemoval<G, VisvalingamWhyattTraits<G>>;
 
