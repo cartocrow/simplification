@@ -74,8 +74,8 @@ void testHistoricVW() {
 	using MyPoint = Point<MyKernel>;
 	// datastructures
 	using MyGraph = HistoricVertexRemovalGraph<MyKernel>;
-	using MyBaseGraph = HVRGraph<MyKernel>;
-	using MyVertex = HVRGraph<MyKernel>::Vertex;
+	using MyBaseGraph = MyGraph::BaseGraph;
+	using MyVertex = MyGraph::Vertex;
 	using MyPQT = PointQuadTree<MyVertex, MyKernel>;
 	// algorithms
 	using MyAlgorithm = VisvalingamWhyatt<MyGraph>;
