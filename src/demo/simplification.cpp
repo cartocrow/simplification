@@ -117,6 +117,14 @@ void testHistoricVW() {
 			<< "\n";
 	}
 
+	hg->backInTime();
+
+	std::cout << "BACK " << g->getVertexCount() << "\n";
+	for (MyVertex* v : g->getVertices()) {
+		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
+			<< "\n";
+	}
+
 	delete vw;
 	delete pqt;
 	delete hg;

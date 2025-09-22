@@ -51,8 +51,8 @@ template <class Graph> struct SplitOperation : public Operation<Graph> {
 	virtual void undo(Graph& g) {
 
 		future_1 = post_edge_1->data().hist;
-		future_2 = post_edge_2->data().hist
-
+		future_2 = post_edge_2->data().hist;
+			
 		Vertex* v = post_edge_1->commonVertex(post_edge_2);
 
 		Vertex* u;

@@ -164,6 +164,10 @@ namespace cartocrow::simplification {
 			}
 
 			bool step() {
+				if constexpr (ModifiableGraphWithHistory<MG>) {
+					assert(graph.atPresent());
+				}
+
 				while (!queue.empty()) {
 					Vertex* v = queue.pop();
 
@@ -208,7 +212,15 @@ namespace cartocrow::simplification {
 						}
 
 						// perform the removal
+						if constexpr (ModifiableGraphWithHistory<MG>) {
+							graph.startBatch(v->data().cost);
+						}
+
 						graph.mergeVertex(v);
+
+						if constexpr (ModifiableGraphWithHistory<MG>) {
+							graph.endBatch();
+						}
 
 						// update the neighbors
 						update(u);
