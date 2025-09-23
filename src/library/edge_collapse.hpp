@@ -157,8 +157,6 @@ namespace cartocrow::simplification {
 			assert(graph.atPresent());
 		}
 
-		std::cout << "stepping\n";
-
 		while (!queue.empty()) {
 			Edge* e = queue.pop();
 
@@ -195,7 +193,7 @@ namespace cartocrow::simplification {
 
 			if (!edata.blocked_by_degzero && edata.blocked_by.empty()) {
 
-				std::cout << " -> collapsing!";
+				std::cout << " -> collapsing!\n";
 				// not blocked, executing!
 
 				// remove from blocking lists and search structure
@@ -241,7 +239,6 @@ namespace cartocrow::simplification {
 
 				if (edata.erase_both) {
 
-					std::cout << ": double\n";
 					graph.mergeVertex(src);
 					Edge* ne = graph.mergeVertex(tar);
 
@@ -261,7 +258,6 @@ namespace cartocrow::simplification {
 
 					// NB: edata will be erased on removing vertex b, hence, we need a local copy
 					Point<Kernel> pt = edata.point;
-					std::cout << " to " << pt << "\n";
 
 					// perform the collapse
 					graph.mergeVertex(src);
@@ -313,7 +309,6 @@ namespace cartocrow::simplification {
 			edata.erase_both = true;
 			edata.creates_difference = false;
 			edata.cost = 0;
-			std::cout << "both align\n";
 			return;
 		}
 		else if (abc) {
@@ -321,7 +316,6 @@ namespace cartocrow::simplification {
 			edata.creates_difference = false;
 			edata.cost = 0;
 			edata.point = c;
-			std::cout << "align at " << b << "\n";
 			return;
 		}
 		else if (bcd) {
@@ -329,7 +323,6 @@ namespace cartocrow::simplification {
 			edata.creates_difference = false;
 			edata.cost = 0;
 			edata.point = b;
-			std::cout << "align at " << c << "\n";
 			return;
 		}
 
@@ -368,8 +361,6 @@ namespace cartocrow::simplification {
 			assert(!ad.has_on_boundary(b));
 			assert(!ad.has_on_boundary(c));
 
-
-			std::cout << "erase both\n";
 			edata.erase_both = true;
 
 			// implies that neither b nor c is on ad
@@ -407,9 +398,6 @@ namespace cartocrow::simplification {
 
 				edata.T1 = Triangle<Kernel>(b, is, edata.point);
 				edata.T2 = Triangle<Kernel>(c, d, is);
-
-
-				std::cout << "ab det : " << edata.point << "\n";
 			}
 			else {
 				auto intersection = CGAL::intersection(arealine, cd);
@@ -421,9 +409,6 @@ namespace cartocrow::simplification {
 
 				edata.T1 = Triangle<Kernel>(a, b, is);
 				edata.T2 = Triangle<Kernel>(c, is, edata.point);
-
-
-				std::cout << "cd det : " << edata.point << "\n";
 			}
 		}
 
