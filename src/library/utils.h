@@ -47,6 +47,16 @@ namespace cartocrow::simplification::utils {
 		return a.xmin() <= pt.x() && pt.x() <= a.xmax() && a.ymin() <= pt.y() && pt.y() <= a.ymax();
 	}
 
+	template<typename K>
+	bool overlaps(Rectangle<K>& a, Segment<K>& seg) {
+		if (CGAL::intersection(a, seg)) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+
 	template<typename T>
 	bool listRemove(T* elt, std::vector<T*>& vec) {
 

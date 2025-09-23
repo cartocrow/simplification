@@ -12,21 +12,7 @@ namespace cartocrow::simplification {
 	};
 
 	namespace detail {
-		template <typename P, typename K> requires PointConvertable<P, K> struct PQTNode {
-		
-			using Node = PQTNode<P, K>;
-
-			Node* parent;
-			Node* lt;
-			Node* lb;
-			Node* rt;
-			Node* rb;
-			Rectangle<K>* rect;
-			std::vector<P*>* elts;
-
-			PQTNode();
-			~PQTNode();
-		};
+		template <typename P, typename K> requires PointConvertable<P, K> struct PQTNode;
 	}
 
 	template <typename P, typename K> requires PointConvertable<P, K> class PointQuadTree {

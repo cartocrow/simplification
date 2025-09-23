@@ -8,26 +8,38 @@
 namespace cartocrow::simplification {
 
 	namespace detail {
-		template <typename P, typename K> requires PointConvertable<P, K>
-		PQTNode<P, K>::PQTNode() {
-			parent = nullptr;
-			lt = nullptr;
-			lb = nullptr;
-			rt = nullptr;
-			rb = nullptr;
-			rect = nullptr;
-			elts = nullptr;
-		}
 
-		template <typename P, typename K> requires PointConvertable<P, K>
-		PQTNode<P, K>::~PQTNode() {
-			delete rect;
-			delete lt;
-			delete lb;
-			delete rt;
-			delete rb;
-			delete elts;
-		}
+		template <typename P, typename K> requires PointConvertable<P, K> struct PQTNode {
+
+			using Node = PQTNode<P, K>;
+
+			Node* parent;
+			Node* lt;
+			Node* lb;
+			Node* rt;
+			Node* rb;
+			Rectangle<K>* rect;
+			std::vector<P*>* elts;
+
+			PQTNode() {
+				parent = nullptr;
+				lt = nullptr;
+				lb = nullptr;
+				rt = nullptr;
+				rb = nullptr;
+				rect = nullptr;
+				elts = nullptr;
+			}
+
+			~PQTNode() {
+				delete rect;
+				delete lt;
+				delete lb;
+				delete rt;
+				delete rb;
+				delete elts;
+			}
+		};
 	}
 
 	template <typename P, typename K> requires PointConvertable<P, K>
