@@ -155,7 +155,7 @@ void testHistoricVW() {
 void testKSBB() {
 	std::cout << "started KSBB test\n";
 
-	using MyKernel = Inexact;
+	using MyKernel = Exact;
 	// geometries
 	using MyRectangle = Rectangle<MyKernel>;
 	using MyPoint = Point<MyKernel>;
@@ -173,6 +173,14 @@ void testKSBB() {
 	MySQT* sqt = new MySQT(box, 3, 0.05);
 
 	MyGraph* g = new MyGraph();
+
+	//MyVertex* a = g->addVertex(MyPoint(0, 0));
+	//MyVertex* b = g->addVertex(MyPoint(0, 50));
+	//MyVertex* c = g->addVertex(MyPoint(50, 40));
+	//MyVertex* d = g->addVertex(MyPoint(70, 0));
+	//g->addEdge(a, b);
+	//g->addEdge(b, c);
+	//g->addEdge(c, d);
 
 	MyVertex* a = g->addVertex(MyPoint(51, 51));
 	MyVertex* b = g->addVertex(MyPoint(10, 40));
@@ -199,7 +207,8 @@ void testKSBB() {
 
 	ksbb->initialize(true, true); // true signals that the sqt & pqt havent been filled yet
 
-	ksbb->runToComplexity(3);
+	ksbb->step();
+	//ksbb->runToComplexity(0);
 
 	std::cout << "POST " << g->getVertexCount() << "\n";
 	for (MyVertex* v : g->getVertices()) {
@@ -216,9 +225,9 @@ void testKSBB() {
 
 int main(int argc, char** argv) {
 
-	testVW();
+	//testVW();
 
-	testHistoricVW();
+	//testHistoricVW();
 
 	testKSBB();
 	
