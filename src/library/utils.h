@@ -30,6 +30,23 @@ namespace cartocrow::simplification::utils {
 		return Rectangle<K>(left, bottom, right, top);
 	}
 
+	template<typename K>
+	bool encloses(Rectangle<K>& larger, Rectangle<K>& smaller) {
+		return larger.xmin() <= smaller.xmin() && larger.ymin() <= smaller.ymin() &&
+			larger.xmax() >= smaller.xmax() && larger.ymax() >= smaller.ymax();
+	}
+
+	template<typename K>
+	bool disjoint(Rectangle<K>& a, Rectangle<K>& b) {
+		return a.xmax() < b.xmin() || a.xmin() > b.xmax() || a.ymax() < b.ymin() ||
+			a.ymin() > b.ymax();
+	}
+
+	template<typename K>
+	bool contains(Rectangle<K>& a, Point<K>& pt) {
+		return a.xmin() <= pt.x() && pt.x() <= a.xmax() && a.ymin() <= pt.y() && pt.y() <= a.ymax();
+	}
+
 	template<typename T>
 	bool listRemove(T* elt, std::vector<T*>& vec) {
 

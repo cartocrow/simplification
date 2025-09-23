@@ -1,6 +1,6 @@
 #pragma once
 
-namespace cartocrow {
+namespace cartocrow::simplification {
 
 template <class T, class QT> concept QueueTraits = requires(T * elt, T* elt2, int i) {
 	{QT::setIndex(elt, i)};
@@ -114,4 +114,4 @@ template <class T, class QT> requires QueueTraits<T, QT> class IndexedPriorityQu
 		siftDown(QT::getIndex(elt), elt);
 	}
 };
-} // namespace cartocrow
+} // namespace cartocrow::simplification

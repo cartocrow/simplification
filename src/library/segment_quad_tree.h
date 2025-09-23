@@ -2,7 +2,7 @@
 
 #include <cartocrow/core/core.h>
 
-namespace cartocrow {
+namespace cartocrow::simplification {
 
 	template <typename P, typename K> concept SegmentConvertable = requires(P p) {
 
