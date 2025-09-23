@@ -1,0 +1,453 @@
+// -----------------------------------------------------------------------------
+// IMPLEMENTATION OF TEMPLATE FUNCTIONS
+// Do not include this file, but the .h file instead
+// -----------------------------------------------------------------------------
+
+#include "utils.h"
+
+namespace cartocrow::simplification {
+
+
+	template <class VD, class ED, typename K>
+	bool StraightGraph<VD, ED, K>::verifyOriented() {
+		for (Vertex* v : vertices) {
+			if (v->degree() != 2) continue; // irrelevant for orientation
+
+			Edge* bwd = v->incident[0];
+			Edge* fwd = v->incident[1];
+
+			if (bwd->target == v && fwd->source == v) continue; // already satisfies orientation
+
+			return false;
+		}
+
+		return true;
+	}
+
+	template <class VD, class ED, typename K>
+	bool StraightGraph<VD, ED, K>::verifySorted() {
+		for (Vertex* v : vertices) {
+			if (v->degree() > 2) {
+				CGAL::Direction_2<Kernel> dir_prev = CGAL::Direction_2<Kernel>(v->neighbor(0)->getPoint() - v->getPoint());
+				for (int i = 1; i < v->degree(); i++) {
+					CGAL::Direction_2<Kernel> dir = CGAL::Direction_2<Kernel>(v->neighbor(i)->getPoint() - v->getPoint());
+					if (dir < dir_prev) {
+						return false;
+					}
+					dir_prev = dir;
+				}
+			}
+		}
+		return true;
+	}
+
+	template <class VD, class ED, typename K>
+	StraightGraph<VD, ED, K>::StraightGraph() {
+		oriented = false;
+		sorted = false;
+	}
+
+	template <class VD, class ED, typename K>
+	StraightGraph<VD, ED, K>::~StraightGraph() {
+		for (Edge* e : edges) {
+			delete e;
+		}
+		for (Vertex* v : vertices) {
+			delete v;
+		}
+	}
+
+	template <class VD, class ED, typename K>
+	bool StraightGraph<VD, ED, K>::isOriented() {
+		assert(!oriented || verifyOriented());
+		return oriented;
+	}
+
+	template <class VD, class ED, typename K>
+	bool StraightGraph<VD, ED, K>::isSorted() {
+		assert(!sorted || verifySorted());
+		return sorted;
+	}
+
+	template <class VD, class ED, typename K>
+	int StraightGraph<VD, ED, K>::getVertexCount() {
+		return vertices.size();
+	}
+
+	template <class VD, class ED, typename K>
+	int StraightGraph<VD, ED, K>::getEdgeCount() {
+		return edges.size();
+	}
+
+	template <class VD, class ED, typename K>
+	std::vector<StraightVertex<VD, ED, K>*>& StraightGraph<VD, ED, K>::getVertices() {
+		return vertices;
+	}
+
+	template <class VD, class ED, typename K>
+	std::vector<StraightEdge<VD, ED, K>*>& StraightGraph<VD, ED, K>::getEdges() {
+		return edges;
+	}
+
+	template <class VD, class ED, typename K>
+	StraightVertex<VD, ED, K>* StraightGraph<VD, ED, K>::addVertex(Point<K> pt) {
+		oriented = false;
+		sorted = false;
+
+		Vertex* v = new Vertex();
+		v->index = vertices.size();
+		v->point = Point<K>(pt.x(), pt.y());
+		vertices.push_back(v);
+		return v;
+	}
+
+	template <class VD, class ED, typename K>
+	void StraightGraph<VD, ED, K>::removeVertex(Vertex* vtx) {
+		oriented = false;
+		sorted = false;
+
+		for (Edge* e : vtx->incident) {
+			Vertex* other = e->other(vtx);
+
+			utils::listRemove(e, other->incident);
+
+			Edge* swp = utils::swapRemove(e->index, edges);
+			if (swp != nullptr) {
+				swp->index = e->index;
+			}
+
+			delete e;
+		}
+
+
+		Vertex* swp = utils::swapRemove(vtx->index, vertices);
+		if (swp != nullptr) {
+			swp->index = vtx->index;
+		}
+		delete vtx;
+	}
+
+	template <class VD, class ED, typename K>
+	StraightEdge<VD, ED, K>* StraightGraph<VD, ED, K>::addEdge(Vertex* source, Vertex* target) {
+		oriented = false;
+		sorted = false;
+
+		Edge* e = new Edge();
+		e->index = edges.size();
+		e->source = source;
+		e->target = target;
+		edges.push_back(e);
+		source->incident.push_back(e);
+		target->incident.push_back(e);
+		return e;
+	}
+	template <class VD, class ED, typename K>
+	void StraightGraph<VD, ED, K>::removeEdge(Edge* edge) {
+		oriented = false;
+		sorted = false;
+
+		utils::listRemove(edge, edge->source->incident);
+		utils::listRemove(edge, edge->target->incident);
+
+		Edge* swp = utils::swapRemove(edge->index, edges);
+		if (swp != nullptr) {
+			swp->index = edge->index;
+		}
+
+		delete edge;
+	}
+
+	template <class VD, class ED, typename K>
+	void StraightGraph<VD, ED, K>::orient() {
+		for (Vertex* v : vertices) {
+			if (v->degree() != 2) continue; // irrelevant for orientation
+
+			Edge* bwd = v->incident[0];
+			Edge* fwd = v->incident[1];
+
+			if (bwd->target == v && fwd->source == v) continue; // already satisfies orientation
+
+			if (bwd->target != v) {
+				bwd->reverse();
+			}
+
+			if (fwd->source != v) {
+				fwd->reverse();
+			}
+
+			Vertex* fv = fwd->target;
+			while (fv->degree() == 2 && fv != v) {
+				if (fv->incident[0] != fwd) {
+					fv->incident[1] = fv->incident[0];
+					fv->incident[0] = fwd;
+				}
+
+				fwd = fv->incident[1];
+				if (fwd->source != fv) {
+					fwd->reverse();
+				}
+				fv = fwd->target;
+			}
+
+			if (fv != v) {
+				Vertex* bv = bwd->source;
+				while (bv->degree() == 2) {
+					if (bv->incident[1] != bwd) {
+						bv->incident[0] = bv->incident[1];
+						bv->incident[1] = bwd;
+					}
+
+					bwd = bv->incident[0];
+					if (bwd->target != bv) {
+						bwd->reverse();
+					}
+					bv = bwd->source;
+				}
+			}
+		}
+
+		oriented = true;
+	}
+
+	template <class VD, class ED, typename K>
+	void StraightGraph<VD, ED, K>::sortIncidentEdges() {
+		for (Vertex* v : vertices) {
+			if (v->degree() > 2) {
+				std::ranges::sort(v->incident, [&v](Edge* e, Edge* f) {
+					CGAL::Direction_2<Kernel> dir_e = CGAL::Direction_2<Kernel>(e->other(v)->getPoint() - v->getPoint());
+					CGAL::Direction_2<Kernel> dir_f = CGAL::Direction_2<Kernel>(f->other(v)->getPoint() - v->getPoint());
+					return dir_e < dir_f;
+					});
+			}
+		}
+		sorted = true;
+	}
+
+	template <class VD, class ED, typename K>
+	StraightVertex<VD, ED, K>* StraightGraph<VD, ED, K>::splitEdge(Edge* edge, Point<K> pt) {
+		assert(oriented && verifyOriented());
+
+		Vertex* v = new Vertex();
+		v->index = vertices.size();
+		v->point = Point<K>(pt.x(), pt.y());
+		vertices.push_back(v);
+
+		Vertex* w = edge->target;
+
+		edge->target = v;
+		v->incident.push_back(edge);
+
+		Edge* newedge = new Edge();
+		newedge->index = edges.size();
+		newedge->source = v;
+		newedge->target = w;
+		edges.push_back(newedge);
+
+		v->incident.push_back(newedge);
+		utils::listReplace(edge, newedge, w->incident);
+
+		return v;
+	}
+
+	template <class VD, class ED, typename K>
+	StraightEdge<VD, ED, K>* StraightGraph<VD, ED, K>::mergeVertex(Vertex* v) {
+		assert(oriented && verifyOriented());
+		assert(v->degree() == 2);
+
+		Edge* edge = v->incident[0]; // (u,v)
+		Edge* other = v->incident[1]; // (v,w)
+
+		// reroute edge and take its place in the other's target
+		edge->target = other->target;
+		utils::listReplace(other, edge, edge->target->incident);
+
+		// delete other edge: no need to remove from incident lists...
+		Edge* eswp = utils::swapRemove(other->index, edges);
+		if (eswp != nullptr) {
+			eswp->index = other->index;
+		}
+		delete other;
+
+		// delete the vertex: no need to clear edges anymore
+		Vertex* vswp = utils::swapRemove(v->index, vertices);
+		if (vswp != nullptr) {
+			vswp->index = v->index;
+		}
+		delete v;
+
+		return edge;
+
+	}
+	template <class VD, class ED, typename K>
+	void StraightGraph<VD, ED, K>::shiftVertex(Vertex* v, Point<K> pt) {
+		v->setPoint(pt);
+	}
+
+	template <class VD, class ED, typename K>
+	int StraightVertex<VD, ED, K>::graphIndex() {
+		return index;
+	}
+	template <class VD, class ED, typename K>
+	int StraightVertex<VD, ED, K>::degree() {
+		return incident.size();
+	}
+
+	template <class VD, class ED, typename K>
+	std::vector<StraightEdge<VD, ED, K>*>& StraightVertex<VD, ED, K>::getEdges() {
+		return incident;
+	}
+
+	template <class VD, class ED, typename K>
+	StraightEdge<VD, ED, K>* StraightVertex<VD, ED, K>::edge(int i) {
+		return incident[i];
+	}
+
+	template <class VD, class ED, typename K>
+	StraightVertex<VD, ED, K>* StraightVertex<VD, ED, K>::neighbor(int i) {
+		return incident[i]->other(this);
+	}
+
+	template <class VD, class ED, typename K>
+	bool StraightVertex<VD, ED, K>::isNeighborOf(Vertex* v) {
+		for (Edge* e : incident) {
+			if (e->other(this) == v) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	template <class VD, class ED, typename K>
+	VD& StraightVertex<VD, ED, K>::data() {
+		return d;
+	}
+
+	template <class VD, class ED, typename K>
+	void StraightVertex<VD, ED, K>::setPoint(Point<K>& pt) {
+		point = Point<K>(pt.x(), pt.y());
+	}
+
+	template <class VD, class ED, typename K>
+	Point<K>& StraightVertex<VD, ED, K>::getPoint() {
+		return point;
+	}
+
+	template <class VD, class ED, typename K>
+	StraightEdge<VD, ED, K>* StraightVertex<VD, ED, K>::incoming() {
+		assert(degree() == 2);
+		// assume oriented...
+		return incident[0];
+	}
+
+	template <class VD, class ED, typename K>
+	StraightEdge<VD, ED, K>* StraightVertex<VD, ED, K>::outgoing() {
+		assert(degree() == 2);
+		// assume oriented...
+		return incident[1];
+	}
+
+	template <class VD, class ED, typename K>
+	StraightVertex<VD, ED, K>* StraightVertex<VD, ED, K>::next() {
+		assert(degree() == 2);
+		// assume oriented...
+		return incident[1]->target;
+	}
+
+	template <class VD, class ED, typename K>
+	StraightVertex<VD, ED, K>* StraightVertex<VD, ED, K>::previous() {
+		assert(degree() == 2);
+		// assume oriented...
+		return incident[0]->source;
+	}
+
+
+
+	template <class VD, class ED, typename K>
+	int StraightEdge<VD, ED, K>::graphIndex() {
+		return index;
+	}
+
+	template <class VD, class ED, typename K>
+	StraightVertex<VD, ED, K>* StraightEdge<VD, ED, K>::getSource() {
+		return source;
+	}
+
+	template <class VD, class ED, typename K>
+	StraightVertex<VD, ED, K>* StraightEdge<VD, ED, K>::getTarget() {
+		return target;
+	}
+
+	template <class VD, class ED, typename K>
+	void StraightEdge<VD, ED, K>::reverse() {
+		Vertex* t = source;
+		source = target;
+		target = t;
+	}
+
+	template <class VD, class ED, typename K>
+	ED& StraightEdge<VD, ED, K>::data() {
+		return d;
+	}
+
+	template <class VD, class ED, typename K>
+	Segment<K> StraightEdge<VD, ED, K>::getSegment() {
+		return Segment<K>(source->point, target->point);
+	}
+
+	template <class VD, class ED, typename K>
+	StraightVertex<VD, ED, K>* StraightEdge<VD, ED, K>::other(Vertex* v) {
+		assert(v == source || v == target);
+
+		return v == source ? target : source;
+	}
+
+	template <class VD, class ED, typename K>
+	StraightVertex<VD, ED, K>* StraightEdge<VD, ED, K>::commonVertex(Edge* e) {
+		if (source == e->target || source == e->source) {
+			return source;
+		}
+		else if (target == e->target || target == e->source) {
+			return target;
+		}
+		else {
+			return nullptr;
+		}
+	}
+
+	template <class VD, class ED, typename K>
+	StraightEdge<VD, ED, K>* StraightEdge<VD, ED, K>::sourceWalk() {
+		assert(source->degree() == 2);
+		Edge* w = source->incident[0];
+		if (w == this) {
+			return source->incident[1];
+		}
+		else {
+			return w;
+		}
+	}
+
+	template <class VD, class ED, typename K>
+	StraightEdge<VD, ED, K>* StraightEdge<VD, ED, K>::targetWalk() {
+		assert(target->degree() == 2);
+		Edge* w = target->incident[0];
+		if (w == this) {
+			return target->incident[1];
+		}
+		else {
+			return w;
+		}
+	}
+
+	template <class VD, class ED, typename K>
+	StraightVertex<VD, ED, K>* StraightEdge<VD, ED, K>::sourceWalkNeighbor() {
+		Edge* e = sourceWalk();
+		return e->other(source);
+	}
+
+	template <class VD, class ED, typename K>
+	StraightVertex<VD, ED, K>* StraightEdge<VD, ED, K>::targetWalkNeighbor() {
+		Edge* e = targetWalk();
+		return e->other(target);
+	}
+
+} // namespace cartocrow::simplification

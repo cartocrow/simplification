@@ -11,4 +11,43 @@ namespace cartocrow::simplification::utils {
 
 		return Rectangle<Kernel>(left, bottom, right, top);
 	}
+
+	template<typename T>
+	bool listRemove(T* elt, std::vector<T*>& vec) {
+
+		auto pos = std::find(vec.begin(), vec.end(), elt);
+		if (pos != vec.end()) {
+			vec.erase(pos);
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+
+	template<typename T>
+	T* swapRemove(int index, std::vector<T*>& vec) {
+		if (index == vec.size() - 1) {
+			vec.pop_back();
+			return nullptr;
+		}
+		else {
+			vec[index] = vec[vec.size() - 1];
+			vec.pop_back();
+			return vec[index];
+		}
+	}
+
+	template<typename T>
+	void listReplace(T* oldelt, T* newelt, std::vector<T*>& vec) {
+		for (int i = 0; i < vec.size(); i++) {
+			if (vec[i] == oldelt) {
+				vec[i] = newelt;
+				return;
+			}
+
+		}
+		assert(false);
+
+	}
 }

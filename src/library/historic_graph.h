@@ -11,16 +11,10 @@ template <class G> struct Operation;
 template <class Graph> struct Operation {
 
 	using Edge = Graph::Edge;
-	using Vertex = Graph::Vertex;
-	using Op = Operation<Graph>;
 
-	Edge* pre_edge;
-	Op* past;
+	Edge* edge;
 
-	Operation(Edge* e) : pre_edge(e) {
-		past = e->data().hist;
-		e->data().hist = this;
-	}
+	Operation(Edge* e) : edge(e) {}
 
 	virtual void undo(Graph& g) = 0;
 	virtual void redo(Graph& g) = 0;
@@ -32,49 +26,62 @@ template <class Graph> struct SplitOperation : public Operation<Graph> {
 	using Vertex = Graph::Vertex;
 	using Op = Operation<Graph>;
 
-	SplitOperation(Edge* e, Point<typename Graph::Kernel> pt) : Operation<Graph>(e), post_loc(pt) {
-		post_edge_1 = nullptr;
-		post_edge_2 = nullptr;
-		future_1 = nullptr;
-		future_2 = nullptr;
+	SplitOperation(Edge* e, Point<typename Graph::Kernel> pt) : Operation<Graph>(e), loc(pt) {
+		// store the past
+		past = e->data().hist;
+		// we don't know the future yet
+		future_inc = nullptr;
+		future_out = nullptr;
 	}
 
-	// Result of the split
-	Edge* post_edge_1;
-	Edge* post_edge_2;
-	Point<typename Graph::Kernel> post_loc;
+	// if not yet performed / undone:
+	//   edge == the edge to split
+	// if performed / redone:
+	//   edge == incoming edge of the created vertex
 
-	// edge histories of the result
-	Op* future_1;
-	Op* future_2;
+	Point<typename Graph::Kernel> loc;
+	Op* past;
+	Op* future_inc;
+	Op* future_out;
 
 	virtual void undo(Graph& g) {
 
-		future_1 = post_edge_1->data().hist;
-		future_2 = post_edge_2->data().hist;
-			
-		Vertex* v = post_edge_1->commonVertex(post_edge_2);
+		// store the future
+		future_inc = this->edge->data().hist;
+		future_out = this->edge->getTarget()->outgoing()->data().hist;
 
-		Vertex* u;
-		Vertex* w;
-		if (v->edge(0)->getTarget() == v) {
-			u = v->neighbor(0);
-			w = v->neighbor(1);
-		}
-		else {
-			u = v->neighbor(1);
-			w = v->neighbor(0);
-		}
+		// perform and update this edge
+		this->edge = g.mergeVertex(this->edge->getTarget());
 
-		g.removeVertex(v);
-		this->pre_edge = g.addEdge(u, w);
-
-		if (this->past != nullptr) {
-			this->pre_edge->data().hist = this->past;
+		// update the past
+		this->edge->data().hist = past;
+		if (past != nullptr) {
+			past->edge = this->edge;
 		}
 	}
 
-	virtual void redo(Graph& g) {}
+	virtual void redo(Graph& g) {
+		perform(g);
+	}
+
+	Vertex* perform(Graph& g) {
+
+		// perform and update this edge
+		Vertex* v = g.splitEdge(this->edge, loc);
+		this->edge = v->incoming();
+
+		// update the future
+		v->incoming()->data().hist = future_inc;
+		v->outgoing()->data().hist = future_out;
+		if (future_inc != nullptr) {
+			future_inc->edge = v->incoming();
+		}
+		if (future_out != nullptr) {
+			future_out->edge = v->outgoing();
+		}
+
+		return v;
+	}
 };
 
 template <class Graph> struct EraseOperation : public Operation<Graph> {
@@ -83,62 +90,60 @@ template <class Graph> struct EraseOperation : public Operation<Graph> {
 	using Vertex = Graph::Vertex;
 	using Op = Operation<Graph>;
 
-	EraseOperation(Vertex* v) : Operation<Graph>(v->edge(0)) {
-		target = v == this->pre_edge->getTarget();
-		pre_loc = v->getPoint();
-		target_2 = v == v->edge(1)->getTarget();
-		past_2 = v->edge(1)->data().hist;
+	EraseOperation(Vertex* v) : Operation<Graph>(v->incoming()), loc(v->getPoint()) {
+		// store the past
+		past_inc = v->incoming()->data().hist;
+		past_out = v->outgoing()->data().hist;
+		// we don't know the future yet
+		future = nullptr;
 	}
 
-	bool target;
-	bool target_2;
-	Point<typename Graph::Kernel> pre_loc;
+	// if not yet performed / undone:
+	//   edge == incoming edge of the vertex to erase
+	// if performed / redone:
+	//   edge == the resulting edge
 
-	// edge histories of the input
-	Op* past_2 = nullptr;
-	// edge histories of the result
-	Op* future = nullptr;
+	Point<typename Graph::Kernel> loc;
+	Op* past_inc;
+	Op* past_out;
+	Op* future;
 
 	virtual void undo(Graph& g) {
 
-		Vertex* u = this->pre_edge->getSource();
-		Vertex* w = this->pre_edge->getTarget();
+		// store the future
+		future = this->edge->data().hist;
 
-		g.removeEdge(this->pre_edge);
+		// perform and update this edge
+		Vertex* v = g.splitEdge(this->edge, loc);
+		this->edge = v->incoming();
 
-		Vertex* v = g.addVertex(pre_loc);
-		if (target) {
-			this->pre_edge = g.addEdge(u, v);
+		// update the past
+		v->incoming()->data().hist = past_inc;
+		v->outgoing()->data().hist = past_out;
+		if (past_inc != nullptr) {
+			past_inc->edge = this->edge;
 		}
-		else {
-			this->pre_edge = g.addEdge(v, u);
-		}
-
-		Edge* edge_2;
-		if (target_2) {
-			edge_2 = g.addEdge(w, v);
-		}
-		else {
-			edge_2 = g.addEdge(v, w);
-		}
-
-		if (this->past != nullptr) {
-			this->past->pre_edge = this->pre_edge;
-		}
-
-		if (past_2 != nullptr) {
-			this->past->pre_edge = edge_2;
+		if (past_out != nullptr) {
+			past_out->edge = this->edge;
 		}
 	}
 
 	virtual void redo(Graph& g) {
+		perform(g);
+	}
 
-		Vertex* u = target ? this->pre_edge->getSource() : this->pre_edge->getTarget();
-		Vertex* v = target ? this->pre_edge->getTarget() : this->pre_edge->getSource();
-		Vertex* w = target ? this->pre_edge->targetWalkNeighbor() : this->pre_edge->sourceWalkNeighbor();
+	Edge* perform(Graph& g) {
 
-		g.removeVertex(v);
-		this->pre_edge = g.addEdge(u, w);
+		// perform and update this edge
+		this->edge = g.mergeVertex(this->edge->getTarget());
+
+		// update the future
+		this->edge->data().hist = future;
+		if (future != nullptr) {
+			future->edge = this->edge;
+		}
+
+		return this->edge;
 	}
 };
 
@@ -148,32 +153,45 @@ template <class Graph> struct ShiftOperation : public Operation<Graph> {
 	using Vertex = Graph::Vertex;
 	using Op = Operation<Graph>;
 
-	ShiftOperation(Vertex* v, Point<typename Graph::Kernel> pt) : Operation<Graph>(v.edge(0)) {
-		target = v == this->pre_edge->getTarget();
-		pre_loc = v->getPoint();
-		post_loc = pt;
+	ShiftOperation(Vertex* v, Point<typename Graph::Kernel> pt) : Operation<Graph>(v.incoming()), pre_loc(v->getPoint()), post_loc(pt) {	
+		// store the past
+		past = this->edge->data().hist;
+		// we don't know the future yet
+		future = nullptr;
 	}
 
-	// Input to the split
-	bool target;
+	// edge is always the incoming edge of v
+	Op* past;
+	Op* future;
+
 	Point<typename Graph::Kernel> pre_loc;
-	// Result of the split
 	Point<typename Graph::Kernel> post_loc;
 
 	virtual void undo(Graph& g) {
 
-		Vertex* v = target ? this->pre_edge->target() : this->pre_edge->source();
-		v->setPoint(pre_loc);
+		// store the future
+		future = this->edge->data().hist;
 
-		if (this->past != nullptr) {
-			this->past->pre_edge = this->pre_edge;
+		// perform (no need to update edge...)
+		this->edge->getTarget()->setPoint(pre_loc);
+
+		// update the past
+		this->edge->data().hist = past;
+		if (past != nullptr) {
+			past->edge = this->edge; // NB: we should keep doing this as the edge may have changed in the future
 		}
 	}
 
 	virtual void redo(Graph& g) {
 
-		Vertex* v = target ? this->pre_edge->target() : this->pre_edge->source();
-		v->setPoint(post_loc);
+		// perform (no need to update edge)
+		this->edge->getTarget()->setPoint(post_loc);
+
+		// update the future
+		this->edge->data().hist = future;
+		if (future != nullptr) {
+			future->edge = this->edge; // NB: we should keep doing this as the edge may have changed in the future
+		}
 	}
 };
 
@@ -240,6 +258,8 @@ class HistoricGraph {
 
   public:
 	HistoricGraph(Graph& graph) : graph(graph), max_cost(0) {
+		assert(graph.isOriented());
+
 		in_complexity = graph.getEdgeCount();
 	}
 
@@ -275,19 +295,19 @@ class HistoricGraph {
 		assert(building_batch != nullptr);
 
 		EraseOperation<Graph>* op = new EraseOperation<Graph>(v);
-		op->redo(graph);
+		Edge* e = op->perform(graph);
 		building_batch->operations.push_back(op);
 
-		return op->pre_edge;
+		return e;
 	}
 
 	Vertex* splitEdge(Edge* e, Point<Kernel> p) {
 
 		SplitOperation<Graph>* op = new SplitOperation<Graph>(e, p);
-		op->redo(graph);
+		Vertex* v = op->perform(graph);
 		building_batch->operations.push_back(op);
 
-		return op->post_edge_1->commonVertex(op->post_edge_2);
+		return v;
 	}
 
 	void shiftVertex(Vertex* v, Point<Kernel> p) {

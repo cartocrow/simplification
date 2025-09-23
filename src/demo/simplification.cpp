@@ -2,7 +2,7 @@
 #include "library/segment_quad_tree.h"
 #include "library/straight_graph.h"
 
-#include "library/vw_simplification.h"
+#include "library/vertex_removal.h"
 
 #include <iostream>
 
@@ -40,6 +40,10 @@ void testVW() {
 	g->addEdge(d, e);
 	g->addEdge(e, f);
 	g->addEdge(f, a);
+
+	g->orient();
+
+	assert(g->isOriented());
 
 	std::cout << "PRE " << g->getVertexCount() << "\n";
 	for (MyVertex* v : g->getVertices()) {
@@ -97,6 +101,8 @@ void testHistoricVW() {
 	g->addEdge(d, e);
 	g->addEdge(e, f);
 	g->addEdge(f, a);
+
+	g->orient();
 
 	std::cout << "PRE " << g->getVertexCount() << "\n";
 	for (MyVertex* v : g->getVertices()) {

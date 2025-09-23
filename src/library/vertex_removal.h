@@ -2,7 +2,6 @@
 
 #include <cartocrow/core/core.h>
 
-#include "utils.h"
 #include "point_quad_tree.h"
 #include "straight_graph.h"
 #include "indexed_priority_queue.h"
@@ -86,7 +85,6 @@ namespace cartocrow::simplification {
 			IndexedPriorityQueue<Vertex, detail::VRQueueTraits<Vertex, Kernel>> queue;
 
 			void update(Vertex* v);
-
 		public:
 			VertexRemoval(MG& g, PointQuadTree<Vertex, Kernel>& qt) : graph(g), pqt(qt) {}
 			~VertexRemoval() {}
@@ -95,6 +93,27 @@ namespace cartocrow::simplification {
 			bool runToComplexity(int k);
 			bool step();
 	};
+
+
+	/// <summary>
+	/// Traits for running VisvalingamWhyatt vertex-removal algorithms. The cost is equal to the area of the spanned triangle.
+	/// </summary>
+	/// <typeparam name="G">The graph type for the algorithm</typeparam>
+	template <typename G> struct VisvalingamWhyattTraits {
+		using Kernel = G::Kernel;
+
+		static Number<Kernel> getCost(typename G::Vertex* v) {
+			return CGAL::abs(
+				CGAL::area(v->getPoint(), v->previous()->getPoint(), v->next()->getPoint()));
+		}
+	};
+
+	/// <summary>
+	/// Shorthand for the VisvalingamWhyatt vertex-removal algorithm.
+	/// </summary>
+	/// <typeparam name="G">The graph type for the algorithm</typeparam>
+	template <typename G>
+	using VisvalingamWhyatt = VertexRemoval<G, VisvalingamWhyattTraits<G>>;
 
 } // namespace cartocrow::simplification
 

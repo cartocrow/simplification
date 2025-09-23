@@ -3,22 +3,24 @@
 // Do not include this file, but the .h file instead
 // -----------------------------------------------------------------------------
 
+#include "utils.h"
+
 namespace cartocrow::simplification {
 
 	namespace detail {
-		template <typename K> struct VRData {
-			Number<typename K> cost;
-			std::vector<typename VertexRemovalGraph<K>::Vertex*> blocked_by;
-			std::vector<typename VertexRemovalGraph<K>::Vertex*> blocking;
+		template <class V, typename K>
+		struct VRBase {
+			Number<K> cost;
+			std::vector<V*> blocked_by;
+			std::vector<V*> blocking;
 			int qid;
 		};
 
+		template <typename K> struct VRData : VRBase<typename VertexRemovalGraph<K>::Vertex, K> {
+		};
 
-		template <typename K> struct HVRData {
-			Number<typename K> cost;
-			std::vector<typename HVRGraph<K>::Vertex*> blocked_by;
-			std::vector<typename HVRGraph<K>::Vertex*> blocking;
-			int qid;
+
+		template <typename K> struct HVRData : VRBase<typename HVRGraph<K>::Vertex, K> {
 		};
 
 		template <typename K> struct HVREdge {
@@ -29,15 +31,15 @@ namespace cartocrow::simplification {
 		template<class Vertex, class Kernel>
 		struct VRQueueTraits {
 
-			static void setIndex(Vertex * elt, int index) {
+			static void setIndex(Vertex* elt, int index) {
 				elt->data().qid = index;
 			}
 
-			static int getIndex(Vertex * elt) {
+			static int getIndex(Vertex* elt) {
 				return elt->data().qid;
 			}
 
-			static int compare(Vertex * a, Vertex * b) {
+			static int compare(Vertex* a, Vertex* b) {
 				Number<Kernel> ac = a->data().cost;
 				Number<Kernel> bc = b->data().cost;
 				if (ac < bc) {
@@ -55,6 +57,7 @@ namespace cartocrow::simplification {
 
 	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
 	void VertexRemoval<MG, VRT>::initialize(bool initQuadTree) {
+
 		if (initQuadTree) {
 			pqt.clear();
 			for (Vertex* v : graph.getVertices()) {
@@ -88,8 +91,8 @@ namespace cartocrow::simplification {
 
 			std::cout << "trying " << v->getPoint();
 
-			Vertex* u = v->neighbor(0);
-			Vertex* w = v->neighbor(1);
+			Vertex* u = v->previous();
+			Vertex* w = v->next();
 
 			// test whether the operation is blocked
 			Point<Kernel>& up = u->getPoint();
@@ -97,7 +100,7 @@ namespace cartocrow::simplification {
 			Point<Kernel>& wp = w->getPoint();
 			Triangle<Kernel> T(up, vp, wp);
 
-			Rectangle<Kernel> rect = utils::boxOf<Kernel>(up, vp, wp);
+			Rectangle<Kernel> rect = utils::boxOf(up, vp, wp);
 
 			pqt.findContained(rect, [&T, &u, &v, &w](Vertex& b) {
 				if (&b != u && &b != v && &b != w && !T.has_on_unbounded_side(b.getPoint())) {
@@ -116,10 +119,7 @@ namespace cartocrow::simplification {
 				pqt.remove(*v);
 				for (Vertex* b : v->data().blocking) {
 
-					auto position =
-						std::find(b->data().blocked_by.begin(), b->data().blocked_by.end(), v);
-					if (position != b->data().blocked_by.end()) {
-						b->data().blocked_by.erase(position);
+					if (utils::listRemove(v, b->data().blocked_by)) {
 						if (b->data().blocked_by.empty()) {
 							queue.push(b);
 						}
@@ -167,15 +167,13 @@ namespace cartocrow::simplification {
 
 		// clear topology
 		for (Vertex* b : v->data().blocked_by) {
-			auto position = std::find(b->data().blocking.begin(), b->data().blocking.end(), v);
-			if (position != b->data().blocking.end()) {
-				b->data().blocking.erase(position);
-			}
+			utils::listRemove(v, b->data().blocking);
 		}
 		v->data().blocked_by.clear();
 
-		Vertex* u = v->neighbor(0);
-		Vertex* w = v->neighbor(1);
+		Vertex* u = v->previous();
+		Vertex* w = v->next();
+
 		if (u->isNeighborOf(w)) {
 			queue.remove(u);
 			return;
