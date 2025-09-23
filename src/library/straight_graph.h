@@ -31,7 +31,6 @@ namespace cartocrow::simplification {
 
 	public:
 		StraightGraph();
-
 		~StraightGraph();
 
 		bool isOriented();
@@ -52,10 +51,11 @@ namespace cartocrow::simplification {
 		void orient();
 
 		/// <summary>
-		/// Sorts the edges at each vertex with degree > 2 in counter-clockwise order.		/// 
+		/// Sorts the edges at each vertex with degree > 2 in counter-clockwise order.		
 		/// </summary>
 		void sortIncidentEdges();
 
+		// functions below are only correct in an oriented graph; they maintain orientation and sortedness
 		Vertex* splitEdge(Edge* edge, Point<K> pt);
 		Edge* mergeVertex(Vertex* v);
 		void shiftVertex(Vertex* v, Point<K> pt);
@@ -92,6 +92,7 @@ namespace cartocrow::simplification {
 		void setPoint(Point<K>& pt);
 		Point<K>& getPoint();
 
+		// functions below are only for deg-2 vertices in an oriented graph
 		Edge* incoming();
 		Edge* outgoing();
 		Vertex* next();
@@ -131,6 +132,10 @@ namespace cartocrow::simplification {
 		Edge* targetWalk();
 		Vertex* sourceWalkNeighbor();
 		Vertex* targetWalkNeighbor();
+
+		// functions below are only for deg-2 vertices in an oriented graph
+		Edge* next();
+		Edge* previous();
 	};
 
 } // namespace cartocrow::simplification

@@ -450,4 +450,14 @@ namespace cartocrow::simplification {
 		return e->other(target);
 	}
 
+	template <class VD, class ED, typename K>
+	StraightEdge<VD, ED, K>* StraightEdge<VD, ED, K>::previous() {
+		return source->incoming();
+	}
+
+	template <class VD, class ED, typename K>
+	StraightEdge<VD, ED, K>* StraightEdge<VD, ED, K>::next() {
+		return target->outgoing();
+	}
+
 } // namespace cartocrow::simplification

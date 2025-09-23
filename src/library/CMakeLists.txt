@@ -9,6 +9,8 @@ set(HEADERS
 	point_quad_tree.h
 	segment_quad_tree.h
 
+	common.h
+
 	modifiable_graph.h
 	oblivious_graph.h
 	historic_graph.h

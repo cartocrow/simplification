@@ -48,7 +48,7 @@ template <class Graph> struct SplitOperation : public Operation<Graph> {
 
 		// store the future
 		future_inc = this->edge->data().hist;
-		future_out = this->edge->getTarget()->outgoing()->data().hist;
+		future_out = this->edge->next()->data().hist;
 
 		// perform and update this edge
 		this->edge = g.mergeVertex(this->edge->getTarget());

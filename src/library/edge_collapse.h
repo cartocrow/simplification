@@ -2,460 +2,100 @@
 
 #include <cartocrow/core/core.h>
 
+#include "point_quad_tree.h"
+#include "segment_quad_tree.h"
+#include "straight_graph.h"
 #include "indexed_priority_queue.h"
+#include "modifiable_graph.h"
+#include "historic_graph.h"
+
+#include "common.h"
 
 namespace cartocrow::simplification {
 
-class ECVertexData {
-	// nothing to store for a vertex
-};
+	namespace detail {
+		template <class MG, class ECT>
+		concept ECSetup = requires(MG::Edge * e) {
+			requires ModifiableGraph<MG>;
 
-template <typename K> class ECData;
-template <typename K> using ECGraph = StraightGraph<ECVertexData, ECData<K>, K>;
-template <typename K> using ECVertex = StraightVertex<ECVertexData, ECData<K>, K>;
-template <typename K> using ECEdge = StraightEdge<ECVertexData, ECData<K>, K>;
+			requires std::same_as<typename MG::Kernel, typename ECT::Kernel>;
 
-template <typename K> struct Collapse {
-	bool erase_both;
-	Point<K> point;
-	Polygon<K> T1, T2;
-};
+		{
+			e->data().cost
+		} -> std::same_as<Number<typename MG::Kernel>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
 
-template <class ECT, typename K> concept EdgeCollapseTraits = requires(ECEdge<K> * e) {
+		{
+			e->data().blocked_by
+		} -> std::same_as<std::vector<typename MG::Edge*>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
 
-	{ECT::determineCollapse(e)};
-};
+		{
+			e->data().blocking
+		} -> std::same_as<std::vector<typename MG::Edge*>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
 
-template <class ECT, typename K> requires EdgeCollapseTraits<ECT, K> class EdgeCollapse;
+		{
+			e->data().qid
+		} -> std::same_as<int&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
 
-template <typename K> struct ECQueueTraits;
 
-template <typename K> class ECData {
-	// collapse information (public, such that custom traits can set them)
-  public:
-	bool erase_both; // special case: both endpoints are to be removed
-	Point<K> point; // general case: endpoints merge onto this point
-	bool creates_difference; // special case: when the edge is collinear with its neighbors, there are no difference-triangles
-	Triangle<K> T1, T2; // the two triangles of difference
-	Number<K> cost; // the cost of the collapse
+		{
+			ECT::determineCollapse(e)
+		};
+		};
 
-  private:
-	// blocking information
-	bool blocked_by_degzero;
-	std::vector<ECEdge<K>*> blocked_by;
-	std::vector<ECEdge<K>*> blocking;
+		template <typename K> struct ECData;
+		template <typename K> struct HECData;
 
-	// queue information
-	int qid;
-
-	template <class ECT, typename K> requires EdgeCollapseTraits<ECT, K> friend class EdgeCollapse;
-
-	friend class ECQueueTraits<K>;
-};
-
-template <typename K> struct ECQueueTraits {
-
-	static void setIndex(ECEdge<K>* elt, int index) {
-		elt->data().qid = index;
+		template<typename K>
+		using HECGraph = StraightGraph<VoidData, HECData<K>, K>;
 	}
 
-	static int getIndex(ECEdge<K>* elt) {
-		return elt->data().qid;
-	}
-
-	static int compare(ECEdge<K>* a, ECEdge<K>* b) {
-		Number<K> ac = a->data().cost;
-		Number<K> bc = b->data().cost;
-		if (ac < bc) {
-			return -1;
-		} else if (ac > bc) {
-			return 1;
-		} else {
-			return 0;
-		}
-	}
-};
-
-template <class ECT, typename K> requires EdgeCollapseTraits<ECT, K> class EdgeCollapse {
-
-  private:
-	ECGraph<K>& graph;
-	SegmentQuadTree<ECEdge<K>, K>& sqt;
-	PointQuadTree<ECVertex<K>, K>& pqt;
-	IndexedPriorityQueue<ECEdge<K>, ECQueueTraits<K>> queue;
-
-	void update(ECEdge<K>* e) {
-
-		// last condition checks for a triangle
-		if (e->getSource()->degree() != 2 || e->getTarget()->degree() != 2 ||
-		    e->sourceWalkNeighbor() == e->targetWalkNeighbor()) {
-			queue.remove(e);
-			return;
-		}
-
-		ECT::determineCollapse(e);
-
-		ECData<K>& edata = e->data();
-
-		// clear topology
-		for (ECEdge<K>* b : edata.blocked_by) {
-			auto position = std::find(b->data().blocking.begin(), b->data().blocking.end(), e);
-			if (position != b->data().blocking.end()) {
-				b->data().blocking.erase(position);
-			}
-		}
-		edata.blocked_by.clear();
-
-		if (queue.contains(e)) {
-			queue.update(e);
-		} else {
-			queue.push(e);
-		}
-	}
-
-	Rectangle<K> boxOf(Triangle<K>& T1, Triangle<K>& T2) {
-
-		Number<K> left = CGAL::min(CGAL::min(T1[0].x(), CGAL::min(T1[1].x(), T1[2].x())),
-		                           CGAL::min(T2[0].x(), CGAL::min(T2[1].x(), T2[2].x())));
-		Number<K> right = CGAL::max(CGAL::max(T1[0].x(), CGAL::max(T1[1].x(), T1[2].x())),
-		                            CGAL::max(T2[0].x(), CGAL::max(T2[1].x(), T2[2].x())));
-
-		Number<K> bottom = CGAL::min(CGAL::min(T1[0].y(), CGAL::min(T1[1].y(), T1[2].y())),
-		                             CGAL::min(T2[0].y(), CGAL::min(T2[1].y(), T2[2].y())));
-		Number<K> top = CGAL::max(CGAL::max(T1[0].y(), CGAL::max(T1[1].y(), T1[2].y())),
-		                          CGAL::max(T2[0].y(), CGAL::max(T2[1].y(), T2[2].y())));
-
-		return Rectangle<K>(left, bottom, right, top);
-	}
-
-	bool blocks(ECEdge<K>& edge, ECEdge<K>* collapse) {
-		ECEdge<K>* prev = collapse->sourceWalk();
-		ECEdge<K>* next = collapse->targetWalk();
-
-		if (&edge == collapse || &edge == prev || &edge == next) {
-			// involved in collapse
-			return false;
-		}
-
-		ECVertex<K>* prev_v = collapse->sourceWalkNeighbor();
-		ECVertex<K>* next_v = collapse->targetWalkNeighbor();
-
-		bool source_shared = edge.getSource() == prev_v || edge.getSource() == next_v;
-		bool target_shared = edge.getTarget() == prev_v || edge.getTarget() == next_v;
-
-		auto is_1 = CGAL::intersection(collapse->data().T1, edge.getSegment());
-		if (is_1) {
-			if (Point<K>* pt = std::get_if<Point<K>>(&*is_1)) {
-				// make sure it's not the common point
-				if (!(source_shared && *pt == edge.getSource()->getPoint()) &&
-				    !(target_shared && *pt == edge.getTarget()->getPoint())) {
-					return true;
-				}
-			} else {
-				// proper overlap, definitely blocking
-				return true;
-			}
-		} // no intersection
-
-		auto is_2 = CGAL::intersection(collapse->data().T2, edge.getSegment());
-		if (is_2) {
-			if (Point<K>* pt = std::get_if<Point<K>>(&*is_2)) {
-				// make sure it's not the common point
-				if (!(source_shared && *pt == edge.getSource()->getPoint()) &&
-				    !(target_shared && *pt == edge.getTarget()->getPoint())) {
-					return true;
-				}
-			} else {
-				// proper overlap, definitely blocking
-				return true;
-			}
-		} // no intersection
-
-		return false;
-	}
-
-  public:
-	EdgeCollapse(ECGraph<K>& g, SegmentQuadTree<ECEdge<K>, K>& sqt, PointQuadTree<ECVertex<K>, K>& pqt)
-	    : graph(g), sqt(sqt), pqt(pqt) {}
-	~EdgeCollapse() {	}
-
-	void initialize(bool initSQT, bool initPQT) {
-		if (initSQT) {
-			for (ECEdge<K>* e : graph.getEdges()) {
-				sqt.insert(*e);
-			}
-		}
-
-		if (initPQT) {
-			for (ECVertex<K>* v : graph.getVertices()) {
-				if (v->degree() == 0) {
-					pqt.insert(*v);
-				}
-			}
-		}
-
-		for (ECEdge<K>* e : graph.getEdges()) {
-			update(e);
-		}
-	}
-
-	bool runToComplexity(int k) {
-		while (graph.getEdgeCount() > k) {
-			if (!step()) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	bool step() {
-		while (!queue.empty()) {
-			ECEdge<K>* e = queue.pop();
-
-			std::cout << "trying " << e->getSegment();
-
-			ECData<K>& edata = e->data();
-
-			if (edata.creates_difference) {
-				// possibly blocked?
-
-				Rectangle<K> rect = boxOf(edata.T1, edata.T2);
-
-				edata.blocked_by_degzero = false;
-
-				pqt.findContained(rect, [&edata](ECVertex<K>& b) {
-					if (!edata.T1.has_on_unbounded_side(b.getPoint()) ||
-					    !edata.T2.has_on_unbounded_side(b.getPoint())) {
-						// blocked, by an unmovable vertex
-						edata.blocked_by_degzero = true;
-					}
-				});
-
-				if (!edata.blocked_by_degzero) {
-
-					sqt.findOverlapped(rect, [this, &e](ECEdge<K>& b) {
-						if (blocks(b, e)) {
-							b.data().blocking.push_back(e);
-							e->data().blocked_by.push_back(&b);
-						}
-					});
-				}
-
-			} // else: no difference, cannot be blocked
-
-			if (!edata.blocked_by_degzero && edata.blocked_by.empty()) {
-
-				std::cout << " -> collapsing!\n";
-				// not blocked, executing!
-
-				// remove from blocking lists and search structure
-				ECEdge<K>* prev = e->sourceWalk();
-				ECEdge<K>* next = e->targetWalk();
-				sqt.remove(*e);
-				sqt.remove(*prev);
-				sqt.remove(*next);
-
-				queue.remove(prev);
-				queue.remove(next);
-
-				for (ECEdge<K>* b : edata.blocking) {
-
-					auto position =
-					    std::find(b->data().blocked_by.begin(), b->data().blocked_by.end(), e);
-					if (position != b->data().blocked_by.end()) {
-						b->data().blocked_by.erase(position);
-						if (b->data().blocked_by.empty() && !b->data().blocked_by_degzero) {
-							queue.push(b);
-						}
-					}
-				}
-
-				ECVertex<K>* a = e->sourceWalkNeighbor();
-				ECVertex<K>* b = e->getSource();
-				ECVertex<K>* c = e->getTarget();
-				ECVertex<K>* d = e->targetWalkNeighbor();
-
-				if (edata.erase_both) {
-					// perform the collapse
-					graph.removeVertex(b);
-					graph.removeVertex(c);
-					ECEdge<K>* ne = graph.addEdge(a, b);
-
-					// insert the one new edge
-					sqt.insert(*ne);
-
-					// update it and its neighbors, if applicable
-					update(ne);
-					if (ne->getSource()->degree() == 2) {
-						update(ne->sourceWalk());
-					}
-					if (ne->getTarget()->degree() == 2) {
-						update(ne->targetWalk());
-					}
-				} else {
-
-					// NB: edata will be erased on removing vertex b, hence, we need a local copy
-					Point<K> pt = edata.point;
-
-					// perform the collapse
-					graph.removeVertex(b);
-					ECEdge<K>* ne = graph.addEdge(a, c);
-					ECEdge<K>* ne2 = ne->targetWalk();
-
-					c->setPoint(pt);
-
-					// insert the two "new" edges
-					sqt.insert(*ne);
-					sqt.insert(*ne2);
-
-					// update them and their neighbors, if applicable
-					update(ne);
-					update(ne2);
-
-					if (ne->getSource()->degree() == 2) {
-						update(ne->sourceWalk());
-					}
-					if (ne2->getTarget()->degree() == 2) {
-						update(ne2->targetWalk());
-					}
-				}
-
-				return true;
-			} else {
-				std::cout << " -> blocked by " << edata.blocked_by.size()
-				          << " edges and by degzero: " << edata.blocked_by_degzero << " \n ";
-			}
-		}
-
-		return false;
-	}
-};
-
-
-template <typename K> struct KronenfeldEtAlTraits {
-	static void determineCollapse(ECEdge<K>* e) {
-		ECData<K>& edata = e->data();
-
-		Point<K> a = e->sourceWalkNeighbor()->getPoint();
-		Point<K> b = e->getSource()->getPoint();
-		Point<K> c = e->getTarget()->getPoint();
-		Point<K> d = e->targetWalkNeighbor()->getPoint();
-
-		bool abc = CGAL::collinear(a, b, c);
-		bool bcd = CGAL::collinear(b, c, d);
-		if (abc && bcd) {
-			edata.erase_both = true;
-			edata.creates_difference = false;
-			edata.cost = 0;
-			return;
-		}
-		else if (abc) {
-			edata.erase_both = false;
-			edata.creates_difference = false;
-			edata.cost = 0;
-			edata.point = c;
-			return;
-		}
-		else if (bcd) {
-			edata.erase_both = false;
-			edata.creates_difference = false;
-			edata.cost = 0;
-			edata.point = b;
-			return;
-		}
-
-		// else, no consecutive collinear edges
-		edata.creates_difference = true;
-
-		Polygon<K> P;
-		P.push_back(a);
-		P.push_back(b);
-		P.push_back(c);
-		P.push_back(d);
-
-		Line<K> ad(a, d);
-		Line<K> ab(a, b);
-		Line<K> bc(b, c);
-		Line<K> cd(c, d);
-
-		// area = base * height / 2
-		// height = 2*area / base
-		// so, we're going to rotate the vector d-a, such that we get a normal of length |d-a| = base.
-		// To get a vector of length height, we then multiply this vector with height_times_base / base^2.
-		// This normalized the vector and makes it length height! (without squareroots...)
-		Number<K> height_times_base = 2 * P.area();
-
-		Vector<K> perpv = (d - a).perpendicular(CGAL::CLOCKWISE);
-
-		CGAL::Aff_transformation_2<K> s(CGAL::SCALING, height_times_base / perpv.squared_length());
-		perpv = perpv.transform(s);
-
-		CGAL::Aff_transformation_2<K> t(CGAL::TRANSLATION, perpv);
-		Line<K> arealine = ad.transform(t);
-
-		if (ad.has_on_boundary(arealine.point())) {
-
-			// these should be caught already by the collinearity checks earlier
-			assert(!ad.has_on_boundary(b));
-			assert(!ad.has_on_boundary(c));
-
-			edata.erase_both = true;
-
-			// implies that neither b nor c is on ad
-			auto intersection = CGAL::intersection(bc, ad);
-			Point<K> pt = std::get<Point<K>>(*intersection);
-
-			edata.T1 = Triangle<K>(a, b, pt);
-			edata.T2 = Triangle<K>(c, d, pt);
-
-		}
-		else {
-			edata.erase_both = false;
-
-			bool ab_determines_shape;
-			// determine type
-			if (ad.has_on_positive_side(b) == ad.has_on_positive_side(c)) {
-				// same side of ab, so further point determines
-				ab_determines_shape = CGAL::squared_distance(b, ad) > CGAL::squared_distance(c, ad);
-			}
-			else {
-				// opposite sides of ad, so the one that is on same side as area line
-				ab_determines_shape =
-					ad.has_on_positive_side(b) == ad.has_on_positive_side(arealine.point());
-			}
-
-			// configure type
-			if (ab_determines_shape) {
-
-				auto intersection = CGAL::intersection(arealine, ab);
-				edata.point = std::get<Point<K>>(*intersection);
-
-				Segment<K> ns = Segment<K>(edata.point, d);
-				auto intersection2 = CGAL::intersection(bc, ns);
-				Point<K> is = std::get<Point<K>>(*intersection2);
-
-				edata.T1 = Triangle<K>(b, is, edata.point);
-				edata.T2 = Triangle<K>(c, d, is);
-
-			}
-			else {
-				auto intersection = CGAL::intersection(arealine, cd);
-				edata.point = std::get<Point<K>>(*intersection);
-
-				Segment<K> ns = Segment<K>(edata.point, a);
-				auto intersection2 = CGAL::intersection(bc, ns);
-				Point<K> is = std::get<Point<K>>(*intersection2);
-
-				edata.T1 = Triangle<K>(a, b, is);
-				edata.T2 = Triangle<K>(c, is, edata.point);
-			}
-		}
-
-		// since it is an area preserving method, T1 and T2 have the same area
-		edata.cost = 2 * CGAL::abs(edata.T1.area());
-	}
-};
-
-template <typename K> using KronenfeldEtAl = EdgeCollapse<KronenfeldEtAlTraits<K>, K>;
+	/// <summary>
+	/// Graph type that can be used with the EdgeCollapse implementation. This variant is oblivious: changes made to the graph are not recoverable.
+	/// </summary>
+	/// <typeparam name="K">Desired CGAL kernel</typeparam>
+	template<typename K>
+	using EdgeCollapseGraph = StraightGraph<VoidData, detail::ECData<K>, K>;
+
+	/// <summary>
+	/// Graph type that can be used with the EdgeCollapse implementation. This variant is historic: changes made to the graph can be undone and redone to retrieve intermediate steps.
+	/// </summary>
+	/// <typeparam name="K">Desired CGAL kernel</typeparam>
+	template<typename K>
+	using HistoricEdgeCollapseGraph = HistoricGraph<detail::HECGraph<K>>;
+
+
+	template <class MG, class ECT> requires detail::ECSetup<MG, ECT> class EdgeCollapse {
+	public:
+		using Vertex = MG::Vertex;
+		using Edge = MG::Edge;
+		using Kernel = MG::Kernel;
+	private:
+		MG& graph;
+		SegmentQuadTree<Edge, Kernel>& sqt;
+		PointQuadTree<Vertex, Kernel>& pqt;
+		IndexedPriorityQueue<Edge, GraphQueueTraits<Edge, Kernel>> queue;
+
+		void update(Edge* e);
+		bool blocks(Edge& edge, Edge* collapse);
+
+	public:
+		EdgeCollapse(MG& g, SegmentQuadTree<Edge, Kernel>& sqt, PointQuadTree<Vertex, Kernel>& pqt);
+		~EdgeCollapse();
+
+		void initialize(bool initSQT, bool initPQT);
+		bool runToComplexity(int k);
+		bool step();
+	};
+
+
+	template <typename G> struct KronenfeldEtAlTraits {
+		using Kernel = G::Kernel;
+
+		static void determineCollapse(typename G::Edge* e);
+	};
+
+	template <typename G> using KronenfeldEtAl = EdgeCollapse<G, KronenfeldEtAlTraits<G>>;
 
 } // namespace cartocrow::simplification
+
+#include "edge_collapse.hpp"

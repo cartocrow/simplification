@@ -8,6 +8,8 @@
 #include "modifiable_graph.h"
 #include "historic_graph.h"
 
+#include "common.h"
+
 namespace cartocrow::simplification {
 
 	namespace detail {
@@ -48,9 +50,6 @@ namespace cartocrow::simplification {
 
 		template<typename K>
 		using HVRGraph = StraightGraph<HVRData<K>, HVREdge<K>, K>;
-
-		template<class Vertex, class Kernel>
-		struct VRQueueTraits;
 	}
 
 	/// <summary>
@@ -82,7 +81,7 @@ namespace cartocrow::simplification {
 		private:
 			MG& graph;
 			PointQuadTree<Vertex, Kernel>& pqt;
-			IndexedPriorityQueue<Vertex, detail::VRQueueTraits<Vertex, Kernel>> queue;
+			IndexedPriorityQueue<Vertex, GraphQueueTraits<Vertex, Kernel>> queue;
 
 			void update(Vertex* v);
 		public:
@@ -102,10 +101,7 @@ namespace cartocrow::simplification {
 	template <typename G> struct VisvalingamWhyattTraits {
 		using Kernel = G::Kernel;
 
-		static Number<Kernel> getCost(typename G::Vertex* v) {
-			return CGAL::abs(
-				CGAL::area(v->getPoint(), v->previous()->getPoint(), v->next()->getPoint()));
-		}
+		static Number<Kernel> getCost(typename G::Vertex* v);
 	};
 
 	/// <summary>

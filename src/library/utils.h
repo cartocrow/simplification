@@ -1,15 +1,33 @@
 #pragma once
 
+#include <cartocrow/core/core.h>
+
 namespace cartocrow::simplification::utils {
 
-	template <typename Kernel>
-	Rectangle<Kernel> boxOf(Point<Kernel>& a, Point<Kernel>& b, Point<Kernel>& c) {
-		Number<Kernel> left = CGAL::min(a.x(), CGAL::min(b.x(), c.x()));
-		Number<Kernel> right = CGAL::max(a.x(), CGAL::max(b.x(), c.x()));
-		Number<Kernel> bottom = CGAL::min(a.y(), CGAL::min(b.y(), c.y()));
-		Number<Kernel> top = CGAL::max(a.y(), CGAL::max(b.y(), c.y()));
+	template <typename K>
+	Rectangle<K> boxOf(Point<K>& a, Point<K>& b, Point<K>& c) {
+		Number<K> left = CGAL::min(a.x(), CGAL::min(b.x(), c.x()));
+		Number<K> right = CGAL::max(a.x(), CGAL::max(b.x(), c.x()));
+		Number<K> bottom = CGAL::min(a.y(), CGAL::min(b.y(), c.y()));
+		Number<K> top = CGAL::max(a.y(), CGAL::max(b.y(), c.y()));
 
-		return Rectangle<Kernel>(left, bottom, right, top);
+		return Rectangle<K>(left, bottom, right, top);
+	}
+
+	template<typename K>
+	Rectangle<K> boxOf(Triangle<K>& T1, Triangle<K>& T2) {
+
+		Number<K> left = CGAL::min(CGAL::min(T1[0].x(), CGAL::min(T1[1].x(), T1[2].x())),
+			CGAL::min(T2[0].x(), CGAL::min(T2[1].x(), T2[2].x())));
+		Number<K> right = CGAL::max(CGAL::max(T1[0].x(), CGAL::max(T1[1].x(), T1[2].x())),
+			CGAL::max(T2[0].x(), CGAL::max(T2[1].x(), T2[2].x())));
+
+		Number<K> bottom = CGAL::min(CGAL::min(T1[0].y(), CGAL::min(T1[1].y(), T1[2].y())),
+			CGAL::min(T2[0].y(), CGAL::min(T2[1].y(), T2[2].y())));
+		Number<K> top = CGAL::max(CGAL::max(T1[0].y(), CGAL::max(T1[1].y(), T1[2].y())),
+			CGAL::max(T2[0].y(), CGAL::max(T2[1].y(), T2[2].y())));
+
+		return Rectangle<K>(left, bottom, right, top);
 	}
 
 	template<typename T>
