@@ -1,5 +1,7 @@
+#include "library/indexed_priority_queue.h"
 #include "library/point_quad_tree.h"
 #include "library/segment_quad_tree.h"
+
 #include "library/straight_graph.h"
 
 #include "library/vertex_removal.h"
@@ -215,12 +217,66 @@ void testKSBB() {
 	std::cout << "done KSBB test\n";
 }
 
+
+void testQueue() {
+
+	struct MyElt {
+		int v;
+		int id;
+
+		MyElt(int v) : v(v), id(-1) {}
+	};
+
+	struct MyQueueTraits {
+		using Element = MyElt;
+
+		static void setIndex(Element* e, int id) {
+			e->id = id;
+		}
+
+		static int getIndex(Element* e) {
+			return e->id;
+		}
+
+		static int compare(Element* e, Element* f) {
+			if (e->v == f->v) {
+				return 0;
+			}
+			else if (e->v < f->v) {
+				return -1;
+			}
+			else {
+				return 1;
+			}
+		}
+	};
+
+	using MyQueue = IndexedPriorityQueue<MyQueueTraits>;
+	
+	MyQueue q;
+
+	MyElt e(1);
+	MyElt f(3);
+	MyElt g(2);
+
+	q.push(&f);
+	q.push(&g);
+	q.push(&e);
+
+	while (!q.empty()) {
+		MyElt* elt = q.pop();
+		std::cout << " " << elt->v;
+	}
+}
+
 int main(int argc, char** argv) {
 
-	//testVW();
+	testVW();
 
-	//testHistoricVW();
+	testHistoricVW();
 
 	testKSBB();
+
+	testQueue();
 	
 }

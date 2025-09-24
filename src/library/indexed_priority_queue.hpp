@@ -5,11 +5,11 @@
  
 namespace cartocrow::simplification {
 
-	template <class T, class QT> requires QueueTraits<T, QT>
-	void IndexedPriorityQueue<T, QT>::siftUp(int k, T* elt) {
+	template <QueueTraits QT>
+	void IndexedPriorityQueue<QT>::siftUp(int k, Element* elt) {
 		while (k > 0) {
 			int parent = (k - 1) >> 1;
-			T* e = queue[parent];
+			Element* e = queue[parent];
 			if (QT::compare(elt, e) >= 0) {
 				break;
 			}
@@ -21,12 +21,12 @@ namespace cartocrow::simplification {
 		QT::setIndex(elt, k);
 	}
 
-	template <class T, class QT> requires QueueTraits<T, QT>
-	void IndexedPriorityQueue<T, QT>::siftDown(int k, T* elt) {
+	template <QueueTraits QT>
+	void IndexedPriorityQueue<QT>::siftDown(int k, Element* elt) {
 		int half = queue.size() >> 1;
 		while (k < half) {
 			int child = (k << 1) + 1;
-			T* c = queue[child];
+			Element* c = queue[child];
 			int right = child + 1;
 			if (right < queue.size() && QT::compare(c, queue[right]) > 0) {
 				c = queue[child = right];
@@ -42,26 +42,26 @@ namespace cartocrow::simplification {
 		QT::setIndex(elt, k);
 	}
 
-	template <class T, class QT> requires QueueTraits<T, QT>
-	bool IndexedPriorityQueue<T, QT>::empty() {
+	template <QueueTraits QT>
+	bool IndexedPriorityQueue<QT>::empty() {
 		return queue.empty();
 	}
 
-	template <class T, class QT> requires QueueTraits<T, QT>
-	void IndexedPriorityQueue<T, QT>::push(T* elt) {
+	template <QueueTraits QT>
+	void IndexedPriorityQueue<QT>::push(Element* elt) {
 		queue.push_back(elt);
 		siftUp(queue.size() - 1, elt);
 	}
 
-	template <class T, class QT> requires QueueTraits<T, QT>
-	T* IndexedPriorityQueue<T, QT>::pop() {
+	template <QueueTraits QT>
+	QT::Element* IndexedPriorityQueue<QT>::pop() {
 		if (queue.empty()) {
 			return nullptr;
 		}
-		T* result = queue[0];
+		Element* result = queue[0];
 		QT::setIndex(result, -1);
 
-		T* last = queue[queue.size() - 1];
+		Element* last = queue[queue.size() - 1];
 		queue.pop_back();
 		if (!queue.empty()) {
 			siftDown(0, last);
@@ -70,8 +70,8 @@ namespace cartocrow::simplification {
 		return result;
 	}
 
-	template <class T, class QT> requires QueueTraits<T, QT>
-	bool IndexedPriorityQueue<T, QT>::remove(T* elt) {
+	template <QueueTraits QT>
+	bool IndexedPriorityQueue<QT>::remove(Element* elt) {
 		int id = QT::getIndex(elt);
 		if (id < 0 || id >= queue.size() || queue[id] != elt) {
 			return false;
@@ -82,7 +82,7 @@ namespace cartocrow::simplification {
 				queue.pop_back();
 			}
 			else {
-				T* moved = queue[queue.size() - 1];
+				Element* moved = queue[queue.size() - 1];
 				queue.pop_back();
 				siftDown(id, moved);
 				if (queue[id] == moved) {
@@ -94,8 +94,8 @@ namespace cartocrow::simplification {
 		}
 	}
 
-	template <class T, class QT> requires QueueTraits<T, QT>
-	bool IndexedPriorityQueue<T, QT>::contains(T* elt) {
+	template <QueueTraits QT>
+	bool IndexedPriorityQueue<QT>::contains(Element* elt) {
 		int id = QT::getIndex(elt);
 		if (id < 0 || id >= queue.size()) {
 			return false;
@@ -105,8 +105,8 @@ namespace cartocrow::simplification {
 		}
 	}
 
-	template <class T, class QT> requires QueueTraits<T, QT>
-	void IndexedPriorityQueue<T, QT>::update(T* elt) {
+	template <QueueTraits QT>
+	void IndexedPriorityQueue<QT>::update(Element* elt) {
 		siftUp(QT::getIndex(elt), elt);
 		siftDown(QT::getIndex(elt), elt);
 	}

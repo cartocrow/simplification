@@ -81,7 +81,7 @@ namespace cartocrow::simplification {
 		private:
 			MG& graph;
 			PointQuadTree<Vertex, Kernel>& pqt;
-			IndexedPriorityQueue<Vertex, GraphQueueTraits<Vertex, Kernel>> queue;
+			IndexedPriorityQueue<GraphQueueTraits<Vertex, Kernel>> queue;
 
 			void update(Vertex* v);
 		public:

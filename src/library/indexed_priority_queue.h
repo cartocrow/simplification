@@ -1,8 +1,12 @@
 #pragma once
 
+#include <vector>
+
 namespace cartocrow::simplification {
 
-	template <class T, class QT> concept QueueTraits = requires(T * elt, T * elt2, int i) {
+	template <class QT> concept QueueTraits = requires(typename QT::Element * elt, int i) {
+		typename QT::Element;
+
 		{ QT::setIndex(elt, i) };
 
 		{
@@ -10,27 +14,31 @@ namespace cartocrow::simplification {
 		} -> std::same_as<int>;
 
 		{
-			QT::compare(elt, elt2)
+			QT::compare(elt, elt)
 		} -> std::same_as<int>; // negative if elt < elt2, positive if elt > elt2, zero if elt = elt2. Smallest value == highest priority (top of queue)
 	};
 
-	template <class T, class QT> requires QueueTraits<T, QT> class IndexedPriorityQueue {
-	private:
-		std::vector<T*> queue;
+	template <QueueTraits QT> class IndexedPriorityQueue {
+	public:
+		using Element = QT::Element;
 
-		void siftUp(int k, T* elt);
-		void siftDown(int k, T* elt);
+	private:
+		std::vector<Element*> queue;
+
+		void siftUp(int k, Element* elt);
+		void siftDown(int k, Element* elt);
 
 	public:
 		bool empty();
 
-		void push(T* elt);
-		T* pop();
+		void push(Element* elt);
+		Element* pop();
 
-		bool remove(T* elt);
-		bool contains(T* elt);
-		void update(T* elt);
+		bool remove(Element* elt);
+		bool contains(Element* elt);
+		void update(Element* elt);
 	};
+
 } // namespace cartocrow::simplification
 
 #include "indexed_priority_queue.hpp"

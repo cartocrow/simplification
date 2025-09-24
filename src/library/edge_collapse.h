@@ -73,7 +73,7 @@ namespace cartocrow::simplification {
 		MG& graph;
 		SegmentQuadTree<Edge, Kernel>& sqt;
 		PointQuadTree<Vertex, Kernel>& pqt;
-		IndexedPriorityQueue<Edge, GraphQueueTraits<Edge, Kernel>> queue;
+		IndexedPriorityQueue<GraphQueueTraits<Edge, Kernel>> queue;
 
 		void update(Edge* e);
 		bool blocks(Edge& edge, Edge* collapse);
