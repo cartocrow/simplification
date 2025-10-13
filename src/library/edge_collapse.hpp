@@ -160,7 +160,7 @@ namespace cartocrow::simplification {
 		while (!queue.empty()) {
 			Edge* e = queue.pop();
 
-			std::cout << "trying " << e->getSegment();
+			//std::cout << "trying " << e->getSegment();
 
 			auto& edata = e->data();
 
@@ -193,7 +193,7 @@ namespace cartocrow::simplification {
 
 			if (!edata.blocked_by_degzero && edata.blocked_by.empty()) {
 
-				std::cout << " -> collapsing!\n";
+				//std::cout << " -> collapsing!\n";
 				// not blocked, executing!
 
 				// remove from blocking lists and search structure
@@ -286,8 +286,8 @@ namespace cartocrow::simplification {
 				return true;
 			}
 			else {
-				std::cout << " -> blocked by " << edata.blocked_by.size()
-					<< " edges and by degzero: " << edata.blocked_by_degzero << " \n ";
+				//std::cout << " -> blocked by " << edata.blocked_by.size()
+				//	<< " edges and by degzero: " << edata.blocked_by_degzero << " \n ";
 			}
 		}
 
