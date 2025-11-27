@@ -10,69 +10,81 @@
 
 #include <iostream>
 #include <fstream>
+#include <chrono>
 
 using namespace cartocrow;
 using namespace cartocrow::simplification;
 
-//void testVW() {
-//	std::cout << "started VW test\n";
-//
-//	using MyKernel = Exact;
-//	// geometries
-//	using MyRectangle = Rectangle<MyKernel>;
-//	using MyPoint = Point<MyKernel>;
-//	// datastructures
-//	using MyGraph = VertexRemovalGraph<MyKernel>;
-//	using MyVertex = MyGraph::Vertex;
-//	using MyPQT = PointQuadTree<MyVertex, MyKernel>;
-//	// algorithms
-//	using MyAlgorithm = VisvalingamWhyatt<MyGraph>;
-//
-//	MyRectangle box(0, 0, 100, 100);
-//	MyPQT* pqt = new MyPQT(box, 3);
-//
-//	MyGraph* g = new MyGraph();
-//
-//	MyVertex* a = g->addVertex(MyPoint(51, 51));
-//	MyVertex* b = g->addVertex(MyPoint(10, 40));
-//	MyVertex* c = g->addVertex(MyPoint(10, 90));
-//	MyVertex* d = g->addVertex(MyPoint(55, 55));
-//	MyVertex* e = g->addVertex(MyPoint(90, 10));
-//	MyVertex* f = g->addVertex(MyPoint(40, 10));
-//	g->addEdge(a, b);
-//	g->addEdge(b, c);
-//	g->addEdge(c, d);
-//	g->addEdge(d, e);
-//	g->addEdge(e, f);
-//	g->addEdge(f, a);
-//
-//	g->orient();
-//
-//	assert(g->isOriented());
-//
-//	std::cout << "PRE " << g->getVertexCount() << "\n";
-//	for (MyVertex* v : g->getVertices()) {
-//		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
-//		          << "\n";
-//	}
-//
-//	MyAlgorithm* vw = new MyAlgorithm(*g, *pqt);
-//	vw->initialize(true); // true signals that the pqt hasnt been filled yet
-//
-//	vw->runToComplexity(3);
-//
-//	std::cout << "POST " << g->getVertexCount() << "\n";
-//	for (MyVertex* v : g->getVertices()) {
-//		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
-//		          << "\n";
-//	}
-//
-//	delete vw;
-//	delete pqt;
-//	delete g;
-//
-//	std::cout << "done VW test\n";
-//}
+void testVW() {
+	std::cout << "started VW test\n";
+
+	using MyKernel = Exact;
+	// geometries
+	using MyRectangle = Rectangle<MyKernel>;
+	using MyPoint = Point<MyKernel>;
+	// datastructures
+	using MyGraph = VertexRemovalGraph<MyKernel>;
+	using MyVertex = MyGraph::Vertex;
+	using MyPQT = PointQuadTree<MyVertex, MyKernel>;
+	// algorithms
+	using MyAlgorithm = VisvalingamWhyatt<MyGraph>;
+
+	MyRectangle box(880.611, 946.642, 3525.15, 4070.09); // gemeeenten_2022_30k
+
+	//MyRectangle box(0, 0, 100, 100);
+	MyPQT* pqt = new MyPQT(box, 3);
+
+	MyGraph* g = new MyGraph();
+
+    #include "gemeenten_2022_30k.inc"
+
+	/*MyVertex* a = g->addVertex(MyPoint(51, 51));
+	MyVertex* b = g->addVertex(MyPoint(10, 40));
+	MyVertex* c = g->addVertex(MyPoint(10, 90));
+	MyVertex* d = g->addVertex(MyPoint(55, 55));
+	MyVertex* e = g->addVertex(MyPoint(90, 10));
+	MyVertex* f = g->addVertex(MyPoint(40, 10));
+	g->addEdge(a, b);
+	g->addEdge(b, c);
+	g->addEdge(c, d);
+	g->addEdge(d, e);
+	g->addEdge(e, f);
+	g->addEdge(f, a);*/
+
+	g->orient();
+
+	assert(g->isOriented());
+
+	std::cout << "PRE " << g->getVertexCount() << "\n";
+	/*for (MyVertex* v : g->getVertices()) {
+		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
+		          << "\n";
+	}*/
+
+	auto start = std::chrono::steady_clock::now();
+
+	MyAlgorithm* vw = new MyAlgorithm(*g, *pqt);
+	vw->initialize(true); // true signals that the pqt hasnt been filled yet
+
+	vw->runToComplexity(3);
+
+	auto end = std::chrono::steady_clock::now();
+	auto diff = end - start;
+	
+	std::cout << std::chrono::duration<double, std::milli>(diff).count() << " ms" << std::endl;
+
+	std::cout << "POST " << g->getVertexCount() << "\n";
+	/*for (MyVertex* v : g->getVertices()) {
+		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
+		          << "\n";
+	}*/
+
+	delete vw;
+	delete pqt;
+	delete g;
+
+	std::cout << "done VW test\n";
+}
 //
 //void testHistoricVW() {
 //	std::cout << "started Historic VW test\n";
@@ -437,7 +449,7 @@ void loadedKSBB() {
 
 int main(int argc, char** argv) {
 
-	//testVW();
+	testVW();
 
 	//testHistoricVW();
 
@@ -447,6 +459,6 @@ int main(int argc, char** argv) {
 
 	//testBMRS();
 
-	loadedKSBB();
+	//loadedKSBB();
 
 }

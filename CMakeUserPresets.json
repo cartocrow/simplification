@@ -10,7 +10,7 @@
           "type": "PATH"
         },
         "CMAKE_MODULE_PATH": {
-          "value": "D:/repos/cartocrow/cmake",
+          "value": "D:/repos/cartocrow/core/cmake",
           "type": "PATH"
         }
       },
@@ -23,7 +23,7 @@
       "inherits": [ "_x64-Debug", "CommonLocalPaths" ],
       "cacheVariables": {
         "Ipelib_LIBRARY": "D:/repos/ext/ipe-msvc/x64/Debug/ipe-msvc.lib",
-        "CartoCrow_DIR": "D:/repos/cartocrow/out/install/Debug/lib/cmake/CartoCrow"
+        "CartoCrow_DIR": "D:/repos/cartocrow/core/out/install/Debug/lib/cmake/CartoCrow"
       }
     },
     {
@@ -31,7 +31,7 @@
       "inherits": [ "_x64-Release", "CommonLocalPaths" ],
       "cacheVariables": {
         "Ipelib_LIBRARY": "D:/repos/ext/ipe-msvc/x64/Release/ipe-msvc.lib",
-        "CartoCrow_DIR": "D:/repos/cartocrow/out/install/Release/lib/cmake/CartoCrow"
+        "CartoCrow_DIR": "D:/repos/cartocrow/core/out/install/Release/lib/cmake/CartoCrow"
       }
     },
     {
@@ -39,7 +39,7 @@
       "inherits": [ "_x64-RelWithDebInfo", "CommonLocalPaths" ],
       "cacheVariables": {
         "Ipelib_LIBRARY": "D:/repos/ext/ipe-msvc/x64/Release/ipe-msvc.lib",
-        "CartoCrow_DIR": "D:/repos/cartocrow/out/install/ReleaseWithDebug/lib/cmake/CartoCrow"
+        "CartoCrow_DIR": "D:/repos/cartocrow/core/out/install/ReleaseWithDebug/lib/cmake/CartoCrow"
       },
     }
   ]
