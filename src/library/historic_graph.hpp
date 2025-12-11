@@ -270,44 +270,7 @@ namespace cartocrow::simplification {
 		requires detail::EdgeStoredOperations<Graph>
 	int HistoricGraph<Graph>::getEdgeCount() {
 		return graph.getEdgeCount();
-	}
-
-	template <class Graph>
-		requires detail::EdgeStoredOperations<Graph>
-	Graph::Edge* HistoricGraph<Graph>::mergeVertex(Vertex* v) {
-
-		assert(v->degree() == 2);
-		assert(building_batch != nullptr);
-
-		detail::EraseOperation<Graph>* op = new detail::EraseOperation<Graph>(v);
-		Edge* e = op->perform(graph);
-		building_batch->operations.push_back(op);
-
-		return e;
-	}
-
-	template <class Graph>
-		requires detail::EdgeStoredOperations<Graph>
-	Graph::Vertex* HistoricGraph<Graph>::splitEdge(Edge* e, Point<Kernel> p) {
-
-		detail::SplitOperation<Graph>* op = new detail::SplitOperation<Graph>(e, p);
-		Vertex* v = op->perform(graph);
-		building_batch->operations.push_back(op);
-
-		return v;
-	}
-
-	template <class Graph>
-		requires detail::EdgeStoredOperations<Graph>
-	void HistoricGraph<Graph>::shiftVertex(Vertex* v, Point<Kernel> p) {
-
-		assert(v->degree() > 0);
-		assert(building_batch != nullptr);
-
-		detail::ShiftOperation<Graph>* op = new detail::ShiftOperation<Graph>(v, p);
-		op->redo(graph);
-		building_batch->operations.push_back(op);
-	}
+	}	
 
 	template <class Graph>
 		requires detail::EdgeStoredOperations<Graph>
@@ -403,6 +366,41 @@ namespace cartocrow::simplification {
 
 		building_batch->post_complexity = graph.getEdgeCount();
 		building_batch = nullptr;
+	}
+	template <class Graph>
+		requires detail::EdgeStoredOperations<Graph>
+	Graph::Edge* HistoricGraph<Graph>::mergeVertex(Vertex* v) {
+		assert(v->degree() == 2);
+		assert(building_batch != nullptr);
+
+		detail::EraseOperation<Graph>* op = new detail::EraseOperation<Graph>(v);
+		Edge* e = op->perform(graph);
+		building_batch->operations.push_back(op);
+
+		return e;
+	}
+
+	template <class Graph>
+		requires detail::EdgeStoredOperations<Graph>
+	Graph::Vertex* HistoricGraph<Graph>::splitEdge(Edge* e, Point<Kernel> p) {
+
+		detail::SplitOperation<Graph>* op = new detail::SplitOperation<Graph>(e, p);
+		Vertex* v = op->perform(graph);
+		building_batch->operations.push_back(op);
+
+		return v;
+	}
+
+	template <class Graph>
+		requires detail::EdgeStoredOperations<Graph>
+	void HistoricGraph<Graph>::shiftVertex(Vertex* v, Point<Kernel> p) {
+
+		assert(v->degree() > 0);
+		assert(building_batch != nullptr);
+
+		detail::ShiftOperation<Graph>* op = new detail::ShiftOperation<Graph>(v, p);
+		op->redo(graph);
+		building_batch->operations.push_back(op);
 	}
 
 } // namespace cartocrow::simplification

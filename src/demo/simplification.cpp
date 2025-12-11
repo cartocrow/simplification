@@ -5,8 +5,8 @@
 #include "library/straight_graph.h"
 
 #include "library/vertex_removal.h"
-#include "library/edge_collapse.h"
-#include "library/edge_moves.h"
+//#include "library/edge_collapse.h"
+//#include "library/edge_moves.h"
 
 #include <iostream>
 #include <fstream>
@@ -36,7 +36,7 @@ void testVW() {
 
 	MyGraph* g = new MyGraph();
 
-    #include "gemeenten_2022_30k.inc"
+    //#include "gemeenten_2022_30k.inc"
 
 	/*MyVertex* a = g->addVertex(MyPoint(51, 51));
 	MyVertex* b = g->addVertex(MyPoint(10, 40));
@@ -168,170 +168,170 @@ void testVW() {
 //	std::cout << "done VW test\n";
 //}
 
-void testKSBB() {
-	std::cout << "started KSBB test\n";
-
-	using MyKernel = Exact;
-	// geometries
-	using MyRectangle = Rectangle<MyKernel>;
-	using MyPoint = Point<MyKernel>;
-	// datastructures
-	using MyGraph = EdgeCollapseGraph<MyKernel>;
-	using MyVertex = MyGraph::Vertex;
-	using MyEdge = MyGraph::Edge;
-	using MyPQT = PointQuadTree<MyVertex, MyKernel>;
-	using MySQT = SegmentQuadTree<MyEdge, MyKernel>;
-	// algorithms
-	using MyAlgorithm = KronenfeldEtAl<MyGraph>;
-
-	MyRectangle box(0, 0, 100, 100);
-	MyPQT* pqt = new MyPQT(box, 3);
-	MySQT* sqt = new MySQT(box, 3, 0.05);
-
-	MyGraph* g = new MyGraph();
-
-	MyVertex* a = g->addVertex(MyPoint(51, 51));
-	MyVertex* b = g->addVertex(MyPoint(10, 40));
-	MyVertex* c = g->addVertex(MyPoint(10, 90));
-	MyVertex* d = g->addVertex(MyPoint(55, 55));
-	MyVertex* e = g->addVertex(MyPoint(90, 10));
-	MyVertex* f = g->addVertex(MyPoint(40, 10));
-	g->addEdge(a, b);
-	g->addEdge(b, c);
-	g->addEdge(c, d);
-	g->addEdge(d, e);
-	g->addEdge(e, f);
-	g->addEdge(f, a);
-
-	g->orient();
-
-	std::cout << "PRE " << g->getEdgeCount() << "\n";
-	for (MyVertex* v : g->getVertices()) {
-		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
-			<< "\n";
-	}
-
-	MyAlgorithm* ksbb = new MyAlgorithm(*g, *sqt, *pqt);
-
-	ksbb->initialize(true, true); // true signals that the sqt & pqt havent been filled yet
-
-	//ksbb->step();
-	ksbb->runToComplexity(0);
-
-	std::cout << "POST " << g->getEdgeCount() << "\n";
-	for (MyVertex* v : g->getVertices()) {
-		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
-			<< "\n";
-	}
-
-	delete ksbb;
-	delete pqt;
-	delete g;
-
-	std::cout << "done KSBB test\n";
-}
-
-void loadedKSBB() {
-	std::cout << "Loaded KSBB\n";
-
-	using MyKernel = Exact;
-	// geometries
-	using MyRectangle = Rectangle<MyKernel>;
-	using MyPoint = Point<MyKernel>;
-	// datastructures
-	using MyGraph = EdgeCollapseGraph<MyKernel>;
-	using MyVertex = MyGraph::Vertex;
-	using MyEdge = MyGraph::Edge;
-	using MyPQT = PointQuadTree<MyVertex, MyKernel>;
-	using MySQT = SegmentQuadTree<MyEdge, MyKernel>;
-	// algorithms
-	using MyAlgorithm = KronenfeldEtAl<MyGraph>;
-
-	MyRectangle box(13.0909, 16.798000000000002, 274.909, 352.76279999999997);
-
-	MyPQT* pqt = new MyPQT(box, 10);
-	MySQT* sqt = new MySQT(box, 10, 0.05);
-
-	MyGraph* g = new MyGraph();
-
-#include "graph.inc"
-
-	g->orient();
-
-	std::cout << "PRE " << g->getEdgeCount() << "\n";
-
-	MyAlgorithm* ksbb = new MyAlgorithm(*g, *sqt, *pqt);
-
-	ksbb->initialize(true, true); // true signals that the sqt & pqt havent been filled yet
-
-	std::ofstream* ofs = new std::ofstream("output.txt");
-	std::ostream& out = *ofs;
-
-	out << "<ipeselection pos = \"0 0\">\n";
-	
-	//out << "<path stroke = \"0\">\n";
-	//ksbb->runToComplexity(2000);	
-	//for (MyEdge* e : g->getEdges()) {
-	//	out << e->getSource()->getPoint() << " m\n" << e->getTarget()->getPoint() << " l\n";
-	//}
-	//out << "</path>\n";
-
-	//out << "<path stroke = \"0\">\n";
-	//ksbb->runToComplexity(1500);
-	//for (MyEdge* e : g->getEdges()) {
-	//	out << e->getSource()->getPoint() << " m\n" << e->getTarget()->getPoint() << " l\n";
-	//}
-	//out << "</path>\n";
-
-	//out << "<path stroke = \"0\">\n";
-	//ksbb->runToComplexity(1000);
-	//for (MyEdge* e : g->getEdges()) {
-	//	out << e->getSource()->getPoint() << " m\n" << e->getTarget()->getPoint() << " l\n";
-	//}
-	//out << "</path>\n";
-
-	//out << "<path stroke = \"0\">\n";
-	//ksbb->runToComplexity(750);
-	//for (MyEdge* e : g->getEdges()) {
-	//	out << e->getSource()->getPoint() << " m\n" << e->getTarget()->getPoint() << " l\n";
-	//}
-	//out << "</path>\n";
-
-	out << "<path stroke = \"0\">\n";
-	ksbb->runToComplexity(500);
-	for (MyEdge* e : g->getEdges()) {
-		out << e->getSource()->getPoint() << " m\n" << e->getTarget()->getPoint() << " l\n";
-	}
-	out << "</path>\n";
-
-	out << "<path stroke = \"0\">\n";
-	ksbb->runToComplexity(400);
-	for (MyEdge* e : g->getEdges()) {
-		out << e->getSource()->getPoint() << " m\n" << e->getTarget()->getPoint() << " l\n";
-	}
-	out << "</path>\n";
-
-	out << "<path stroke = \"0\">\n";
-	ksbb->runToComplexity(300);
-	for (MyEdge* e : g->getEdges()) {
-		out << e->getSource()->getPoint() << " m\n" << e->getTarget()->getPoint() << " l\n";
-	}
-	out << "</path>\n";
-
-	out << "</ipeselection>\n";
-
-	out.flush();
-	ofs->close();
-	delete ofs;
-
-	delete ksbb;
-	delete pqt;
-	delete g;
-
-
-
-	std::cout << "done loaded KSBB\n";
-}
+//void testKSBB() {
+//	std::cout << "started KSBB test\n";
+//
+//	using MyKernel = Exact;
+//	// geometries
+//	using MyRectangle = Rectangle<MyKernel>;
+//	using MyPoint = Point<MyKernel>;
+//	// datastructures
+//	using MyGraph = EdgeCollapseGraph<MyKernel>;
+//	using MyVertex = MyGraph::Vertex;
+//	using MyEdge = MyGraph::Edge;
+//	using MyPQT = PointQuadTree<MyVertex, MyKernel>;
+//	using MySQT = SegmentQuadTree<MyEdge, MyKernel>;
+//	// algorithms
+//	using MyAlgorithm = KronenfeldEtAl<MyGraph>;
+//
+//	MyRectangle box(0, 0, 100, 100);
+//	MyPQT* pqt = new MyPQT(box, 3);
+//	MySQT* sqt = new MySQT(box, 3, 0.05);
+//
+//	MyGraph* g = new MyGraph();
+//
+//	MyVertex* a = g->addVertex(MyPoint(51, 51));
+//	MyVertex* b = g->addVertex(MyPoint(10, 40));
+//	MyVertex* c = g->addVertex(MyPoint(10, 90));
+//	MyVertex* d = g->addVertex(MyPoint(55, 55));
+//	MyVertex* e = g->addVertex(MyPoint(90, 10));
+//	MyVertex* f = g->addVertex(MyPoint(40, 10));
+//	g->addEdge(a, b);
+//	g->addEdge(b, c);
+//	g->addEdge(c, d);
+//	g->addEdge(d, e);
+//	g->addEdge(e, f);
+//	g->addEdge(f, a);
+//
+//	g->orient();
+//
+//	std::cout << "PRE " << g->getEdgeCount() << "\n";
+//	for (MyVertex* v : g->getVertices()) {
+//		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
+//			<< "\n";
+//	}
+//
+//	MyAlgorithm* ksbb = new MyAlgorithm(*g, *sqt, *pqt);
+//
+//	ksbb->initialize(true, true); // true signals that the sqt & pqt havent been filled yet
+//
+//	//ksbb->step();
+//	ksbb->runToComplexity(0);
+//
+//	std::cout << "POST " << g->getEdgeCount() << "\n";
+//	for (MyVertex* v : g->getVertices()) {
+//		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
+//			<< "\n";
+//	}
+//
+//	delete ksbb;
+//	delete pqt;
+//	delete g;
+//
+//	std::cout << "done KSBB test\n";
+//}
+//
+//void loadedKSBB() {
+//	std::cout << "Loaded KSBB\n";
+//
+//	using MyKernel = Exact;
+//	// geometries
+//	using MyRectangle = Rectangle<MyKernel>;
+//	using MyPoint = Point<MyKernel>;
+//	// datastructures
+//	using MyGraph = EdgeCollapseGraph<MyKernel>;
+//	using MyVertex = MyGraph::Vertex;
+//	using MyEdge = MyGraph::Edge;
+//	using MyPQT = PointQuadTree<MyVertex, MyKernel>;
+//	using MySQT = SegmentQuadTree<MyEdge, MyKernel>;
+//	// algorithms
+//	using MyAlgorithm = KronenfeldEtAl<MyGraph>;
+//
+//	MyRectangle box(13.0909, 16.798000000000002, 274.909, 352.76279999999997);
+//
+//	MyPQT* pqt = new MyPQT(box, 10);
+//	MySQT* sqt = new MySQT(box, 10, 0.05);
+//
+//	MyGraph* g = new MyGraph();
+//
+//#include "graph.inc"
+//
+//	g->orient();
+//
+//	std::cout << "PRE " << g->getEdgeCount() << "\n";
+//
+//	MyAlgorithm* ksbb = new MyAlgorithm(*g, *sqt, *pqt);
+//
+//	ksbb->initialize(true, true); // true signals that the sqt & pqt havent been filled yet
+//
+//	std::ofstream* ofs = new std::ofstream("output.txt");
+//	std::ostream& out = *ofs;
+//
+//	out << "<ipeselection pos = \"0 0\">\n";
+//	
+//	//out << "<path stroke = \"0\">\n";
+//	//ksbb->runToComplexity(2000);	
+//	//for (MyEdge* e : g->getEdges()) {
+//	//	out << e->getSource()->getPoint() << " m\n" << e->getTarget()->getPoint() << " l\n";
+//	//}
+//	//out << "</path>\n";
+//
+//	//out << "<path stroke = \"0\">\n";
+//	//ksbb->runToComplexity(1500);
+//	//for (MyEdge* e : g->getEdges()) {
+//	//	out << e->getSource()->getPoint() << " m\n" << e->getTarget()->getPoint() << " l\n";
+//	//}
+//	//out << "</path>\n";
+//
+//	//out << "<path stroke = \"0\">\n";
+//	//ksbb->runToComplexity(1000);
+//	//for (MyEdge* e : g->getEdges()) {
+//	//	out << e->getSource()->getPoint() << " m\n" << e->getTarget()->getPoint() << " l\n";
+//	//}
+//	//out << "</path>\n";
+//
+//	//out << "<path stroke = \"0\">\n";
+//	//ksbb->runToComplexity(750);
+//	//for (MyEdge* e : g->getEdges()) {
+//	//	out << e->getSource()->getPoint() << " m\n" << e->getTarget()->getPoint() << " l\n";
+//	//}
+//	//out << "</path>\n";
+//
+//	out << "<path stroke = \"0\">\n";
+//	ksbb->runToComplexity(500);
+//	for (MyEdge* e : g->getEdges()) {
+//		out << e->getSource()->getPoint() << " m\n" << e->getTarget()->getPoint() << " l\n";
+//	}
+//	out << "</path>\n";
+//
+//	out << "<path stroke = \"0\">\n";
+//	ksbb->runToComplexity(400);
+//	for (MyEdge* e : g->getEdges()) {
+//		out << e->getSource()->getPoint() << " m\n" << e->getTarget()->getPoint() << " l\n";
+//	}
+//	out << "</path>\n";
+//
+//	out << "<path stroke = \"0\">\n";
+//	ksbb->runToComplexity(300);
+//	for (MyEdge* e : g->getEdges()) {
+//		out << e->getSource()->getPoint() << " m\n" << e->getTarget()->getPoint() << " l\n";
+//	}
+//	out << "</path>\n";
+//
+//	out << "</ipeselection>\n";
+//
+//	out.flush();
+//	ofs->close();
+//	delete ofs;
+//
+//	delete ksbb;
+//	delete pqt;
+//	delete g;
+//
+//
+//
+//	std::cout << "done loaded KSBB\n";
+//}
 
 //void testBMRS() {
 //	std::cout << "started BMRS test\n";

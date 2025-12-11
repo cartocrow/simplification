@@ -1,7 +1,6 @@
 {
   "dependencies": [
     "cgal",
-    "glog",
     "nlohmann-json",
     "qt5-base",
     "qt5-svg",

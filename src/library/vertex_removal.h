@@ -20,26 +20,25 @@ namespace cartocrow::simplification {
 
 			requires std::same_as<typename MG::Kernel, typename VRT::Kernel>;
 
-		{
-			v->data().cost
-		} -> std::same_as<Number<typename MG::Kernel>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
-
-		{
-			v->data().blocked_by
-		} -> std::same_as<std::vector<typename MG::Vertex*>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
-
-		{
-			v->data().blocking
-		} -> std::same_as<std::vector<typename MG::Vertex*>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
-
-		{
-			v->data().qid
-		} -> std::same_as<int&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
-
-
-		{
-			VRT::getCost(v)
-		} -> std::same_as<Number<typename VRT::Kernel>>;
+		    {
+		    	v->data().cost
+		    } -> std::same_as<Number<typename MG::Kernel>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
+		    
+		    {
+		    	v->data().blocked_by
+		    } -> std::same_as<std::vector<typename MG::Vertex*>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
+		    
+		    {
+		    	v->data().blocking
+		    } -> std::same_as<std::vector<typename MG::Vertex*>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
+		    
+		    {
+		    	v->data().qid
+		    } -> std::same_as<int&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
+		    
+		    {
+		    	VRT::getCost(v)
+		    } -> std::same_as<Number<typename VRT::Kernel>>;
 		};
 
 		template <typename K> struct VRData;

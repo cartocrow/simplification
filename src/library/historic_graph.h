@@ -60,6 +60,7 @@ namespace cartocrow::simplification {
 		Edge* mergeVertex(Vertex* v);
 		Vertex* splitEdge(Edge* e, Point<Kernel> p);
 		void shiftVertex(Vertex* v, Point<Kernel> p);
+		
 	};
 
 } // namespace cartocrow::simplification
