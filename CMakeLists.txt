@@ -17,8 +17,8 @@ find_package(CartoCrow REQUIRED)
 # All source files should use include paths relative to the source root
 include_directories(src)
 
-add_subdirectory(src/library)
-add_subdirectory(src/demo)
-add_subdirectory(src/test)
+add_subdirectory(library)
+add_subdirectory(frontend)
+add_subdirectory(test)
 
 
