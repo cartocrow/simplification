@@ -36,9 +36,7 @@ void testVW() {
 
 	MyGraph* g = new MyGraph();
 
-    //#include "gemeenten_2022_30k.inc"
-
-	/*MyVertex* a = g->addVertex(MyPoint(51, 51));
+	MyVertex* a = g->addVertex(MyPoint(51, 51));
 	MyVertex* b = g->addVertex(MyPoint(10, 40));
 	MyVertex* c = g->addVertex(MyPoint(10, 90));
 	MyVertex* d = g->addVertex(MyPoint(55, 55));
@@ -49,7 +47,7 @@ void testVW() {
 	g->addEdge(c, d);
 	g->addEdge(d, e);
 	g->addEdge(e, f);
-	g->addEdge(f, a);*/
+	g->addEdge(f, a);
 
 	g->orient();
 
