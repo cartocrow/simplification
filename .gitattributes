@@ -4,4 +4,4 @@
 *.txt linguist-vendored
 
 # make sure to mark these files for C++
-*.hpp linguist-language=C++
+**/*.hpp linguist-language=C++
