@@ -31,9 +31,8 @@ void testVW() {
 	// algorithms
 	using MyAlgorithm = VisvalingamWhyatt<MyGraph>;
 
-	MyRectangle box(880.611, 946.642, 3525.15, 4070.09); // gemeeenten_2022_30k
-
-	//MyRectangle box(0, 0, 100, 100);
+	
+	MyRectangle box(0, 0, 100, 100);
 	MyPQT* pqt = new MyPQT(box, 3);
 
 	MyGraph* g = new MyGraph();
