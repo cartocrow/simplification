@@ -8,14 +8,10 @@ project(cartocrow-simplification
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-if(MSVC)
-    add_compile_definitions(_USE_MATH_DEFINES)
-endif()
-
 find_package(CartoCrow REQUIRED)
 
 # All source files should use include paths relative to the source root
-include_directories(src)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 add_subdirectory(library)
 add_subdirectory(frontend)
