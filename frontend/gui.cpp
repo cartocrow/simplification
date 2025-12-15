@@ -1,28 +1,21 @@
 #include "gui.h"
 
-template<class Graph>
-class GraphPainting : public GeometryPainting {
-public:
-	GraphPainting(Graph& graph, const Color color, const double linewidth) : m_graph(graph), m_color(color), m_linewidth(linewidth) {
-	}
+#include <QCheckBox>
+#include <QComboBox>
+#include <QDockWidget>
+#include <QFileDialog>
+#include <QLabel>
+#include <QPushButton>
+#include <QSpinBox>
+#include <QVBoxLayout>
+#include <QMessageBox>
 
-protected:
-	void paint(GeometryRenderer& renderer) const override {
-		renderer.setMode(GeometryRenderer::stroke);
+#include "library/utils.h"
 
-		renderer.setStroke(m_color, m_linewidth);
-
-		for (typename Graph::Edge* e : m_graph.getEdges()) {
-			renderer.draw(e->getSegment());
-		}
-	}
-
-private:
-	Graph& m_graph;
-	const Color m_color;
-	const double m_linewidth;
-};
-
+#include "vw.h"
+#include "ksbb.h"
+#include "graph_painter.h"
+#include "ipe_reader.h"
 
 void launchGUI(int argc, char* argv[]) {
 	QApplication app(argc, argv);
@@ -31,7 +24,7 @@ void launchGUI(int argc, char* argv[]) {
 	app.exec();
 }
 
-void SimplificationGUI::repaint() {
+void SimplificationGUI::updatePaintings() {
 	m_renderer->clear();
 
 	if (input != nullptr) {
@@ -39,55 +32,21 @@ void SimplificationGUI::repaint() {
 		m_renderer->addPainting(paint, "Input");
 	}
 
-	if (output != nullptr) {
-		auto paint = std::make_shared<GraphPainting<OutputGraph>>(*output, Color{ 80, 80, 200 }, 2);
-		m_renderer->addPainting(paint, "Output");
+	for (SimplificationAlgorithm* alg : algorithms) {
+		if (alg->hasResult()) {
+			m_renderer->addPainting(alg->getPainting(), alg->getName());
+		}
 	}
 
 	m_renderer->update();
 }
 
-void SimplificationGUI::initialize() {
-	if (input == nullptr) {
-		return;
-	}
-
-	if (vw != nullptr) {
-		delete vw;
-	}
-	if (output != nullptr) {
-		delete output;
-	}
-
-	output = new OutputGraph();
-
-	std::vector<OutputGraph::Vertex*> vtxmap;
-
-	for (InputGraph::Vertex* v : input->getVertices()) {
-		OutputGraph::Vertex* ov = output->addVertex(v->getPoint());
-		vtxmap.push_back(ov);
-	}
-
-	for (InputGraph::Edge* e : input->getEdges()) {
-		OutputGraph::Vertex* v = vtxmap[e->getSource()->graphIndex()];
-		OutputGraph::Vertex* w = vtxmap[e->getTarget()->graphIndex()];
-		output->addEdge(v, w);
-	}
-
-	output->orient();
-
-	Rectangle<Inexact> box(0, 0, 100, 100);
-	outpqt = new OutputPQT(box, 3);
-
-	vw = new VisvalingamWhyatt<OutputGraph>(*output, *outpqt);
-	vw->initialize(true); 
-	vw->runToComplexity(3);
-
-	repaint();
-}
-
 SimplificationGUI::SimplificationGUI() {
 	setWindowTitle("Simplification");
+
+	algorithms.push_back(new VWSimplifier());
+	algorithms.push_back(new KSBBSimplifier());
+	int default_alg = 1;
 
 	auto* dockWidget = new QDockWidget();
 	addDockWidget(Qt::LeftDockWidgetArea, dockWidget);
@@ -96,15 +55,35 @@ SimplificationGUI::SimplificationGUI() {
 	vLayout->setAlignment(Qt::AlignTop);
 	dockWidget->setWidget(vWidget);
 
-	auto* basicOptions = new QLabel("<h3>Basic options</h3>");
-	vLayout->addWidget(basicOptions);
-	auto* directorySelector = new QPushButton("Select input directory");
-	vLayout->addWidget(directorySelector);
-	auto* fileSelector = new QComboBox();
-	auto* fileSelectorLabel = new QLabel("Input file");
-	fileSelectorLabel->setBuddy(fileSelector);
-	vLayout->addWidget(fileSelectorLabel);
-	vLayout->addWidget(fileSelector);
+	auto* ioSettings = new QLabel("<h3>Input / output</h3>");
+	vLayout->addWidget(ioSettings);
+
+	auto* loadFileButton = new QPushButton("Load file");
+	vLayout->addWidget(loadFileButton);
+
+	auto* vwSettings = new QLabel("<h3>Simplification</h3>");
+	vLayout->addWidget(vwSettings);
+
+	auto* algorithmSelector = new QComboBox();
+	vLayout->addWidget(algorithmSelector);
+	for (SimplificationAlgorithm* alg : algorithms) {
+		algorithmSelector->addItem(QString::fromStdString(alg->getName()));
+	}
+	algorithmSelector->setCurrentIndex(default_alg);
+
+	auto* initButton = new QPushButton("Initialize");
+	vLayout->addWidget(initButton);
+
+	auto* reverseButton = new QPushButton("Step back");
+	vLayout->addWidget(reverseButton);
+	auto* stepButton = new QPushButton("Step forward");
+	vLayout->addWidget(stepButton);
+
+	auto* runButton = new QPushButton("Run to complexity");
+	vLayout->addWidget(runButton);
+	auto* desiredComplexity = new QSpinBox();
+	desiredComplexity->setValue(10);
+	vLayout->addWidget(desiredComplexity);
 
 	m_renderer = new GeometryWidget();
 	m_renderer->setDrawAxes(false);
@@ -130,23 +109,79 @@ SimplificationGUI::SimplificationGUI() {
 
 	input->orient();
 
-	initialize();
+	connect(loadFileButton, &QPushButton::clicked, [this]() {
+		QString startDir = ".";
+		std::filesystem::path filePath = QFileDialog::getOpenFileName(this, tr("Select isolines"), startDir).toStdString();
+		if (filePath == "") return;
+		loadInput(filePath);
+		});
+
+	connect(initButton, &QPushButton::clicked, [this, algorithmSelector, desiredComplexity]() {
+		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		if (input != nullptr) {
+			alg->initialize(input);
+			desiredComplexity->setValue(alg->getComplexity());
+			updatePaintings();
+		}
+		});
+
+	connect(reverseButton, &QPushButton::clicked, [this, algorithmSelector, desiredComplexity]() {
+		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		if (alg->hasResult()) {
+			alg->runToComplexity(alg->getComplexity() + 1);
+			desiredComplexity->setValue(alg->getComplexity());
+			m_renderer->repaint();
+		}
+		});
+
+	connect(stepButton, &QPushButton::clicked, [this, algorithmSelector, desiredComplexity]() {
+		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		if (alg->hasResult()) {
+			alg->runToComplexity(alg->getComplexity() - 1);
+			desiredComplexity->setValue(alg->getComplexity());
+			m_renderer->repaint();
+		}
+		});
+
+	connect(runButton, &QPushButton::clicked, [this, algorithmSelector, desiredComplexity]() {
+		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		if (alg->hasResult()) {
+			alg->runToComplexity(desiredComplexity->value());
+			desiredComplexity->setValue(alg->getComplexity());
+			m_renderer->repaint();
+		}
+		});
+
+	updatePaintings();
 }
 
 SimplificationGUI::~SimplificationGUI() {
+	for (SimplificationAlgorithm* alg : algorithms) {
+		alg->clear();
+		delete alg;
+	}
 	if (m_renderer != nullptr) {
 		delete m_renderer;
 	}
-	if (vw != nullptr) {
-		delete vw;
-	}
-	if (outpqt != nullptr) {
-		delete outpqt;
-	}
-	if (output != nullptr) {
-		delete output;
-	}
 	if (input != nullptr) {
 		delete input;
+	}
+}
+
+void SimplificationGUI::loadInput(const std::filesystem::path& path) {
+	if (input != nullptr) {
+		delete input;
+
+		for (SimplificationAlgorithm* alg : algorithms) {
+			alg->clear();
+		}
+	}
+
+	input = readIpeFile(path);
+
+	updatePaintings();
+
+	if (input != nullptr) {
+		m_renderer->fitInView(utils::boxOf<InputGraph::Vertex, MyKernel>(input->getVertices()).bbox());
 	}
 }

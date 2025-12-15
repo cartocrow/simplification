@@ -1,13 +1,16 @@
 set(SOURCES
     debug.cpp
     gui.cpp
+    ksbb.cpp
     main.cpp
+    vw.cpp
 )
 add_executable(simplification ${SOURCES})
 target_link_libraries(
     simplification
     PRIVATE
     cartocrow::core
+    cartocrow::reader
     cartocrow::renderer
     CGAL::CGAL
     Qt5::Widgets

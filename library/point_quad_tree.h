@@ -35,6 +35,7 @@ namespace cartocrow::simplification {
 		bool remove(P& elt);
 
 		void findContained(Rectangle<K>& query, std::function<void(P&)> act);
+		P* findElement(Point<K>& query, Number<K> prec = 0);
 	};
 
 } // namespace cartocrow::simplification

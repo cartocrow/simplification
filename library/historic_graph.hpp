@@ -151,7 +151,7 @@ namespace cartocrow::simplification {
 			using Vertex = Graph::Vertex;
 			using Op = Operation<Graph>;
 
-			ShiftOperation(Vertex* v, Point<typename Graph::Kernel> pt) : Operation<Graph>(v.incoming()), pre_loc(v->getPoint()), post_loc(pt) {
+			ShiftOperation(Vertex* v, Point<typename Graph::Kernel> pt) : Operation<Graph>(v->incoming()), pre_loc(v->getPoint()), post_loc(pt) {
 				// store the past
 				past = this->edge->data().hist;
 				// we don't know the future yet

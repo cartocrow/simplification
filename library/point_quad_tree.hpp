@@ -245,4 +245,13 @@ namespace cartocrow::simplification {
 		findContainedRecursive(root, query, act);
 	}
 
+	template <typename P, typename K> requires PointConvertable<P, K>
+	P* PointQuadTree<P, K>::findElement(Point<K>& query, Number<K> prec) {
+		Rectangle<K> rq(query.x() - prec, query.y()-prec, query.x() + prec, query.y() + prec);
+		P* result = nullptr;
+		findContainedRecursive(root, rq, [result](P& p) mutable {
+			result = &p;
+			});
+		return result;
+	}
 } // namespace cartocrow::simplification
