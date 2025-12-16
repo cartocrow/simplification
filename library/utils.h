@@ -104,14 +104,20 @@ namespace cartocrow::simplification::utils {
 	}
 
 	template<typename K>
-	bool disjoint(Rectangle<K>& a, Rectangle<K>& b) {
+	bool disjoint(const Rectangle<K>& a, const Rectangle<K>& b) {
 		return a.xmax() < b.xmin() || a.xmin() > b.xmax() || a.ymax() < b.ymin() ||
 			a.ymin() > b.ymax();
 	}
 
 	template<typename K>
-	bool contains(Rectangle<K>& a, Point<K>& pt) {
-		return a.xmin() <= pt.x() && pt.x() <= a.xmax() && a.ymin() <= pt.y() && pt.y() <= a.ymax();
+	bool contains(const Rectangle<K>& a, const Point<K>& pt, const Number<K> prec = 0) {
+		return a.xmin() - prec <= pt.x() && pt.x() <= a.xmax() + prec && a.ymin() - prec <= pt.y() && pt.y() <= a.ymax() + prec;
+	}
+
+	template<typename K>
+	bool samePoint(const Point<K>& a, const Point<K>& b, const Number<K> prec = 0) {
+		return a.x() - prec <= b.x() && b.x() <= a.x() + prec
+			&& a.y() - prec <= b.y() && b.y() <= a.y() + prec;
 	}
 
 	template<typename K>

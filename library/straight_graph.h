@@ -97,6 +97,10 @@ namespace cartocrow::simplification {
 		Edge* outgoing();
 		Vertex* next();
 		Vertex* previous();
+
+		friend std::ostream& operator<<(std::ostream& os, StraightVertex<VD, ED, K> const* self) {
+			return os << "(" << self->index << ":" << self->point << ")";
+		}
 	};
 
 	template <class VD, class ED, typename K> class StraightEdge {
@@ -136,6 +140,10 @@ namespace cartocrow::simplification {
 		// functions below are only for deg-2 vertices in an oriented graph
 		Edge* next();
 		Edge* previous();
+
+		friend std::ostream& operator<<(std::ostream& os, StraightEdge<VD, ED, K> const* self) {
+			return os << self->source << "--" << self->target;
+		}
 	};
 
 } // namespace cartocrow::simplification

@@ -122,7 +122,7 @@ namespace cartocrow::simplification {
 					past_inc->edge = this->edge;
 				}
 				if (past_out != nullptr) {
-					past_out->edge = this->edge;
+					past_out->edge = this->edge->next();
 				}
 			}
 
@@ -270,7 +270,7 @@ namespace cartocrow::simplification {
 		requires detail::EdgeStoredOperations<Graph>
 	int HistoricGraph<Graph>::getEdgeCount() {
 		return graph.getEdgeCount();
-	}	
+	}
 
 	template <class Graph>
 		requires detail::EdgeStoredOperations<Graph>
@@ -375,6 +375,7 @@ namespace cartocrow::simplification {
 
 		detail::EraseOperation<Graph>* op = new detail::EraseOperation<Graph>(v);
 		Edge* e = op->perform(graph);
+		op->edge->data().hist = op;
 		building_batch->operations.push_back(op);
 
 		return e;
@@ -386,6 +387,7 @@ namespace cartocrow::simplification {
 
 		detail::SplitOperation<Graph>* op = new detail::SplitOperation<Graph>(e, p);
 		Vertex* v = op->perform(graph);
+		op->edge->data().hist = op;
 		building_batch->operations.push_back(op);
 
 		return v;
@@ -400,6 +402,7 @@ namespace cartocrow::simplification {
 
 		detail::ShiftOperation<Graph>* op = new detail::ShiftOperation<Graph>(v, p);
 		op->redo(graph);
+		op->edge->data().hist = op;
 		building_batch->operations.push_back(op);
 	}
 

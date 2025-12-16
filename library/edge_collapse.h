@@ -77,6 +77,7 @@ namespace cartocrow::simplification {
 
 		void update(Edge* e);
 		bool blocks(Edge& edge, Edge* collapse);
+		bool validateState();
 
 	public:
 		EdgeCollapse(MG& g, SegmentQuadTree<Edge, Kernel>& sqt, PointQuadTree<Vertex, Kernel>& pqt);

@@ -246,12 +246,15 @@ namespace cartocrow::simplification {
 		v->incident.push_back(newedge);
 		utils::listReplace(edge, newedge, w->incident);
 
+		assert(oriented && verifyOriented());
+
 		return v;
 	}
 
 	template <class VD, class ED, typename K>
 	StraightEdge<VD, ED, K>* StraightGraph<VD, ED, K>::mergeVertex(Vertex* v) {
 		assert(oriented && verifyOriented());
+
 		assert(v->degree() == 2);
 
 		Edge* edge = v->incident[0]; // (u,v)
@@ -274,6 +277,8 @@ namespace cartocrow::simplification {
 			vswp->index = v->index;
 		}
 		delete v;
+
+		assert(oriented && verifyOriented());
 
 		return edge;
 

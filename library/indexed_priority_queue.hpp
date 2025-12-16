@@ -3,6 +3,8 @@
 // Do not include this file, but the .h file instead
 // -----------------------------------------------------------------------------
  
+#include <cassert>
+
 namespace cartocrow::simplification {
 
 	template <QueueTraits QT>
@@ -49,6 +51,9 @@ namespace cartocrow::simplification {
 
 	template <QueueTraits QT>
 	void IndexedPriorityQueue<QT>::push(Element* elt) {
+		assert(!contains(elt));
+		assert(std::find(queue.begin(), queue.end(), elt) == queue.end());
+
 		queue.push_back(elt);
 		siftUp(queue.size() - 1, elt);
 	}
@@ -67,6 +72,9 @@ namespace cartocrow::simplification {
 			siftDown(0, last);
 		}
 
+		assert(!contains(result));
+		assert(std::find(queue.begin(), queue.end(), result) == queue.end());
+
 		return result;
 	}
 
@@ -74,6 +82,8 @@ namespace cartocrow::simplification {
 	bool IndexedPriorityQueue<QT>::remove(Element* elt) {
 		int id = QT::getIndex(elt);
 		if (id < 0 || id >= queue.size() || queue[id] != elt) {
+			assert(!contains(elt));
+			assert(std::find(queue.begin(), queue.end(), elt) == queue.end());
 			return false;
 		}
 		else {
@@ -90,6 +100,8 @@ namespace cartocrow::simplification {
 				}
 			}
 
+			assert(!contains(elt));
+			assert(std::find(queue.begin(), queue.end(), elt) == queue.end());
 			return true;
 		}
 	}
@@ -107,8 +119,18 @@ namespace cartocrow::simplification {
 
 	template <QueueTraits QT>
 	void IndexedPriorityQueue<QT>::update(Element* elt) {
+		assert(contains(elt));
+		assert(std::find(queue.begin(), queue.end(), elt) != queue.end());
+
 		siftUp(QT::getIndex(elt), elt);
 		siftDown(QT::getIndex(elt), elt);
 	}
 
+	template <QueueTraits QT>
+	void IndexedPriorityQueue<QT>::clear() {
+		for (Element* elt : queue) {
+			QT::setIndex(elt, -1);
+		}
+		queue.clear();
+	}
 } // namespace cartocrow::simplification

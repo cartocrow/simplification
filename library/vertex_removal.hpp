@@ -62,8 +62,6 @@ namespace cartocrow::simplification {
 		while (!queue.empty()) {
 			Vertex* v = queue.pop();
 
-			//std::cout << "trying " << v->getPoint();
-
 			Vertex* u = v->previous();
 			Vertex* w = v->next();
 
@@ -85,7 +83,6 @@ namespace cartocrow::simplification {
 
 			if (v->data().blocked_by.empty()) {
 
-				//std::cout << " -> removing!\n";
 				// not blocked, executing!
 
 				// remove from blocking lists and search structure
@@ -124,9 +121,6 @@ namespace cartocrow::simplification {
 
 				return true;
 			}
-			else {
-				//std::cout << " -> blocked by " << v->data().blocked_by.size() << " vertices\n";
-			}
 		}
 
 		return false;
@@ -148,7 +142,7 @@ namespace cartocrow::simplification {
 		Vertex* w = v->next();
 
 		if (u->isNeighborOf(w)) {
-			queue.remove(u);
+			queue.remove(v);
 			return;
 		}
 

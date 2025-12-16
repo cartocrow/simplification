@@ -37,6 +37,8 @@ namespace cartocrow::simplification {
 		bool remove(Element* elt);
 		bool contains(Element* elt);
 		void update(Element* elt);
+
+		void clear();
 	};
 
 } // namespace cartocrow::simplification

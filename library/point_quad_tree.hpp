@@ -246,12 +246,41 @@ namespace cartocrow::simplification {
 	}
 
 	template <typename P, typename K> requires PointConvertable<P, K>
-	P* PointQuadTree<P, K>::findElement(Point<K>& query, Number<K> prec) {
-		Rectangle<K> rq(query.x() - prec, query.y()-prec, query.x() + prec, query.y() + prec);
-		P* result = nullptr;
-		findContainedRecursive(root, rq, [result](P& p) mutable {
-			result = &p;
-			});
-		return result;
+	P* PointQuadTree<P, K>::findElementRecursive(Node* n, const  Point<K>& query, const Number<K> prec) {
+		if (n == nullptr || !utils::contains(*(n->rect), query, prec)) {
+			// outside of the node's rectangle
+			return nullptr;
+		}
+		else if (n->elts == nullptr) {
+			// internal node
+			P* elt = findElementRecursive(n->lb, query, prec);
+			if (elt != nullptr) {
+				return elt;
+			}
+			elt = findElementRecursive(n->lt, query, prec);
+			if (elt != nullptr) {
+				return elt;
+			}
+			elt = findElementRecursive(n->rb, query, prec);
+			if (elt != nullptr) {
+				return elt;
+			}
+			elt = findElementRecursive(n->rt, query, prec);
+			return elt;
+		}
+		else {
+			// leaf node
+			for (P* elt : *(n->elts)) {
+				if (utils::samePoint(elt->getPoint(), query, prec)) {
+					return elt;
+				}
+			}
+			return nullptr;
+		}
+	}
+
+	template <typename P, typename K> requires PointConvertable<P, K>
+	P* PointQuadTree<P, K>::findElement(const Point<K>& query, const  Number<K> prec) {
+		return findElementRecursive(root, query, prec);
 	}
 } // namespace cartocrow::simplification

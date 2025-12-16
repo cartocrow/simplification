@@ -36,14 +36,6 @@ namespace cartocrow::simplification {
 
 	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
 	void EdgeCollapse<MG, ECT>::update(Edge* e) {
-		// last condition checks for a triangle
-		if (e->getSource()->degree() != 2 || e->getTarget()->degree() != 2 ||
-			e->sourceWalkNeighbor() == e->targetWalkNeighbor()) {
-			queue.remove(e);
-			return;
-		}
-
-		ECT::determineCollapse(e);
 
 		auto edata = e->data();
 
@@ -52,6 +44,15 @@ namespace cartocrow::simplification {
 			utils::listRemove(e, b->data().blocking);
 		}
 		edata.blocked_by.clear();
+
+		// last condition checks for a triangle
+		if (e->getSource()->degree() != 2 || e->getTarget()->degree() != 2 ||
+			e->sourceWalkNeighbor() == e->targetWalkNeighbor()) {
+			queue.remove(e);
+			return;
+		}
+
+		ECT::determineCollapse(e);
 
 		if (queue.contains(e)) {
 			queue.update(e);
@@ -136,15 +137,61 @@ namespace cartocrow::simplification {
 			}
 		}
 
+		queue.clear();
+
 		for (Edge* e : graph.getEdges()) {
+			e->data().qid = -1;
+			e->data().blocked_by.clear();
+			e->data().blocking.clear();
+			e->data().blocked_by_degzero = false;
+
 			update(e);
 		}
+
+		assert(validateState());
+	}
+
+	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
+	bool EdgeCollapse<MG, ECT>::validateState() {
+		bool ok = true;
+		for (Edge* e : graph.getEdges()) {
+			if (e->data().qid >= 0) {
+				if (!queue.contains(e)) {
+					std::cout << e << " :: thinks it's in queue but isn't\n";
+					ok = false;
+				}
+			}
+			else if (queue.contains(e)) {
+				std::cout << e << " :: thinks it's not in queue, but is\n";
+				ok = false;
+			}
+
+			for (Edge* b : e->data().blocked_by) {
+				if (std::find(b->data().blocking.begin(), b->data().blocking.end(), e) == b->data().blocking.end()) {
+					std::cout << e << " :: thinks it's blocked by " << b << ", but they don't agree\n";
+					ok = false;
+				}
+			}
+
+			for (Edge* b : e->data().blocking) {
+				if (std::find(b->data().blocked_by.begin(), b->data().blocked_by.end(), e) == b->data().blocked_by.end()) {
+					std::cout << e << " :: thinks it's blocking " << b << ", but they don't agree\n";
+					ok = false;
+				}
+			}
+		}
+		return ok;
 	}
 
 	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
 	bool EdgeCollapse<MG, ECT>::runToComplexity(int k) {
 		while (graph.getEdgeCount() > k) {
+			assert(validateState());
 			if (!step()) {
+				return false;
+			}
+
+			if (!validateState()) {
 				return false;
 			}
 		}
@@ -159,8 +206,6 @@ namespace cartocrow::simplification {
 
 		while (!queue.empty()) {
 			Edge* e = queue.pop();
-
-			//std::cout << "trying " << e->getSegment();
 
 			auto& edata = e->data();
 
@@ -193,7 +238,6 @@ namespace cartocrow::simplification {
 
 			if (!edata.blocked_by_degzero && edata.blocked_by.empty()) {
 
-				//std::cout << " -> collapsing!\n";
 				// not blocked, executing!
 
 				// remove from blocking lists and search structure
@@ -284,10 +328,6 @@ namespace cartocrow::simplification {
 				}
 
 				return true;
-			}
-			else {
-				//std::cout << " -> blocked by " << edata.blocked_by.size()
-				//	<< " edges and by degzero: " << edata.blocked_by_degzero << " \n ";
 			}
 		}
 
