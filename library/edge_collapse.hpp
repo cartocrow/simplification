@@ -37,7 +37,7 @@ namespace cartocrow::simplification {
 	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
 	void EdgeCollapse<MG, ECT>::update(Edge* e) {
 
-		auto edata = e->data();
+		auto& edata = e->data();
 
 		// clear topology
 		for (Edge* b : edata.blocked_by) {
@@ -191,9 +191,10 @@ namespace cartocrow::simplification {
 				return false;
 			}
 
-			if (!validateState()) {
-				return false;
-			}
+			// useful for debugging: stop when an invalid state is reached, without erroring
+			//if (!validateState()) {
+			//	return false;
+			//}
 		}
 		return true;
 	}
@@ -257,6 +258,7 @@ namespace cartocrow::simplification {
 						}
 					}
 				}
+				edata.blocking.clear();
 
 				for (Edge* b : prev->data().blocking) {
 					if (utils::listRemove(prev, b->data().blocked_by)) {
@@ -265,6 +267,7 @@ namespace cartocrow::simplification {
 						}
 					}
 				}
+				prev->data().blocking.clear();
 
 				for (Edge* b : next->data().blocking) {
 					if (utils::listRemove(next, b->data().blocked_by)) {
@@ -273,6 +276,7 @@ namespace cartocrow::simplification {
 						}
 					}
 				}
+				next->data().blocking.clear();
 
 				if constexpr (ModifiableGraphWithHistory<MG>) {
 					graph.startBatch(edata.cost);

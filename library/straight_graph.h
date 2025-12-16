@@ -99,7 +99,7 @@ namespace cartocrow::simplification {
 		Vertex* previous();
 
 		friend std::ostream& operator<<(std::ostream& os, StraightVertex<VD, ED, K> const* self) {
-			return os << "(" << self->index << ":" << self->point << ")";
+			return os << "(" << self->index << ": " << self->point << ")";
 		}
 	};
 
