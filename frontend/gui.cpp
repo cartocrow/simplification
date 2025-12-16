@@ -1,12 +1,10 @@
 #include "gui.h"
 
 #include <QCheckBox>
-#include <QComboBox>
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QLabel>
 #include <QPushButton>
-#include <QSpinBox>
 #include <QVBoxLayout>
 #include <QMessageBox>
 
@@ -27,14 +25,16 @@ void launchGUI(int argc, char* argv[]) {
 void SimplificationGUI::updatePaintings() {
 	m_renderer->clear();
 
+	VertexMode vmode = static_cast<VertexMode>(vertexMode->currentIndex());
+
 	if (input != nullptr) {
-		auto paint = std::make_shared<GraphPainting<InputGraph>>(*input, Color{ 30, 30, 30 }, 1);
+		auto paint = std::make_shared<GraphPainting<InputGraph>>(*input, Color{ 30, 30, 30 }, 1, vmode);
 		m_renderer->addPainting(paint, "Input");
 	}
 
 	for (SimplificationAlgorithm* alg : algorithms) {
 		if (alg->hasResult()) {
-			m_renderer->addPainting(alg->getPainting(), alg->getName());
+			m_renderer->addPainting(alg->getPainting(vmode), alg->getName());
 		}
 	}
 
@@ -61,6 +61,13 @@ SimplificationGUI::SimplificationGUI() {
 	auto* loadFileButton = new QPushButton("Load file");
 	vLayout->addWidget(loadFileButton);
 
+	vertexMode = new QComboBox();
+	vertexMode->addItem("Only degree-0 vertices");
+	vertexMode->addItem("No degree-2 vertices");
+	vertexMode->addItem("All vertices");
+	vertexMode->setCurrentIndex(0);
+	vLayout->addWidget(vertexMode);
+
 	auto* vwSettings = new QLabel("<h3>Simplification</h3>");
 	vLayout->addWidget(vwSettings);
 
@@ -70,6 +77,14 @@ SimplificationGUI::SimplificationGUI() {
 		algorithmSelector->addItem(QString::fromStdString(alg->getName()));
 	}
 	algorithmSelector->setCurrentIndex(default_alg);
+
+	auto* depthSpinLabel = new QLabel("Search-tree depths");
+	vLayout->addWidget(depthSpinLabel);
+	auto* depthSpin = new QSpinBox();
+	depthSpin->setMinimum(1);
+	depthSpin->setMaximum(20);
+	depthSpin->setValue(10);
+	vLayout->addWidget(depthSpin);
 
 	auto* initButton = new QPushButton("Initialize");
 	vLayout->addWidget(initButton);
@@ -81,7 +96,7 @@ SimplificationGUI::SimplificationGUI() {
 
 	auto* runButton = new QPushButton("Run to complexity");
 	vLayout->addWidget(runButton);
-	auto* desiredComplexity = new QSpinBox();
+	desiredComplexity = new QSpinBox();
 	desiredComplexity->setValue(10);
 	vLayout->addWidget(desiredComplexity);
 
@@ -94,12 +109,12 @@ SimplificationGUI::SimplificationGUI() {
 
 	input = new InputGraph();
 
-	InputGraph::Vertex* a = input->addVertex(Point<Inexact>(51, 51));
-	InputGraph::Vertex* b = input->addVertex(Point<Inexact>(10, 40));
-	InputGraph::Vertex* c = input->addVertex(Point<Inexact>(10, 90));
-	InputGraph::Vertex* d = input->addVertex(Point<Inexact>(55, 55));
-	InputGraph::Vertex* e = input->addVertex(Point<Inexact>(90, 10));
-	InputGraph::Vertex* f = input->addVertex(Point<Inexact>(40, 10));
+	InputGraph::Vertex* a = input->addVertex(Point<MyKernel>(51, 51));
+	InputGraph::Vertex* b = input->addVertex(Point<MyKernel>(10, 40));
+	InputGraph::Vertex* c = input->addVertex(Point<MyKernel>(10, 90));
+	InputGraph::Vertex* d = input->addVertex(Point<MyKernel>(55, 55));
+	InputGraph::Vertex* e = input->addVertex(Point<MyKernel>(90, 10));
+	InputGraph::Vertex* f = input->addVertex(Point<MyKernel>(40, 10));
 	input->addEdge(a, b);
 	input->addEdge(b, c);
 	input->addEdge(c, d);
@@ -109,23 +124,23 @@ SimplificationGUI::SimplificationGUI() {
 
 	input->orient();
 
-	connect(loadFileButton, &QPushButton::clicked, [this]() {
+	connect(loadFileButton, &QPushButton::clicked, [this, depthSpin]() {
 		QString startDir = ".";
 		std::filesystem::path filePath = QFileDialog::getOpenFileName(this, tr("Select isolines"), startDir).toStdString();
 		if (filePath == "") return;
-		loadInput(filePath);
+		loadInput(filePath, depthSpin->value());
 		});
 
-	connect(initButton, &QPushButton::clicked, [this, algorithmSelector, desiredComplexity]() {
+	connect(initButton, &QPushButton::clicked, [this, algorithmSelector, depthSpin]() {
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (input != nullptr) {
-			alg->initialize(input);
+			alg->initialize(input, depthSpin->value());
 			desiredComplexity->setValue(alg->getComplexity());
 			updatePaintings();
 		}
 		});
 
-	connect(reverseButton, &QPushButton::clicked, [this, algorithmSelector, desiredComplexity]() {
+	connect(reverseButton, &QPushButton::clicked, [this, algorithmSelector]() {
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
 			alg->runToComplexity(alg->getComplexity() + 1);
@@ -134,7 +149,7 @@ SimplificationGUI::SimplificationGUI() {
 		}
 		});
 
-	connect(stepButton, &QPushButton::clicked, [this, algorithmSelector, desiredComplexity]() {
+	connect(stepButton, &QPushButton::clicked, [this, algorithmSelector]() {
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
 			alg->runToComplexity(alg->getComplexity() - 1);
@@ -143,13 +158,17 @@ SimplificationGUI::SimplificationGUI() {
 		}
 		});
 
-	connect(runButton, &QPushButton::clicked, [this, algorithmSelector, desiredComplexity]() {
+	connect(runButton, &QPushButton::clicked, [this, algorithmSelector]() {
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
 			alg->runToComplexity(desiredComplexity->value());
 			desiredComplexity->setValue(alg->getComplexity());
 			m_renderer->repaint();
 		}
+		});
+
+	connect(vertexMode, static_cast<void (QComboBox::*)(int)>(&QComboBox::activated), [this](int index) {
+			updatePaintings();
 		});
 
 	updatePaintings();
@@ -168,7 +187,7 @@ SimplificationGUI::~SimplificationGUI() {
 	}
 }
 
-void SimplificationGUI::loadInput(const std::filesystem::path& path) {
+void SimplificationGUI::loadInput(const std::filesystem::path& path, const int depth) {
 	if (input != nullptr) {
 		delete input;
 
@@ -177,11 +196,12 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path) {
 		}
 	}
 
-	input = readIpeFile(path);
+	input = readIpeFile(path, depth);
 
 	updatePaintings();
 
 	if (input != nullptr) {
+		desiredComplexity->setMaximum(input->getEdgeCount());
 		m_renderer->fitInView(utils::boxOf<InputGraph::Vertex, MyKernel>(input->getVertices()).bbox());
 	}
 }

@@ -9,3 +9,5 @@ void testKSBB();
 void testLargeKSBB();
 
 void testQueue();
+
+void testPQT();

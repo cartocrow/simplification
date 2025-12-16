@@ -2,6 +2,8 @@
 
 #include <QMainWindow>
 #include <QApplication>
+#include <QSpinBox>
+#include <QComboBox>
 
 #include <cartocrow/core/core.h>
 #include <cartocrow/reader/ipe_reader.h>
@@ -27,12 +29,15 @@ private:
 	InputGraph* input = nullptr;
 	std::vector<SimplificationAlgorithm*> algorithms;
 
+	QSpinBox* desiredComplexity;
+	QComboBox* vertexMode;
+
 	void updatePaintings();
 public:
 	SimplificationGUI();
 	~SimplificationGUI();
 
-	void loadInput(const std::filesystem::path& path);
+	void loadInput(const std::filesystem::path& path, const int depth);
 };
 
 

@@ -6,7 +6,7 @@
 #include "library/utils.h"
 #include "simplification_algorithm.h"
 
-InputGraph* readIpeFile(const std::filesystem::path& file) {
+InputGraph* readIpeFile(const std::filesystem::path& file, const int depth) {
 	std::shared_ptr<ipe::Document> document = IpeReader::loadIpeFile(file);
 
 	if (document->countPages() == 0) {
@@ -51,7 +51,7 @@ InputGraph* readIpeFile(const std::filesystem::path& file) {
 	Rectangle<MyKernel> box = utils::boxOf<MyKernel>(points);
 
 	// construct the graph
-	PointQuadTree<InputGraph::Vertex, MyKernel> pqt(box, 10);
+	PointQuadTree<InputGraph::Vertex, MyKernel> pqt(box, depth);
 
 	for (int i = 0; i < page->count(); i++) {
 		auto object = page->object(i);
@@ -74,6 +74,7 @@ InputGraph* readIpeFile(const std::filesystem::path& file) {
 				InputGraph::Vertex* next = pqt.findElement(point, 0.00001);
 				if (next == nullptr) {
 					next = graph->addVertex(point);
+					pqt.insert(*next);
 				}
 				if (prev != nullptr && !next->isNeighborOf(prev) && next != prev) {
 					graph->addEdge(prev, next);
@@ -88,6 +89,7 @@ InputGraph* readIpeFile(const std::filesystem::path& file) {
 			InputGraph::Vertex* next = pqt.findElement(point, 0.00001);
 			if (next == nullptr) {
 				next = graph->addVertex(point);
+				pqt.insert(*next);
 			}
 			if (prev != nullptr && !next->isNeighborOf(prev) && next != prev) {
 				graph->addEdge(prev, next);

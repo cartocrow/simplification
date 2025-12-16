@@ -2,7 +2,7 @@
 
 #include "graph_painter.h"
 
-void KSBBSimplifier::initialize(InputGraph* graph) {
+void KSBBSimplifier::initialize(InputGraph* graph, const int depth) {
 
 	if (hasResult()) {
 		clear();
@@ -25,9 +25,9 @@ void KSBBSimplifier::initialize(InputGraph* graph) {
 
 	m_base->orient();
 
-	Rectangle<MyKernel> box(0, 0, 100, 100);
-	m_pqt = new KSBBPQT(box, 3);
-	m_sqt = new KSBBSQT(box, 3, 0.05);
+	Rectangle<MyKernel> box = utils::boxOf<KSBBGraph::Vertex, MyKernel>(m_base->getVertices());
+	m_pqt = new KSBBPQT(box, depth);
+	m_sqt = new KSBBSQT(box, depth, 0.05);
 
 	m_graph = new KSBBGraph(*m_base);
 
@@ -37,10 +37,27 @@ void KSBBSimplifier::initialize(InputGraph* graph) {
 
 void KSBBSimplifier::runToComplexity(const int k) {
 	if (hasResult()) {
-		m_graph->recallComplexity(k);
-
-		if (m_graph->getEdgeCount() > k && m_graph->atPresent()) {
-			m_alg->runToComplexity(k);
+		if (k > m_graph->getEdgeCount()) {
+			// revert
+			m_graph->recallComplexity(k);
+		}
+		else if (k < m_graph->getEdgeCount()) {
+			if (m_graph->atPresent()) {
+				// already at present, run algorithm further
+				m_alg->runToComplexity(k);
+			}
+			else {
+				// in the past, go forward
+				m_graph->recallComplexity(k);
+				if (m_graph->atPresent()) {
+					// reached last result, reinit algorithm
+					m_alg->initialize(true, true);
+					if (k < m_graph->getEdgeCount()) {
+						// still more steps to try
+						m_alg->runToComplexity(k);
+					}
+				}
+			}
 		}
 	}
 }
@@ -58,9 +75,9 @@ int KSBBSimplifier::getComplexity() {
 	}
 }
 
-std::shared_ptr<GeometryPainting> KSBBSimplifier::getPainting() {
+std::shared_ptr<GeometryPainting> KSBBSimplifier::getPainting(const VertexMode vmode) {
 	if (hasResult()) {
-		return std::make_shared<GraphPainting<KSBBGraph>>(*m_graph, Color{ 80, 80, 200 }, 2);
+		return std::make_shared<GraphPainting<KSBBGraph>>(*m_graph, Color{ 80, 80, 200 }, 2, vmode);
 	}
 	else {
 		return nullptr;

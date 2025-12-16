@@ -1,14 +1,13 @@
 #include "vw.h"
 
+#include "library/utils.h"
 #include "graph_painter.h"
 
-void VWSimplifier::initialize(InputGraph* graph) {
+void VWSimplifier::initialize(InputGraph* graph, const int depth) {
 
 	if (hasResult()) {
 		clear();
 	}
-
-
 	m_base = new VWGraph::BaseGraph();
 
 	std::vector<VWGraph::Vertex*> vtxmap;
@@ -26,8 +25,8 @@ void VWSimplifier::initialize(InputGraph* graph) {
 
 	m_base->orient();
 
-	Rectangle<MyKernel> box(0, 0, 100, 100);
-	m_pqt = new VWPQT(box, 3);
+	Rectangle<MyKernel> box = utils::boxOf<VWGraph::Vertex,MyKernel>(m_base->getVertices());
+	m_pqt = new VWPQT(box, depth);
 
 	m_graph = new VWGraph(*m_base);
 
@@ -37,10 +36,27 @@ void VWSimplifier::initialize(InputGraph* graph) {
 
 void VWSimplifier::runToComplexity(const int k) {
 	if (hasResult()) {
-		m_graph->recallComplexity(k);
-
-		if (m_graph->getEdgeCount() > k && m_graph->atPresent()) {
-			m_alg->runToComplexity(k);
+		if (k > m_graph->getEdgeCount()) {
+			// revert
+			m_graph->recallComplexity(k);
+		}
+		else if (k < m_graph->getEdgeCount()) {
+			if (m_graph->atPresent()) {
+				// already at present, run algorithm further
+				m_alg->runToComplexity(k);
+			}
+			else {
+				// in the past, go forward
+				m_graph->recallComplexity(k);
+				if (m_graph->atPresent()) {
+					// reached last result, reinit algorithm
+					m_alg->initialize(true);
+					if (k < m_graph->getEdgeCount()) {
+						// still more steps to try
+						m_alg->runToComplexity(k);
+					}
+				}
+			}
 		}
 	}
 }
@@ -58,9 +74,9 @@ int VWSimplifier::getComplexity() {
 	}
 }
 
-std::shared_ptr<GeometryPainting> VWSimplifier::getPainting() {
+std::shared_ptr<GeometryPainting> VWSimplifier::getPainting(const VertexMode vmode) {
 	if (hasResult()) {
-		return std::make_shared<GraphPainting<VWGraph>>(*m_graph, Color{ 80, 80, 200 }, 2);
+		return std::make_shared<GraphPainting<VWGraph>>(*m_graph, Color{ 80, 80, 200 }, 2, vmode);
 	}
 	else {
 		return nullptr;

@@ -31,7 +31,7 @@ void testVW() {
 	// algorithms
 	using MyAlgorithm = VisvalingamWhyatt<MyGraph>;
 
-	
+
 	MyRectangle box(0, 0, 100, 100);
 	MyPQT* pqt = new MyPQT(box, 3);
 
@@ -57,7 +57,7 @@ void testVW() {
 	std::cout << "PRE " << g->getVertexCount() << "\n";
 	/*for (MyVertex* v : g->getVertices()) {
 		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
-		          << "\n";
+				  << "\n";
 	}*/
 
 	auto start = std::chrono::steady_clock::now();
@@ -69,13 +69,13 @@ void testVW() {
 
 	auto end = std::chrono::steady_clock::now();
 	auto diff = end - start;
-	
+
 	std::cout << std::chrono::duration<double, std::milli>(diff).count() << " ms" << std::endl;
 
 	std::cout << "POST " << g->getVertexCount() << "\n";
 	/*for (MyVertex* v : g->getVertices()) {
 		std::cout << " " << v->graphIndex() << ": " << v->getPoint() << ", deg = " << v->degree()
-		          << "\n";
+				  << "\n";
 	}*/
 
 	delete vw;
@@ -267,7 +267,7 @@ void testLargeKSBB() {
 	std::ostream& out = *ofs;
 
 	out << "<ipeselection pos = \"0 0\">\n";
-	
+
 	//out << "<path stroke = \"0\">\n";
 	//ksbb->runToComplexity(2000);	
 	//for (MyEdge* e : g->getEdges()) {
@@ -441,5 +441,42 @@ void testQueue() {
 	while (!q.empty()) {
 		MyElt* elt = q.pop();
 		std::cout << " " << elt->v;
+	}
+}
+
+struct PointElt {
+	Point<Inexact> pt;
+	Point<Inexact>& getPoint() {
+		return pt;
+	}
+
+	PointElt(Number<Inexact> x, Number<Inexact> y) : pt(x, y) {};
+};
+
+void testPQT() {
+	using PQT = PointQuadTree<PointElt, Inexact>;
+	Rectangle<Inexact> box(0, 0, 100, 100);
+	PQT pqt(box, 3);
+
+	PointElt a(10, 10);
+	PointElt b(50, 50);
+	PointElt c(75, 25);
+
+	pqt.insert(a);
+	pqt.insert(b);
+	pqt.insert(c);
+
+	std::cout << "box search" << std::endl;
+	pqt.findContained(box, [](PointElt& pe) {
+		std::cout << "  found " << pe.pt << std::endl;
+		});
+
+	std::cout << "elt search" << std::endl;
+	PointElt* e = pqt.findElement(Point<Inexact>(10, 10), 0.0001);
+	if (e == nullptr) {
+		std::cout << "  e not found" << std::endl;
+	}
+	else {
+		std::cout << "  e = " << e->pt << std::endl;
 	}
 }

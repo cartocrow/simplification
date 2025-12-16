@@ -18,10 +18,10 @@ private:
 	VWPQT* m_pqt = nullptr;
 	VW* m_alg = nullptr;
 public:
-	void initialize(InputGraph* graph) override;
+	void initialize(InputGraph* graph, const int depth) override;
 	void runToComplexity(const int k)  override;
 	int getComplexity() override;
-	std::shared_ptr<GeometryPainting> getPainting() override;
+	std::shared_ptr<GeometryPainting> getPainting(const VertexMode vmode) override;
 	void clear() override;
 	bool hasResult() override;
 	std::string getName() override {
