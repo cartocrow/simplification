@@ -103,6 +103,9 @@ namespace cartocrow::simplification {
 
 	template <class VD, class ED, typename K>
 	void StraightGraph<VD, ED, K>::removeVertex(Vertex* vtx) {
+
+		assert(vertices[vtx->index] == vtx);
+
 		oriented = false;
 		sorted = false;
 
@@ -129,6 +132,9 @@ namespace cartocrow::simplification {
 
 	template <class VD, class ED, typename K>
 	StraightEdge<VD, ED, K>* StraightGraph<VD, ED, K>::addEdge(Vertex* source, Vertex* target) {
+
+		assert(!source->isNeighborOf(target));
+
 		oriented = false;
 		sorted = false;
 
@@ -139,10 +145,14 @@ namespace cartocrow::simplification {
 		edges.push_back(e);
 		source->incident.push_back(e);
 		target->incident.push_back(e);
+
 		return e;
 	}
 	template <class VD, class ED, typename K>
 	void StraightGraph<VD, ED, K>::removeEdge(Edge* edge) {
+
+		assert(edges[edge->index] == edge);
+
 		oriented = false;
 		sorted = false;
 
@@ -207,6 +217,7 @@ namespace cartocrow::simplification {
 		}
 
 		oriented = true;
+		assert(verifyOriented());
 	}
 
 	template <class VD, class ED, typename K>
@@ -221,6 +232,7 @@ namespace cartocrow::simplification {
 			}
 		}
 		sorted = true;
+		assert(verifySorted());
 	}
 
 	template <class VD, class ED, typename K>
