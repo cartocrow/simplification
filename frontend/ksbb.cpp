@@ -2,6 +2,7 @@
 
 #include "library/edge_collapse.h"
 #include "graph_painter.h"
+#include "smoother.h"
 
 using namespace cartocrow::simplification;
 
@@ -16,6 +17,7 @@ static KSBBGraph* m_graph = nullptr;
 static KSBBPQT* m_pqt = nullptr;
 static KSBBSQT* m_sqt = nullptr;
 static KSBB* m_alg = nullptr;
+static InputGraph* m_smooth = nullptr;
 
 KSBBSimplifier& KSBBSimplifier::getInstance() {
 	if (instance == nullptr) {
@@ -108,4 +110,20 @@ void KSBBSimplifier::clear() {
 		delete m_sqt;
 		m_sqt = nullptr;
 	}
+}
+
+void KSBBSimplifier::smooth(Number<MyKernel> radius) {
+	if (hasSmoothResult()) {
+		delete m_smooth;
+	}
+
+	m_smooth = smoothGraph<KSBBGraph::BaseGraph>(&(m_graph->getBaseGraph()), radius);
+}
+
+bool KSBBSimplifier::hasSmoothResult() {
+	return m_smooth != nullptr;
+}
+
+std::shared_ptr<GeometryPainting> KSBBSimplifier::getSmoothPainting() {
+	return std::make_shared<GraphPainting<InputGraph>>(*m_smooth, Color{ 50, 150, 50 }, 2, VertexMode::DEG0_ONLY);
 }

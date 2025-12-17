@@ -21,5 +21,10 @@ public:
 	virtual std::shared_ptr<GeometryPainting> getPainting(const VertexMode vmode) = 0;
 	virtual void clear() = 0;
 	virtual bool hasResult() = 0;
+
+	virtual void smooth(Number<MyKernel> radius) = 0;
+	virtual bool hasSmoothResult() = 0;
+	virtual std::shared_ptr<GeometryPainting> getSmoothPainting() = 0;
+
 	virtual std::string getName() = 0;
 };

@@ -17,6 +17,11 @@ public:
 	std::shared_ptr<GeometryPainting> getPainting(const VertexMode vmode) override;
 	void clear() override;
 	bool hasResult() override;
+
+	void smooth(Number<MyKernel> radius) override;
+	bool hasSmoothResult() override;
+	std::shared_ptr<GeometryPainting> getSmoothPainting() override;
+
 	std::string getName() override {
 		return "Kronenfeld et al.";
 	}

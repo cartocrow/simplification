@@ -36,6 +36,9 @@ void SimplificationGUI::updatePaintings() {
 		if (alg->hasResult()) {
 			m_renderer->addPainting(alg->getPainting(vmode), alg->getName());
 		}
+		if (alg->hasSmoothResult()) {
+			m_renderer->addPainting(alg->getSmoothPainting(), alg->getName()+" (smooth)");
+		}
 	}
 
 	m_renderer->update();
@@ -118,6 +121,9 @@ SimplificationGUI::SimplificationGUI() {
 	complexitySlider->setMinimum(0);
 	vLayout->addWidget(complexitySlider);
 
+	auto* smoothButton = new QPushButton("Smooth");
+	vLayout->addWidget(smoothButton);
+
 	m_renderer = new GeometryWidget();
 	m_renderer->setDrawAxes(false);
 	setCentralWidget(m_renderer);
@@ -130,6 +136,14 @@ SimplificationGUI::SimplificationGUI() {
 		std::filesystem::path filePath = QFileDialog::getOpenFileName(this, tr("Select isolines"), startDir).toStdString();
 		if (filePath == "") return;
 		loadInput(filePath, depthSpin->value());
+		});
+
+	connect(smoothButton, &QPushButton::clicked, [this, algorithmSelector]() {
+		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		if (alg->hasResult()) {
+			alg->smooth(Number<MyKernel>(10));
+			updatePaintings();
+		}
 		});
 
 	connect(initButton, &QPushButton::clicked, [this, algorithmSelector, depthSpin]() {
@@ -187,7 +201,7 @@ SimplificationGUI::SimplificationGUI() {
 		});
 
 	connect(vertexMode, static_cast<void (QComboBox::*)(int)>(&QComboBox::activated), [this](int index) {
-			updatePaintings();
+		updatePaintings();
 		});
 
 	updatePaintings();
@@ -219,6 +233,7 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path, const int d
 	updatePaintings();
 
 	if (input != nullptr) {
+		input->orient();
 		desiredComplexity->setMaximum(input->getEdgeCount());
 		complexitySlider->setMaximum(input->getEdgeCount());
 		m_renderer->fitInView(utils::boxOf<InputGraph::Vertex, MyKernel>(input->getVertices()).bbox());

@@ -2,6 +2,7 @@
 
 #include "library/vertex_removal.h"
 #include "graph_painter.h"
+#include "smoother.h"
 
 using namespace cartocrow::simplification;
 
@@ -14,6 +15,7 @@ static VWGraph::BaseGraph* m_base = nullptr;
 static VWGraph* m_graph = nullptr;
 static VWPQT* m_pqt = nullptr;
 static VW* m_alg = nullptr;
+static InputGraph* m_smooth = nullptr;
 
 VWSimplifier& VWSimplifier::getInstance() {
 	if (instance == nullptr) {
@@ -102,4 +104,25 @@ void VWSimplifier::clear() {
 		delete m_pqt;
 		m_pqt = nullptr;
 	}
+
+	if (hasSmoothResult()) {
+		delete m_smooth;
+		m_smooth = nullptr;
+	}
+}
+
+void VWSimplifier::smooth(Number<MyKernel> radius) {
+	if (hasSmoothResult()) {
+		delete m_smooth;
+	}
+
+	m_smooth = smoothGraph<VWGraph::BaseGraph>(&(m_graph->getBaseGraph()), radius);
+}
+
+bool VWSimplifier::hasSmoothResult() {
+	return m_smooth != nullptr;
+}
+
+std::shared_ptr<GeometryPainting> VWSimplifier::getSmoothPainting() {
+	return std::make_shared<GraphPainting<InputGraph>>(*m_smooth, Color{50, 50, 150}, 2, VertexMode::DEG0_ONLY);
 }
