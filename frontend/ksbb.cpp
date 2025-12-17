@@ -30,22 +30,7 @@ void KSBBSimplifier::initialize(InputGraph* graph, const int depth) {
 		clear();
 	}
 
-	m_base = new KSBBGraph::BaseGraph();
-
-	std::vector<KSBBGraph::Vertex*> vtxmap;
-
-	for (InputGraph::Vertex* v : graph->getVertices()) {
-		KSBBGraph::Vertex* ov = m_base->addVertex(v->getPoint());
-		vtxmap.push_back(ov);
-	}
-
-	for (InputGraph::Edge* e : graph->getEdges()) {
-		KSBBGraph::Vertex* v = vtxmap[e->getSource()->graphIndex()];
-		KSBBGraph::Vertex* w = vtxmap[e->getTarget()->graphIndex()];
-		m_base->addEdge(v, w);
-	}
-
-	m_base->orient();
+	m_base = copyGraph<InputGraph,KSBBGraph::BaseGraph>(graph);
 
 	Rectangle<MyKernel> box = utils::boxOf<KSBBGraph::Vertex, MyKernel>(m_base->getVertices());
 	m_pqt = new KSBBPQT(box, depth);

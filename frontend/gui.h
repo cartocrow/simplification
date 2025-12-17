@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QSpinBox>
 #include <QComboBox>
+#include <QSlider>
 
 #include <cartocrow/renderer/geometry_widget.h>
 
@@ -24,6 +25,7 @@ private:
 
 	QSpinBox* desiredComplexity;
 	QComboBox* vertexMode;
+	QSlider* complexitySlider;
 
 	void updatePaintings();
 public:

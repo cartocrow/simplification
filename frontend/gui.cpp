@@ -89,6 +89,14 @@ SimplificationGUI::SimplificationGUI() {
 	auto* initButton = new QPushButton("Initialize");
 	vLayout->addWidget(initButton);
 
+	auto* stepSpinLabel = new QLabel("Step size");
+	vLayout->addWidget(stepSpinLabel);
+	auto* stepSpin = new QSpinBox();
+	stepSpin->setMinimum(1);
+	stepSpin->setMaximum(1000);
+	stepSpin->setValue(50);
+	vLayout->addWidget(stepSpin);
+
 	auto* reverseButton = new QPushButton("Step back");
 	vLayout->addWidget(reverseButton);
 	auto* stepButton = new QPushButton("Step forward");
@@ -99,6 +107,16 @@ SimplificationGUI::SimplificationGUI() {
 	desiredComplexity = new QSpinBox();
 	desiredComplexity->setValue(10);
 	vLayout->addWidget(desiredComplexity);
+
+	complexitySlider = new QSlider();
+	complexitySlider->setFocusPolicy(Qt::StrongFocus);
+	complexitySlider->setTickPosition(QSlider::TicksBothSides);
+	complexitySlider->setTickInterval(250);
+	complexitySlider->setSingleStep(stepSpin->value());
+	complexitySlider->setOrientation(Qt::Horizontal);
+	complexitySlider->setInvertedAppearance(true);
+	complexitySlider->setMinimum(0);
+	vLayout->addWidget(complexitySlider);
 
 	m_renderer = new GeometryWidget();
 	m_renderer->setDrawAxes(false);
@@ -119,24 +137,27 @@ SimplificationGUI::SimplificationGUI() {
 		if (input != nullptr) {
 			alg->initialize(input, depthSpin->value());
 			desiredComplexity->setValue(alg->getComplexity());
+			complexitySlider->setValue(alg->getComplexity());
 			updatePaintings();
 		}
 		});
 
-	connect(reverseButton, &QPushButton::clicked, [this, algorithmSelector]() {
+	connect(reverseButton, &QPushButton::clicked, [this, algorithmSelector, stepSpin]() {
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
-			alg->runToComplexity(alg->getComplexity() + 1);
+			alg->runToComplexity(alg->getComplexity() + stepSpin->value());
 			desiredComplexity->setValue(alg->getComplexity());
+			complexitySlider->setValue(alg->getComplexity());
 			m_renderer->repaint();
 		}
 		});
 
-	connect(stepButton, &QPushButton::clicked, [this, algorithmSelector]() {
+	connect(stepButton, &QPushButton::clicked, [this, algorithmSelector, stepSpin]() {
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
-			alg->runToComplexity(alg->getComplexity() - 1);
+			alg->runToComplexity(alg->getComplexity() - stepSpin->value());
 			desiredComplexity->setValue(alg->getComplexity());
+			complexitySlider->setValue(alg->getComplexity());
 			m_renderer->repaint();
 		}
 		});
@@ -146,6 +167,21 @@ SimplificationGUI::SimplificationGUI() {
 		if (alg->hasResult()) {
 			alg->runToComplexity(desiredComplexity->value());
 			desiredComplexity->setValue(alg->getComplexity());
+			complexitySlider->setValue(alg->getComplexity());
+			m_renderer->repaint();
+		}
+		});
+
+	connect(stepSpin, &QSpinBox::textChanged, [this, stepSpin]() {
+		complexitySlider->setSingleStep(stepSpin->value());
+		});
+
+	connect(complexitySlider, &QSlider::valueChanged, [this, algorithmSelector](int value) {
+		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		if (alg->hasResult()) {
+			alg->runToComplexity(value);
+			desiredComplexity->setValue(alg->getComplexity());
+			complexitySlider->setValue(alg->getComplexity());
 			m_renderer->repaint();
 		}
 		});
@@ -184,6 +220,7 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path, const int d
 
 	if (input != nullptr) {
 		desiredComplexity->setMaximum(input->getEdgeCount());
+		complexitySlider->setMaximum(input->getEdgeCount());
 		m_renderer->fitInView(utils::boxOf<InputGraph::Vertex, MyKernel>(input->getVertices()).bbox());
 	}
 }

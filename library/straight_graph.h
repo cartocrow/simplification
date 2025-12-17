@@ -146,6 +146,9 @@ namespace cartocrow::simplification {
 		}
 	};
 
+
+	template<class SourceGraph, class TargetGraph>
+	TargetGraph* copyGraph(SourceGraph* src);
 } // namespace cartocrow::simplification
 
 #include "straight_graph.hpp"

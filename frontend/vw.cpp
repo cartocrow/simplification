@@ -27,22 +27,8 @@ void VWSimplifier::initialize(InputGraph* graph, const int depth) {
 	if (hasResult()) {
 		clear();
 	}
-	m_base = new VWGraph::BaseGraph();
 
-	std::vector<VWGraph::Vertex*> vtxmap;
-
-	for (InputGraph::Vertex* v : graph->getVertices()) {
-		VWGraph::Vertex* ov = m_base->addVertex(v->getPoint());
-		vtxmap.push_back(ov);
-	}
-
-	for (InputGraph::Edge* e : graph->getEdges()) {
-		VWGraph::Vertex* v = vtxmap[e->getSource()->graphIndex()];
-		VWGraph::Vertex* w = vtxmap[e->getTarget()->graphIndex()];
-		m_base->addEdge(v, w);
-	}
-
-	m_base->orient();
+	m_base = copyGraph<InputGraph,VWGraph::BaseGraph>(graph);
 
 	Rectangle<MyKernel> box = utils::boxOf<VWGraph::Vertex,MyKernel>(m_base->getVertices());
 	m_pqt = new VWPQT(box, depth);
