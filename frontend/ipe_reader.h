@@ -6,7 +6,9 @@
 #include "library/utils.h"
 #include "simplification_algorithm.h"
 
-InputGraph* readIpeFile(const std::filesystem::path& file, const int depth) {
+template<class Graph>
+Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
+	using Vertex = Graph::Vertex;
 	std::shared_ptr<ipe::Document> document = IpeReader::loadIpeFile(file);
 
 	if (document->countPages() == 0) {
@@ -19,7 +21,7 @@ InputGraph* readIpeFile(const std::filesystem::path& file, const int depth) {
 
 	ipe::Page* page = document->page(0);
 
-	InputGraph* graph = new InputGraph();
+	Graph* graph = new Graph();
 
 	// compute a bounding box
 	std::vector<Point<MyKernel>> points;
@@ -51,7 +53,7 @@ InputGraph* readIpeFile(const std::filesystem::path& file, const int depth) {
 	Rectangle<MyKernel> box = utils::boxOf<MyKernel>(points);
 
 	// construct the graph
-	PointQuadTree<InputGraph::Vertex, MyKernel> pqt(box, depth);
+	PointQuadTree<Vertex, MyKernel> pqt(box, depth);
 
 	for (int i = 0; i < page->count(); i++) {
 		auto object = page->object(i);
@@ -64,14 +66,14 @@ InputGraph* readIpeFile(const std::filesystem::path& file, const int depth) {
 			if (subpath->type() != ipe::SubPath::Type::ECurve) continue;
 			auto curve = subpath->asCurve();
 
-			InputGraph::Vertex* prev = nullptr;
+			Vertex* prev = nullptr;
 			for (int k = 0; k < curve->countSegments(); k++) {
 				auto segment = curve->segment(k);
 				auto pt = matrix * segment.cp(0);
 
 				Point<MyKernel> point(pt.x, pt.y);
 
-				InputGraph::Vertex* next = pqt.findElement(point, 0.00001);
+				Vertex* next = pqt.findElement(point, 0.00001);
 				if (next == nullptr) {
 					next = graph->addVertex(point);
 					pqt.insert(*next);
@@ -86,7 +88,7 @@ InputGraph* readIpeFile(const std::filesystem::path& file, const int depth) {
 
 			Point<MyKernel> point(pt.x, pt.y);
 
-			InputGraph::Vertex* next = pqt.findElement(point, 0.00001);
+			Vertex* next = pqt.findElement(point, 0.00001);
 			if (next == nullptr) {
 				next = graph->addVertex(point);
 				pqt.insert(*next);

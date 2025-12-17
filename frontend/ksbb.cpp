@@ -1,6 +1,28 @@
 #include "ksbb.h"
 
+#include "library/edge_collapse.h"
 #include "graph_painter.h"
+
+using namespace cartocrow::simplification;
+
+using KSBBGraph = HistoricEdgeCollapseGraph<MyKernel>;
+using KSBBPQT = PointQuadTree<KSBBGraph::Vertex, MyKernel>;
+using KSBBSQT = SegmentQuadTree<KSBBGraph::Edge, MyKernel>;
+using KSBB = KronenfeldEtAl<KSBBGraph>;
+
+static KSBBSimplifier* instance = nullptr;
+static KSBBGraph::BaseGraph* m_base = nullptr;
+static KSBBGraph* m_graph = nullptr;
+static KSBBPQT* m_pqt = nullptr;
+static KSBBSQT* m_sqt = nullptr;
+static KSBB* m_alg = nullptr;
+
+KSBBSimplifier& KSBBSimplifier::getInstance() {
+	if (instance == nullptr) {
+		instance = new KSBBSimplifier();
+	}
+	return *instance;
+}
 
 void KSBBSimplifier::initialize(InputGraph* graph, const int depth) {
 
@@ -77,7 +99,7 @@ int KSBBSimplifier::getComplexity() {
 
 std::shared_ptr<GeometryPainting> KSBBSimplifier::getPainting(const VertexMode vmode) {
 	if (hasResult()) {
-		return std::make_shared<GraphPainting<KSBBGraph>>(*m_graph, Color{ 80, 80, 200 }, 2, vmode);
+		return std::make_shared<GraphPainting<KSBBGraph>>(*m_graph, Color{ 80, 200, 80 }, 2, vmode);
 	}
 	else {
 		return nullptr;

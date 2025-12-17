@@ -1,7 +1,26 @@
 #include "vw.h"
 
-#include "library/utils.h"
+#include "library/vertex_removal.h"
 #include "graph_painter.h"
+
+using namespace cartocrow::simplification;
+
+using VWGraph = HistoricVertexRemovalGraph<MyKernel>;
+using VWPQT = PointQuadTree<VWGraph::Vertex, MyKernel>;
+using VW = VisvalingamWhyatt<VWGraph>;
+
+static VWSimplifier* instance = nullptr;
+static VWGraph::BaseGraph* m_base = nullptr;
+static VWGraph* m_graph = nullptr;
+static VWPQT* m_pqt = nullptr;
+static VW* m_alg = nullptr;
+
+VWSimplifier& VWSimplifier::getInstance() {
+	if (instance == nullptr) {
+		instance = new VWSimplifier();
+	}
+	return *instance;
+}
 
 void VWSimplifier::initialize(InputGraph* graph, const int depth) {
 

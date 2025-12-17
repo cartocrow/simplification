@@ -44,8 +44,8 @@ void SimplificationGUI::updatePaintings() {
 SimplificationGUI::SimplificationGUI() {
 	setWindowTitle("Simplification");
 
-	algorithms.push_back(new VWSimplifier());
-	algorithms.push_back(new KSBBSimplifier());
+	algorithms.push_back(&VWSimplifier::getInstance());
+	algorithms.push_back(&KSBBSimplifier::getInstance());
 	int default_alg = 1;
 
 	auto* dockWidget = new QDockWidget();
@@ -177,7 +177,6 @@ SimplificationGUI::SimplificationGUI() {
 SimplificationGUI::~SimplificationGUI() {
 	for (SimplificationAlgorithm* alg : algorithms) {
 		alg->clear();
-		delete alg;
 	}
 	if (m_renderer != nullptr) {
 		delete m_renderer;
@@ -196,7 +195,7 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path, const int d
 		}
 	}
 
-	input = readIpeFile(path, depth);
+	input = readIpeFile<InputGraph>(path, depth);
 
 	updatePaintings();
 
