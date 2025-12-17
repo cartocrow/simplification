@@ -107,23 +107,6 @@ SimplificationGUI::SimplificationGUI() {
 	m_renderer->setMinZoom(0.01);
 	m_renderer->setMaxZoom(1000.0);
 
-	input = new InputGraph();
-
-	InputGraph::Vertex* a = input->addVertex(Point<MyKernel>(51, 51));
-	InputGraph::Vertex* b = input->addVertex(Point<MyKernel>(10, 40));
-	InputGraph::Vertex* c = input->addVertex(Point<MyKernel>(10, 90));
-	InputGraph::Vertex* d = input->addVertex(Point<MyKernel>(55, 55));
-	InputGraph::Vertex* e = input->addVertex(Point<MyKernel>(90, 10));
-	InputGraph::Vertex* f = input->addVertex(Point<MyKernel>(40, 10));
-	input->addEdge(a, b);
-	input->addEdge(b, c);
-	input->addEdge(c, d);
-	input->addEdge(d, e);
-	input->addEdge(e, f);
-	input->addEdge(f, a);
-
-	input->orient();
-
 	connect(loadFileButton, &QPushButton::clicked, [this, depthSpin]() {
 		QString startDir = ".";
 		std::filesystem::path filePath = QFileDialog::getOpenFileName(this, tr("Select isolines"), startDir).toStdString();

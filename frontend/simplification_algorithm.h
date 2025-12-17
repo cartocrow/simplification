@@ -11,7 +11,7 @@ using namespace cartocrow::simplification;
 using MyKernel = Exact;
 extern template StraightGraph<VoidData, VoidData, MyKernel>;
 using InputGraph = StraightGraph<VoidData, VoidData, MyKernel>;
-
+extern template GraphPainting<InputGraph>;
 
 class SimplificationAlgorithm {
 public:

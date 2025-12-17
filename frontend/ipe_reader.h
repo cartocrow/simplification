@@ -1,10 +1,10 @@
 #pragma once
 
 #include <ipepath.h>
+#include <cartocrow/reader/ipe_reader.h>
 
 #include "library/point_quad_tree.h"
 #include "library/utils.h"
-#include "simplification_algorithm.h"
 
 template<class Graph>
 Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
