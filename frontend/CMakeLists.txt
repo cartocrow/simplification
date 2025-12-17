@@ -3,6 +3,7 @@ set(SOURCES
     gui.cpp
     ksbb.cpp
     main.cpp
+    simplification_algorithm.cpp
     vw.cpp
 )
 add_executable(simplification ${SOURCES})

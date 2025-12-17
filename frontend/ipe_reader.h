@@ -67,7 +67,7 @@ Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
 			auto curve = subpath->asCurve();
 
 			Vertex* prev = nullptr;
-			for (int k = 0; k < curve->countSegments(); k++) {
+			for (int k = 0; k < curve->countSegmentsClosing(); k++) {
 				auto segment = curve->segment(k);
 				auto pt = matrix * segment.cp(0);
 
@@ -84,7 +84,7 @@ Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
 				prev = next;
 			}
 
-			auto pt = matrix * curve->segment(curve->countSegments() - 1).last();
+			auto pt = matrix * curve->segment(curve->countSegmentsClosing() - 1).last();
 
 			Point<MyKernel> point(pt.x, pt.y);
 
