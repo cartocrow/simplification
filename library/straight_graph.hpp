@@ -503,4 +503,31 @@ namespace cartocrow::simplification {
 
 		return result;
 	}
+
+	template<class SourceGraph, class TargetGraph>
+	TargetGraph* copyApproximateGraph(SourceGraph* src) {
+		TargetGraph* result = new TargetGraph();
+
+		std::vector<typename TargetGraph::Vertex*> vtxmap;
+
+		for (typename SourceGraph::Vertex* v : src->getVertices()) {
+			typename TargetGraph::Vertex* ov = result->addVertex(approximate(v->getPoint()));
+			vtxmap.push_back(ov);
+		}
+
+		for (typename SourceGraph::Edge* e : src->getEdges()) {
+			typename TargetGraph::Vertex* v = vtxmap[e->getSource()->graphIndex()];
+			typename TargetGraph::Vertex* w = vtxmap[e->getTarget()->graphIndex()];
+			result->addEdge(v, w);
+		}
+
+		if (src->isOriented()) {
+			result->orient();
+		}
+		if (src->isSorted()) {
+			result->sortIncidentEdges();
+		}
+
+		return result;
+	}
 } // namespace cartocrow::simplification
