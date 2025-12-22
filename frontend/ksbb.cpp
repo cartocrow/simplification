@@ -17,7 +17,7 @@ static KSBBGraph* m_graph = nullptr;
 static KSBBPQT* m_pqt = nullptr;
 static KSBBSQT* m_sqt = nullptr;
 static KSBB* m_alg = nullptr;
-static InputGraph* m_smooth = nullptr;
+static SmoothGraph* m_smooth = nullptr;
 
 KSBBSimplifier& KSBBSimplifier::getInstance() {
 	if (instance == nullptr) {
@@ -46,6 +46,11 @@ void KSBBSimplifier::initialize(InputGraph* graph, const int depth) {
 
 void KSBBSimplifier::runToComplexity(const int k) {
 	if (hasResult()) {
+		if (hasSmoothResult()) {
+			delete m_smooth;
+			m_smooth = nullptr;
+		}
+
 		if (k > m_graph->getEdgeCount()) {
 			// revert
 			m_graph->recallComplexity(k);
@@ -110,14 +115,20 @@ void KSBBSimplifier::clear() {
 		delete m_sqt;
 		m_sqt = nullptr;
 	}
-}
 
-void KSBBSimplifier::smooth(Number<MyKernel> radius) {
 	if (hasSmoothResult()) {
 		delete m_smooth;
+		m_smooth = nullptr;
+	}
+}
+
+void KSBBSimplifier::smooth(Number<Inexact> radius, int edges_on_semicircle) {
+	if (hasSmoothResult()) {
+		delete m_smooth;
+		m_smooth = nullptr;
 	}
 
-	m_smooth = smoothGraph<KSBBGraph::BaseGraph>(&(m_graph->getBaseGraph()), radius);
+	m_smooth = smoothGraph<KSBBGraph::BaseGraph>(&(m_graph->getBaseGraph()), radius, edges_on_semicircle);
 }
 
 bool KSBBSimplifier::hasSmoothResult() {
@@ -125,5 +136,5 @@ bool KSBBSimplifier::hasSmoothResult() {
 }
 
 std::shared_ptr<GeometryPainting> KSBBSimplifier::getSmoothPainting() {
-	return std::make_shared<GraphPainting<InputGraph>>(*m_smooth, Color{ 50, 150, 50 }, 2, VertexMode::DEG0_ONLY);
+	return std::make_shared<GraphPainting<SmoothGraph>>(*m_smooth, Color{ 50, 150, 50 }, 2, VertexMode::DEG0_ONLY);
 }

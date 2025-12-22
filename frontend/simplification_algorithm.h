@@ -22,7 +22,7 @@ public:
 	virtual void clear() = 0;
 	virtual bool hasResult() = 0;
 
-	virtual void smooth(Number<MyKernel> radius) = 0;
+	virtual void smooth(Number<Inexact> radius, int edges_on_semicircle) = 0;
 	virtual bool hasSmoothResult() = 0;
 	virtual std::shared_ptr<GeometryPainting> getSmoothPainting() = 0;
 

@@ -15,7 +15,7 @@ static VWGraph::BaseGraph* m_base = nullptr;
 static VWGraph* m_graph = nullptr;
 static VWPQT* m_pqt = nullptr;
 static VW* m_alg = nullptr;
-static InputGraph* m_smooth = nullptr;
+static SmoothGraph* m_smooth = nullptr;
 
 VWSimplifier& VWSimplifier::getInstance() {
 	if (instance == nullptr) {
@@ -43,6 +43,10 @@ void VWSimplifier::initialize(InputGraph* graph, const int depth) {
 
 void VWSimplifier::runToComplexity(const int k) {
 	if (hasResult()) {
+		if (hasSmoothResult()) {
+			delete m_smooth;
+		}
+
 		if (k > m_graph->getEdgeCount()) {
 			// revert
 			m_graph->recallComplexity(k);
@@ -111,12 +115,12 @@ void VWSimplifier::clear() {
 	}
 }
 
-void VWSimplifier::smooth(Number<MyKernel> radius) {
+void VWSimplifier::smooth(Number<Inexact> radius, int edges_on_semicircle) {
 	if (hasSmoothResult()) {
 		delete m_smooth;
 	}
 
-	m_smooth = smoothGraph<VWGraph::BaseGraph>(&(m_graph->getBaseGraph()), radius);
+	m_smooth = smoothGraph<VWGraph::BaseGraph>(&(m_graph->getBaseGraph()), radius, edges_on_semicircle);
 }
 
 bool VWSimplifier::hasSmoothResult() {
@@ -124,5 +128,5 @@ bool VWSimplifier::hasSmoothResult() {
 }
 
 std::shared_ptr<GeometryPainting> VWSimplifier::getSmoothPainting() {
-	return std::make_shared<GraphPainting<InputGraph>>(*m_smooth, Color{50, 50, 150}, 2, VertexMode::DEG0_ONLY);
+	return std::make_shared<GraphPainting<SmoothGraph>>(*m_smooth, Color{50, 50, 150}, 2, VertexMode::DEG0_ONLY);
 }

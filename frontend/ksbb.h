@@ -18,7 +18,7 @@ public:
 	void clear() override;
 	bool hasResult() override;
 
-	void smooth(Number<MyKernel> radius) override;
+	void smooth(Number<Inexact> radius, int edges_on_semicircle) override;
 	bool hasSmoothResult() override;
 	std::shared_ptr<GeometryPainting> getSmoothPainting() override;
 

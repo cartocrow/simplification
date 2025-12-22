@@ -4,6 +4,7 @@ set(SOURCES
     ksbb.cpp
     main.cpp
     simplification_algorithm.cpp
+    smoother.cpp
     vw.cpp
 )
 add_executable(simplification ${SOURCES})

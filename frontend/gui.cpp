@@ -121,6 +121,31 @@ SimplificationGUI::SimplificationGUI() {
 	complexitySlider->setMinimum(0);
 	vLayout->addWidget(complexitySlider);
 
+
+	auto* smoothHeader = new QLabel("<h3>Smoothing</h3>");
+	vLayout->addWidget(smoothHeader);
+
+	auto* smoothLabel = new QLabel("Smooth radius (% of sqrt(bbox area)");
+	vLayout->addWidget(smoothLabel);
+	auto* smoothSlider = new QSlider();
+	smoothSlider->setFocusPolicy(Qt::StrongFocus);
+	smoothSlider->setTickPosition(QSlider::TicksBothSides);
+	smoothSlider->setTickInterval(1000);
+	smoothSlider->setSingleStep(1);
+	smoothSlider->setOrientation(Qt::Horizontal);
+	smoothSlider->setMinimum(1);
+	smoothSlider->setMaximum(10000);
+	smoothSlider->setValue(500);
+	vLayout->addWidget(smoothSlider);
+
+	auto* samplesLabel = new QLabel("Edges on semicircle");
+	vLayout->addWidget(samplesLabel);
+	auto* samplesSpin = new QSpinBox();
+	samplesSpin->setMinimum(1);
+	samplesSpin->setMaximum(1000);
+	samplesSpin->setValue(90);
+	vLayout->addWidget(samplesSpin);
+
 	auto* smoothButton = new QPushButton("Smooth");
 	vLayout->addWidget(smoothButton);
 
@@ -138,13 +163,17 @@ SimplificationGUI::SimplificationGUI() {
 		loadInput(filePath, depthSpin->value());
 		});
 
-	connect(smoothButton, &QPushButton::clicked, [this, algorithmSelector]() {
+
+	auto smoothChange = [this, algorithmSelector, smoothSlider, samplesSpin]() {
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
-			alg->smooth(Number<MyKernel>(10));
+			alg->smooth(Number<Inexact>(smoothSlider->value() / (double)smoothSlider->maximum()), samplesSpin->value());
 			updatePaintings();
 		}
-		});
+		};
+	connect(smoothSlider, &QSlider::valueChanged, smoothChange);
+	connect(samplesSpin, &QSpinBox::textChanged, smoothChange);
+	connect(smoothButton, &QPushButton::clicked, smoothChange);
 
 	connect(initButton, &QPushButton::clicked, [this, algorithmSelector, depthSpin]() {
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
