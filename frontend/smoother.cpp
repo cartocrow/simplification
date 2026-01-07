@@ -63,25 +63,17 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 		Pt end = pt_v + v_rad * out_vec;
 
 		auto is = CGAL::intersection(Line<Inexact>(start, inc_vec.perpendicular(CGAL::COUNTERCLOCKWISE)), Line<Inexact>(end, out_vec.perpendicular(CGAL::COUNTERCLOCKWISE)));
+		if (!is.has_value()) {
+			// collinear
+			continue;
+		}
 		Pt* ctr = std::get_if<Point<Inexact>>(&*is);
 		if (ctr == nullptr) {
 			// collinear
 			continue;
 		}
 
-		// NB: angle is always less than 180 degrees by construction
-		Num dotp = CGAL::scalar_product(inc_vec, out_vec);
-		if (dotp > 1) {
-			dotp = 1;
-		}
-		Num angle = std::acos(dotp);
-
-		int samples = (int)std::floor(edges_on_semicircle * angle / std::numbers::pi);
-
-		if (CGAL::right_turn(v->previous()->getPoint(), pt_v, v->next()->getPoint())) {
-			// arc is clockwise
-			angle *= -1;
-		}
+		bool ccw = CGAL::right_turn(v->previous()->getPoint(), pt_v, v->next()->getPoint());
 
 		// move to start of arc
 		graph->shiftVertex(v, start);
@@ -92,6 +84,22 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 		// introduce intermediate samples
 
 		Vec arm = start - *ctr;
+		Vec endarm = end - *ctr;
+
+		// NB: angle is always less than 180 degrees by construction
+		Num dotp = CGAL::scalar_product(arm, endarm) / std::sqrt(arm.squared_length() * endarm.squared_length());
+		if (dotp > 1) {
+			dotp = 1;
+		}
+		Num angle = std::acos(dotp);
+
+		int samples = (int)std::floor(edges_on_semicircle * angle / std::numbers::pi);
+
+		if (ccw) {
+			// arc is clockwise
+			angle *= -1;
+		}
+
 		CGAL::Aff_transformation_2<Inexact> rot(CGAL::ROTATION, std::sin(angle / samples), std::cos(angle / samples));
 
 		while (samples > 1) {

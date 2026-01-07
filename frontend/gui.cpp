@@ -125,7 +125,7 @@ SimplificationGUI::SimplificationGUI() {
 	auto* smoothHeader = new QLabel("<h3>Smoothing</h3>");
 	vLayout->addWidget(smoothHeader);
 
-	auto* smoothLabel = new QLabel("Smooth radius (% of sqrt(bbox area)");
+	auto* smoothLabel = new QLabel("Smooth radius: % of sqrt(bbox area)");
 	vLayout->addWidget(smoothLabel);
 	auto* smoothSlider = new QSlider();
 	smoothSlider->setFocusPolicy(Qt::StrongFocus);
