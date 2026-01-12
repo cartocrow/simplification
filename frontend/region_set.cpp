@@ -71,7 +71,7 @@ namespace cartocrow {
 					if (prev == nullptr) {
 						first = curr;
 					}
-					else {
+					else if (prev != curr) {
 						InputGraph::Edge* e = prev->edgeTo(curr);
 
 						if (reg.empty() || reg.back().boundary != e->getBoundary()->graphIndex()) {
@@ -82,10 +82,12 @@ namespace cartocrow {
 					prev = curr;
 				}
 
-				InputGraph::Edge* e = prev->edgeTo(first);
+				if (prev != first) {
+					InputGraph::Edge* e = prev->edgeTo(first);
 
-				if (reg.empty() || reg.back().boundary != e->getBoundary()->graphIndex()) {
-					reg.push_back(Arc(e->getBoundary()->graphIndex(), e->getSource() == first));
+					if (reg.empty() || reg.back().boundary != e->getBoundary()->graphIndex()) {
+						reg.push_back(Arc(e->getBoundary()->graphIndex(), e->getSource() == first));
+					}
 				}
 
 				r.arcs.push_back(reg);
