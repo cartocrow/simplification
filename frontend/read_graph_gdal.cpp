@@ -65,7 +65,6 @@ std::pair<RegionSet<Exact>*, OGRSpatialReference*> readRegionSetUsingGDAL(const 
 		default: std::cout << "Did not handle this type of geometry: " << poGeometry->getGeometryName() << std::endl;
 		}
 
-
 		int i = 0;
 		for (auto&& oField : *poFeature) {
 			std::string name = poFeature->GetDefnRef()->GetFieldDefn(i)->GetNameRef();
@@ -78,6 +77,9 @@ std::pair<RegionSet<Exact>*, OGRSpatialReference*> readRegionSetUsingGDAL(const 
 				break;
 			case OFTInteger64:
 				region.attributes[name] = static_cast<int64_t>(oField.GetInteger64());
+				break;
+			case OFTString:
+				region.attributes[name] = static_cast<std::string>(oField.GetString());
 				break;
 			default:
 				std::cout << "Did not handle this type of attribute: " << oField.GetType() << std::endl;

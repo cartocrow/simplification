@@ -56,13 +56,13 @@ void SimplificationGUI::addInputTab() {
 	auto* loadFileButton = new QPushButton("Load file");
 	layout->addWidget(loadFileButton);
 
-	auto* txt = new QLabel("<p>Currently supported file formats:</p><ul><li>IPE files (*.ipe) containing polygons, polylines and points.</li><li>Shapefiles (*.shp) containing (multi)polygons with holes.</li>");
+	auto* txt = new QLabel("<p>Currently supported file formats:</p><ul><li>Shapefiles (*.shp) containing (multi)polygons with holes.</li><li>Geojson files (*.geojson) containing (multi)polygons with holes.</li><li>IPE files (*.ipe) containing polygons, polylines and points. Note that these cannot be saved to a Shapefile currently.</li></ul>");
 	txt->setWordWrap(true);
 	layout->addWidget(txt);
 
 
 	connect(loadFileButton, &QPushButton::clicked, [this]() {
-		std::filesystem::path filePath = QFileDialog::getOpenFileName(this, tr("Select map"), curr_dir, tr("Accepted formats (*.shp *.ipe);;IPE files (*.ipe);;SHP files (*.shp)")).toStdString();
+		std::filesystem::path filePath = QFileDialog::getOpenFileName(this, tr("Select map"), curr_dir, tr("Accepted formats (*.shp *.geojson *.ipe);;Shapefiles (*.shp);;Geojson (*.geojson);;IPE files(*.ipe)")).toStdString();
 		if (filePath == "") return;
 		curr_dir = QString::fromStdU16String(filePath.parent_path().u16string());
 		loadInput(filePath, this->depthSpin->value());
@@ -371,7 +371,7 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path, const int d
 	if (path.extension() == ".ipe") {
 		input = readIpeFile<InputGraph>(path, depth);
 	}
-	else if (path.extension() == ".shp") {
+	else if (path.extension() == ".shp" || path.extension() == ".geojson") {
 		auto [rs, sr] = readRegionSetUsingGDAL(path);
 		m_regions = rs;
 		m_spatialRef = sr;
