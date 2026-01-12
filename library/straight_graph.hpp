@@ -18,7 +18,15 @@ namespace cartocrow::simplification {
 
 			if (bwd->target == v && fwd->source == v) continue; // already satisfies orientation
 
+			std::cout << "edge assumptions not met" << std::endl;
 			return false;
+		}
+
+		for (Edge* e : edges) {
+			if (e->boundary == nullptr) {
+				std::cout << "edge without boundary pointer" << std::endl;
+				return false;
+			}
 		}
 
 		return true;
@@ -41,6 +49,23 @@ namespace cartocrow::simplification {
 		return true;
 	}
 
+
+	template <class VD, class ED, typename K>
+	void StraightGraph<VD, ED, K>::clearBoundaries() {
+		if (oriented) {
+			for (Edge* e : edges) {
+				e->boundary = nullptr;
+			}
+			for (Boundary* b : boundaries) {
+				delete b;
+			}
+			boundaries.clear();
+
+			oriented = false;
+		}
+	}
+
+
 	template <class VD, class ED, typename K>
 	StraightGraph<VD, ED, K>::StraightGraph() {
 		oriented = false;
@@ -49,6 +74,9 @@ namespace cartocrow::simplification {
 
 	template <class VD, class ED, typename K>
 	StraightGraph<VD, ED, K>::~StraightGraph() {
+		for (Boundary* b : boundaries) {
+			delete b;
+		}
 		for (Edge* e : edges) {
 			delete e;
 		}
@@ -79,6 +107,12 @@ namespace cartocrow::simplification {
 		return edges.size();
 	}
 
+
+	template <class VD, class ED, typename K>
+	int StraightGraph<VD, ED, K>::getBoundaryCount() {
+		return boundaries.size();
+	}
+
 	template <class VD, class ED, typename K>
 	std::vector<StraightVertex<VD, ED, K>*>& StraightGraph<VD, ED, K>::getVertices() {
 		return vertices;
@@ -90,8 +124,13 @@ namespace cartocrow::simplification {
 	}
 
 	template <class VD, class ED, typename K>
+	std::vector<StraightBoundary<VD, ED, K>*>& StraightGraph<VD, ED, K>::getBoundaries() {
+		return boundaries;
+	}
+
+	template <class VD, class ED, typename K>
 	StraightVertex<VD, ED, K>* StraightGraph<VD, ED, K>::addVertex(Point<K> pt) {
-		oriented = false;
+		clearBoundaries();
 		sorted = false;
 
 		Vertex* v = new Vertex();
@@ -105,8 +144,8 @@ namespace cartocrow::simplification {
 	void StraightGraph<VD, ED, K>::removeVertex(Vertex* vtx) {
 
 		assert(vertices[vtx->index] == vtx);
-
-		oriented = false;
+		
+		clearBoundaries();
 		sorted = false;
 
 		for (Edge* e : vtx->incident) {
@@ -134,8 +173,8 @@ namespace cartocrow::simplification {
 	StraightEdge<VD, ED, K>* StraightGraph<VD, ED, K>::addEdge(Vertex* source, Vertex* target) {
 
 		assert(!source->isNeighborOf(target));
-
-		oriented = false;
+		
+		clearBoundaries();
 		sorted = false;
 
 		Edge* e = new Edge();
@@ -153,7 +192,7 @@ namespace cartocrow::simplification {
 
 		assert(edges[edge->index] == edge);
 
-		oriented = false;
+		clearBoundaries();
 		sorted = false;
 
 		utils::listRemove(edge, edge->source->incident);
@@ -169,6 +208,12 @@ namespace cartocrow::simplification {
 
 	template <class VD, class ED, typename K>
 	void StraightGraph<VD, ED, K>::orient() {
+		if (oriented) {
+			return;
+		}
+
+		clearBoundaries();
+
 		for (Vertex* v : vertices) {
 			if (v->degree() != 2) continue; // irrelevant for orientation
 
@@ -176,6 +221,12 @@ namespace cartocrow::simplification {
 			Edge* fwd = v->incident[1];
 
 			if (bwd->target == v && fwd->source == v) continue; // already satisfies orientation
+			if (bwd->source == v && fwd->target == v) {
+				// just swap (necessary to ensure direction between graph copies remains the same)
+				v->incident[0] = fwd;
+				v->incident[1] = bwd;
+				continue;
+			}
 
 			if (bwd->target != v) {
 				bwd->reverse();
@@ -212,6 +263,41 @@ namespace cartocrow::simplification {
 						bwd->reverse();
 					}
 					bv = bwd->source;
+				}
+			}
+		}
+
+		for (Edge* e : edges) {
+			if (e->boundary != nullptr) continue; // already handled
+
+			Boundary* b = new Boundary();
+			b->index = boundaries.size();
+			boundaries.push_back(b);
+
+			e->boundary = b;
+
+			b->cyclic = false;
+			b->first = e;
+			b->last = nullptr;
+
+			if (b->first->source->degree() == 2) {
+
+				do {
+					b->first = b->first->previous();
+					b->first->boundary = b;
+				} while (b->first->source->degree() == 2 && b->first != e);
+
+				if (b->first == e) {
+					b->cyclic = true;
+					b->last = b->first->previous();
+				}
+			}
+
+			if (b->last == nullptr) {
+				b->last = e;
+				while (b->last->target->degree() == 2) {
+					b->last = b->last->next();
+					b->last->boundary = b;
 				}
 			}
 		}
@@ -253,7 +339,12 @@ namespace cartocrow::simplification {
 		newedge->index = edges.size();
 		newedge->source = v;
 		newedge->target = w;
+		newedge->boundary = edge->boundary;
 		edges.push_back(newedge);
+
+		if (edge->boundary->last == edge) {
+			edge->boundary->last = newedge;
+		}
 
 		v->incident.push_back(newedge);
 		utils::listReplace(edge, newedge, w->incident);
@@ -271,6 +362,13 @@ namespace cartocrow::simplification {
 
 		Edge* edge = v->incident[0]; // (u,v)
 		Edge* other = v->incident[1]; // (v,w)
+
+		// "other" can be the first edge for cyclic boundaries (cycle of purely deg-2 vertices)
+		if (other->boundary->first == other) {
+			other->boundary->first = edge;
+		} else if (other->boundary->last == other) {
+			other->boundary->last = edge;
+		}
 
 		// reroute edge and take its place in the other's target
 		edge->target = other->target;
@@ -325,7 +423,18 @@ namespace cartocrow::simplification {
 	}
 
 	template <class VD, class ED, typename K>
+	StraightEdge<VD,ED,K>* StraightVertex<VD, ED, K>::edgeTo(Vertex* v) {
+		for (Edge* e : incident) {
+			if (e->other(this) == v) {
+				return e;
+			}
+		}
+		return nullptr;
+	}
+
+	template <class VD, class ED, typename K>
 	bool StraightVertex<VD, ED, K>::isNeighborOf(Vertex* v) {
+		return edgeTo(v) != nullptr;
 		for (Edge* e : incident) {
 			if (e->other(this) == v) {
 				return true;
@@ -468,6 +577,11 @@ namespace cartocrow::simplification {
 	}
 
 	template <class VD, class ED, typename K>
+	StraightBoundary<VD, ED, K>* StraightEdge<VD, ED, K>::getBoundary() {
+		return boundary;
+	}
+
+	template <class VD, class ED, typename K>
 	StraightEdge<VD, ED, K>* StraightEdge<VD, ED, K>::previous() {
 		return source->incoming();
 	}
@@ -496,6 +610,21 @@ namespace cartocrow::simplification {
 
 		if (src->isOriented()) {
 			result->orient();
+
+			// ensure same boundary order
+			std::vector<typename TargetGraph::Boundary*>& tarbounds = result->getBoundaries();
+			for (typename SourceGraph::Boundary* srcbd : src->getBoundaries()) {	
+				typename TargetGraph::Boundary* tarbd = result->getEdges()[srcbd->first->graphIndex()]->getBoundary();
+				if (tarbd->index != srcbd->index) {
+					typename TargetGraph::Boundary* otherbd = tarbounds[srcbd->index];
+
+					tarbounds[srcbd->index] = tarbd;
+					tarbounds[tarbd->index] = otherbd;
+
+					otherbd->index = tarbd->index;
+					tarbd->index = srcbd->index;
+				}
+			}
 		}
 		if (src->isSorted()) {
 			result->sortIncidentEdges();
@@ -523,6 +652,63 @@ namespace cartocrow::simplification {
 
 		if (src->isOriented()) {
 			result->orient();
+			
+			// ensure same boundary order
+			std::vector<typename TargetGraph::Boundary*>& tarbounds = result->getBoundaries();
+			for (typename SourceGraph::Boundary* srcbd : src->getBoundaries()) {
+				typename TargetGraph::Boundary* tarbd = result->getEdges()[srcbd->first->graphIndex()]->getBoundary();
+				if (tarbd->index != srcbd->index) {
+					typename TargetGraph::Boundary* otherbd = tarbounds[srcbd->index];
+
+					tarbounds[srcbd->index] = tarbd;
+					tarbounds[tarbd->index] = otherbd;
+
+					otherbd->index = tarbd->index;
+					tarbd->index = srcbd->index;
+				}
+			}
+		}
+		if (src->isSorted()) {
+			result->sortIncidentEdges();
+		}
+
+		return result;
+	}
+
+	template<class SourceGraph, class TargetGraph>
+	TargetGraph* copyExactGraph(SourceGraph* src) {
+		TargetGraph* result = new TargetGraph();
+
+		std::vector<typename TargetGraph::Vertex*> vtxmap;
+
+		for (typename SourceGraph::Vertex* v : src->getVertices()) {
+			typename TargetGraph::Vertex* ov = result->addVertex(pretendExact(v->getPoint()));
+			vtxmap.push_back(ov);
+		}
+
+		for (typename SourceGraph::Edge* e : src->getEdges()) {
+			typename TargetGraph::Vertex* v = vtxmap[e->getSource()->graphIndex()];
+			typename TargetGraph::Vertex* w = vtxmap[e->getTarget()->graphIndex()];
+			result->addEdge(v, w);
+		}
+
+		if (src->isOriented()) {
+			result->orient();
+
+			// ensure same boundary order
+			std::vector<typename TargetGraph::Boundary*>& tarbounds = result->getBoundaries();
+			for (typename SourceGraph::Boundary* srcbd : src->getBoundaries()) {
+				typename TargetGraph::Boundary* tarbd = result->getEdges()[srcbd->first->graphIndex()]->getBoundary();
+				if (tarbd->index != srcbd->index) {
+					typename TargetGraph::Boundary* otherbd = tarbounds[srcbd->index];
+
+					tarbounds[srcbd->index] = tarbd;
+					tarbounds[tarbd->index] = otherbd;
+
+					otherbd->index = tarbd->index;
+					tarbd->index = srcbd->index;
+				}
+			}
 		}
 		if (src->isSorted()) {
 			result->sortIncidentEdges();

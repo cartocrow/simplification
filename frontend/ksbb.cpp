@@ -138,3 +138,23 @@ bool KSBBSimplifier::hasSmoothResult() {
 std::shared_ptr<GeometryPainting> KSBBSimplifier::getSmoothPainting() {
 	return std::make_shared<GraphPainting<SmoothGraph>>(*m_smooth, Color{ 50, 150, 50 }, 2, VertexMode::DEG0_ONLY);
 }
+
+void KSBBSimplifier::clearSmoothResult() {
+	if (m_smooth != nullptr) {
+		delete m_smooth;
+		m_smooth = nullptr;
+	}
+}
+
+
+InputGraph* KSBBSimplifier::resultToGraph() {
+	if (m_graph == nullptr) {
+		return nullptr;
+	}
+	if (m_smooth == nullptr) {
+		return copyGraph<KSBBGraph::BaseGraph,InputGraph>(m_base);
+	}
+	else {
+		return copyExactGraph<SmoothGraph,InputGraph>(m_smooth);
+	}
+}

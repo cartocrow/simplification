@@ -21,8 +21,11 @@ public:
 	void smooth(Number<Inexact> radius, int edges_on_semicircle) override;
 	bool hasSmoothResult() override;
 	std::shared_ptr<GeometryPainting> getSmoothPainting() override;
+	void clearSmoothResult() override;
 
 	std::string getName() override {
 		return "Visvalingam-Whyatt";
 	}
+
+	InputGraph* resultToGraph() override;
 };

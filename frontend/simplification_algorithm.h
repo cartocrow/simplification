@@ -25,6 +25,9 @@ public:
 	virtual void smooth(Number<Inexact> radius, int edges_on_semicircle) = 0;
 	virtual bool hasSmoothResult() = 0;
 	virtual std::shared_ptr<GeometryPainting> getSmoothPainting() = 0;
+	virtual void clearSmoothResult() = 0;
 
 	virtual std::string getName() = 0;
+
+	virtual InputGraph* resultToGraph() = 0;
 };

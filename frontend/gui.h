@@ -6,8 +6,11 @@
 #include <QComboBox>
 #include <QSlider>
 
+#include <ogrsf_frmts.h>
+
 #include <cartocrow/renderer/geometry_widget.h>
 
+#include "region_set.h"
 #include "simplification_algorithm.h"
 
 using namespace cartocrow;
@@ -20,12 +23,32 @@ class SimplificationGUI : public QMainWindow {
 
 private:
 	GeometryWidget* m_renderer = nullptr;
+	RegionSet<Exact>* m_regions = nullptr;
+	OGRSpatialReference* m_spatialRef = nullptr;
 	InputGraph* input = nullptr;
 	std::vector<SimplificationAlgorithm*> algorithms;
 
+	QTabWidget* tabs;
+	// IO
+	QString curr_dir = ".";
+	// preprocess
+	
+	// simplify
+	QComboBox* algorithmSelector;
 	QSpinBox* desiredComplexity;
-	QComboBox* vertexMode;
 	QSlider* complexitySlider;
+	// postprocess
+
+	// settings
+	QComboBox* vertexMode;
+	QSpinBox* depthSpin;
+
+	void addInputTab();
+	void addPreprocessTab();
+	void addSimplifyTab();
+	void addPostprocessTab();
+	void addOutputTab();
+	void addSettingsTab();
 
 	void updatePaintings();
 public:

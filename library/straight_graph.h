@@ -9,25 +9,31 @@ namespace cartocrow::simplification {
 
 	template <class VD, class ED, typename K> class StraightVertex;
 	template <class VD, class ED, typename K> class StraightEdge;
+	template <class VD, class ED, typename K> class StraightBoundary;
 
 	template <class VD, class ED, typename K> class StraightGraph {
 
 		template <class VD, class ED, typename K> friend class StraightVertex;
 		template <class VD, class ED, typename K> friend class StraightEdge;
+		template <class VD, class ED, typename K> friend class StraightBoundary;
 
 	public:
 		using Kernel = K;
 		using Vertex = StraightVertex<VD, ED, K>;
 		using Edge = StraightEdge<VD, ED, K>;
+		using Boundary = StraightBoundary<VD, ED, K>;
 
 	private:
 		std::vector<Vertex*> vertices;
 		std::vector<Edge*> edges;
+		std::vector<Boundary*> boundaries;
 		bool oriented;
 		bool sorted;
 
 		bool verifyOriented();
 		bool verifySorted();
+
+		void clearBoundaries();
 
 	public:
 		StraightGraph();
@@ -37,8 +43,10 @@ namespace cartocrow::simplification {
 		bool isSorted();
 		int getVertexCount();
 		int getEdgeCount();
+		int getBoundaryCount();
 		std::vector<Vertex*>& getVertices();
 		std::vector<Edge*>& getEdges();
+		std::vector<Boundary*>& getBoundaries();
 
 		Vertex* addVertex(Point<K> pt);
 		void removeVertex(Vertex* vtx);
@@ -65,11 +73,13 @@ namespace cartocrow::simplification {
 
 		template <class VD, class ED, typename K> friend class StraightGraph;
 		template <class VD, class ED, typename K> friend class StraightEdge;
+		template <class VD, class ED, typename K> friend class StraightBoundary;
 
 	public:
 		using Kernel = K;
 		using Vertex = StraightVertex<VD, ED, K>;
 		using Edge = StraightEdge<VD, ED, K>;
+		using Boundary = StraightBoundary<VD, ED, K>;
 		using Data = VD;
 
 	private:
@@ -87,6 +97,7 @@ namespace cartocrow::simplification {
 
 		Edge* edge(int i);
 		Vertex* neighbor(int i);
+		Edge* edgeTo(Vertex* v);
 		bool isNeighborOf(Vertex* v);
 
 		void setPoint(Point<K>& pt);
@@ -107,17 +118,20 @@ namespace cartocrow::simplification {
 
 		template <class VD, class ED, typename K> friend class StraightGraph;
 		template <class VD, class ED, typename K> friend class StraightVertex;
+		template <class VD, class ED, typename K> friend class StraightBoundary;
 
 	public:
 		using Kernel = K;
 		using Vertex = StraightVertex<VD, ED, K>;
 		using Edge = StraightEdge<VD, ED, K>;
+		using Boundary = StraightBoundary<VD, ED, K>;
 		using Data = ED;
 
 	private:
 		int index;
 		Vertex* source;
 		Vertex* target;
+		Boundary* boundary;
 		ED d;
 
 	public:
@@ -137,6 +151,8 @@ namespace cartocrow::simplification {
 		Vertex* sourceWalkNeighbor();
 		Vertex* targetWalkNeighbor();
 
+		Boundary* getBoundary();
+
 		// functions below are only for deg-2 vertices in an oriented graph
 		Edge* next();
 		Edge* previous();
@@ -146,12 +162,53 @@ namespace cartocrow::simplification {
 		}
 	};
 
+	template <class VD, class ED, typename K> class StraightBoundary {
+
+		template <class VD, class ED, typename K> friend class StraightGraph;
+		template <class VD, class ED, typename K> friend class StraightVertex;
+		template <class VD, class ED, typename K> friend class StraightEdge;
+		template <class SourceGraph, class TargetGraph> friend TargetGraph* copyGraph(SourceGraph* src);
+		template <class SourceGraph, class TargetGraph> friend TargetGraph* copyApproximateGraph(SourceGraph* src);
+		template <class SourceGraph, class TargetGraph> friend TargetGraph* copyExactGraph(SourceGraph* src);
+
+	public:
+		using Kernel = K;
+		using Vertex = StraightVertex<VD, ED, K>;
+		using Edge = StraightEdge<VD, ED, K>;
+		using Boundary = StraightBoundary<VD, ED, K>;
+
+	private:
+		int index;
+		Edge* first;
+		Edge* last;
+		bool cyclic;
+
+	public:
+		int graphIndex() {
+			return index;
+		}
+
+		Edge* getFirstEdge() {
+			return first;
+		}
+		Edge* getLastEdge() {
+			return last;
+		}
+
+		bool isCyclic() {
+			return cyclic;
+		}
+	};
+
 
 	template<class SourceGraph, class TargetGraph>
 	TargetGraph* copyGraph(SourceGraph* src);
 
 	template<class SourceGraph, class TargetGraph>
 	TargetGraph* copyApproximateGraph(SourceGraph* src);
+
+	template<class SourceGraph, class TargetGraph>
+	TargetGraph* copyExactGraph(SourceGraph* src);
 } // namespace cartocrow::simplification
 
 #include "straight_graph.hpp"

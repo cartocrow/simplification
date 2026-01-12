@@ -30,9 +30,9 @@ void VWSimplifier::initialize(InputGraph* graph, const int depth) {
 		clear();
 	}
 
-	m_base = copyGraph<InputGraph,VWGraph::BaseGraph>(graph);
+	m_base = copyGraph<InputGraph, VWGraph::BaseGraph>(graph);
 
-	Rectangle<MyKernel> box = utils::boxOf<VWGraph::Vertex,MyKernel>(m_base->getVertices());
+	Rectangle<MyKernel> box = utils::boxOf<VWGraph::Vertex, MyKernel>(m_base->getVertices());
 	m_pqt = new VWPQT(box, depth);
 
 	m_graph = new VWGraph(*m_base);
@@ -128,5 +128,24 @@ bool VWSimplifier::hasSmoothResult() {
 }
 
 std::shared_ptr<GeometryPainting> VWSimplifier::getSmoothPainting() {
-	return std::make_shared<GraphPainting<SmoothGraph>>(*m_smooth, Color{50, 50, 150}, 2, VertexMode::DEG0_ONLY);
+	return std::make_shared<GraphPainting<SmoothGraph>>(*m_smooth, Color{ 50, 50, 150 }, 2, VertexMode::DEG0_ONLY);
+}
+
+void VWSimplifier::clearSmoothResult() {
+	if (m_smooth != nullptr) {
+		delete m_smooth;
+		m_smooth = nullptr;
+	}
+}
+
+InputGraph* VWSimplifier::resultToGraph() {
+	if (m_graph == nullptr) {
+		return nullptr;
+	}
+	if (m_smooth == nullptr) {
+		return copyGraph<VWGraph::BaseGraph, InputGraph>(m_base);
+	}
+	else {
+		return copyExactGraph<SmoothGraph, InputGraph>(m_smooth);
+	}
 }
