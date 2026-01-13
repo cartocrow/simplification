@@ -44,20 +44,23 @@ namespace cartocrow::simplification {
 	}
 
 	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
-	bool VertexRemoval<MG, VRT>::runToComplexity(int k) {
-		while (graph.getEdgeCount() > k) {
-			if (!step()) {
+	bool VertexRemoval<MG, VRT>::run(std::optional<std::function<bool(int, Number<Kernel>)>> stop) {
+		while (true) {
+			Vertex* next = findNextStep();
+			if (next == nullptr) {
 				return false;
 			}
+
+			if (!stop.has_value() || (*stop)(graph.getEdgeCount(), next->data().cost)) {
+				return true;
+			}
+
+			performStep(next);
 		}
-		return true;
 	}
 
 	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
-	bool VertexRemoval<MG, VRT>::step() {
-		if constexpr (ModifiableGraphWithHistory<MG>) {
-			assert(graph.atPresent());
-		}
+	MG::Vertex* VertexRemoval<MG, VRT>::findNextStep() {
 
 		while (!queue.empty()) {
 			Vertex* v = queue.pop();
@@ -82,48 +85,69 @@ namespace cartocrow::simplification {
 				});
 
 			if (v->data().blocked_by.empty()) {
+				// not blocked, this is the next step
+				return v;
+			} // else: continue searching
+		}
 
-				// not blocked, executing!
+		// no valid steps exist
+		return nullptr;
+	}
 
-				// remove from blocking lists and search structure
-				pqt.remove(*v);
-				for (Vertex* b : v->data().blocking) {
+	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
+	void VertexRemoval<MG, VRT>::performStep(Vertex* v) {
 
-					if (utils::listRemove(v, b->data().blocked_by)) {
-						if (b->data().blocked_by.empty()) {
-							queue.push(b);
-						}
-					}
+		// remove from blocking lists and search structure
+		pqt.remove(*v);
+		for (Vertex* b : v->data().blocking) {
+
+			if (utils::listRemove(v, b->data().blocked_by)) {
+				if (b->data().blocked_by.empty()) {
+					queue.push(b);
 				}
-
-				// perform the removal
-				if constexpr (ModifiableGraphWithHistory<MG>) {
-					graph.startBatch(v->data().cost);
-				}
-
-				graph.mergeVertex(v);
-
-				if constexpr (ModifiableGraphWithHistory<MG>) {
-					graph.endBatch();
-				}
-
-				// update the neighbors
-				update(u);
-				update(w);
-
-				// and their common neighbors (to avoid issues with triangles collapsing)
-				for (int i = 0; i < u->degree(); i++) {
-					Vertex* nbr = u->neighbor(i);
-					if (nbr->isNeighborOf(w)) {
-						update(nbr);
-					}
-				}
-
-				return true;
 			}
 		}
 
-		return false;
+		// perform the removal
+		Vertex* u = v->previous();
+		Vertex* w = v->next();
+
+		if constexpr (ModifiableGraphWithHistory<MG>) {
+			graph.startBatch(v->data().cost);
+		}
+
+		graph.mergeVertex(v);
+
+		if constexpr (ModifiableGraphWithHistory<MG>) {
+			graph.endBatch();
+		}
+
+		// update the neighbors
+		update(u);
+		update(w);
+
+		// and their common neighbors (to avoid issues with triangles collapsing)
+		for (int i = 0; i < u->degree(); i++) {
+			Vertex* nbr = u->neighbor(i);
+			if (nbr->isNeighborOf(w)) {
+				update(nbr);
+			}
+		}
+	}
+
+	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
+	bool VertexRemoval<MG, VRT>::step() {
+		if constexpr (ModifiableGraphWithHistory<MG>) {
+			assert(graph.atPresent());
+		}
+
+		Vertex* v = findNextStep();
+		if (v == nullptr) {
+			return false;
+		}
+
+		performStep(v);
+		return true;
 	}
 
 	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>

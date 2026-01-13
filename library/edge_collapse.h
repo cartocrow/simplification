@@ -79,13 +79,16 @@ namespace cartocrow::simplification {
 		bool blocks(Edge& edge, Edge* collapse);
 		bool validateState();
 
+		Edge* findNextStep();
+		void performStep(Edge* e);
 	public:
 		EdgeCollapse(MG& g, SegmentQuadTree<Edge, Kernel>& sqt, PointQuadTree<Vertex, Kernel>& pqt);
 		~EdgeCollapse();
 
 		void initialize(bool initSQT, bool initPQT);
-		bool runToComplexity(int k);
+		bool run(std::optional<std::function<bool(int,Number<Kernel>)>> stop = std::nullopt);
 		bool step();
+
 	};
 
 

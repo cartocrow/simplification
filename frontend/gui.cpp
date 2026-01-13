@@ -3,6 +3,7 @@
 #include <QCheckBox>
 #include <QDockWidget>
 #include <QFileDialog>
+#include <QProgressDialog>
 #include <QLabel>
 #include <QPushButton>
 #include <QVBoxLayout>
@@ -65,7 +66,15 @@ void SimplificationGUI::addInputTab() {
 		std::filesystem::path filePath = QFileDialog::getOpenFileName(this, tr("Select map"), curr_dir, tr("Accepted formats (*.shp *.geojson *.ipe);;Shapefiles (*.shp);;Geojson (*.geojson);;IPE files(*.ipe)")).toStdString();
 		if (filePath == "") return;
 		curr_dir = QString::fromStdU16String(filePath.parent_path().u16string());
+
+		QProgressDialog progress("Loading file", nullptr, 0, 2, this);
+		progress.setWindowModality(Qt::WindowModal);
+		progress.setMinimumDuration(1000);
+		progress.setValue(1);
+
 		loadInput(filePath, this->depthSpin->value());
+
+		progress.setValue(2);
 		});
 }
 
@@ -128,43 +137,73 @@ void SimplificationGUI::addSimplifyTab() {
 	complexitySlider->setMinimum(0);
 	layout->addWidget(complexitySlider);
 
+	auto runAlg = [this](SimplificationAlgorithm* alg, int target) {
+
+		int start = alg->getComplexity();
+
+		if (target == start) {
+			return;
+		}
+
+		QProgressDialog progress("Simplifying", "Stop", 0, target < start ? start - target : target - start, this);
+		progress.setWindowModality(Qt::WindowModal);
+		progress.setMinimumDuration(1000);
+		progress.setValue(0);
+
+		alg->runToComplexity(target,
+			[&progress, &target, &start](int c) {
+				std::string lbl = "Complexity " + std::to_string(c);
+				progress.setLabelText(QString::fromStdString(lbl));
+				progress.setValue(target < start ? start - c : target - c);
+			},
+			[&progress]() {
+				return progress.wasCanceled();
+			});
+
+		progress.setValue(target < start ? start - target : target - start);
+
+		desiredComplexity->setValue(alg->getComplexity());
+		complexitySlider->setValue(alg->getComplexity());
+		m_renderer->repaint();
+		};
+
 	connect(initButton, &QPushButton::clicked, [this]() {
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (input != nullptr) {
+
+			QProgressDialog progress("Initializing", nullptr, 0, 2, this);
+			progress.setWindowModality(Qt::WindowModal);
+			progress.setMinimumDuration(1000);
+			progress.setValue(1);
+
 			alg->initialize(input, depthSpin->value());
+
+			progress.setValue(2);
+
 			desiredComplexity->setValue(alg->getComplexity());
 			complexitySlider->setValue(alg->getComplexity());
 			updatePaintings();
 		}
 		});
 
-	connect(reverseButton, &QPushButton::clicked, [this, stepSpin]() {
+	connect(reverseButton, &QPushButton::clicked, [this, stepSpin, runAlg]() {
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
-			alg->runToComplexity(alg->getComplexity() + stepSpin->value());
-			desiredComplexity->setValue(alg->getComplexity());
-			complexitySlider->setValue(alg->getComplexity());
-			m_renderer->repaint();
+			runAlg(alg, alg->getComplexity() + stepSpin->value());
 		}
 		});
 
-	connect(stepButton, &QPushButton::clicked, [this, stepSpin]() {
+	connect(stepButton, &QPushButton::clicked, [this, stepSpin, runAlg]() {
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
-			alg->runToComplexity(alg->getComplexity() - stepSpin->value());
-			desiredComplexity->setValue(alg->getComplexity());
-			complexitySlider->setValue(alg->getComplexity());
-			m_renderer->repaint();
+			runAlg(alg, alg->getComplexity() - stepSpin->value());
 		}
 		});
 
-	connect(runButton, &QPushButton::clicked, [this]() {
+	connect(runButton, &QPushButton::clicked, [this, runAlg]() {
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
-			alg->runToComplexity(desiredComplexity->value());
-			desiredComplexity->setValue(alg->getComplexity());
-			complexitySlider->setValue(alg->getComplexity());
-			m_renderer->repaint();
+			runAlg(alg, desiredComplexity->value());
 		}
 		});
 
@@ -172,13 +211,10 @@ void SimplificationGUI::addSimplifyTab() {
 		complexitySlider->setSingleStep(stepSpin->value());
 		});
 
-	connect(complexitySlider, &QSlider::valueChanged, [this](int value) {
+	connect(complexitySlider, &QSlider::valueChanged, [this, runAlg](int value) {
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
-			alg->runToComplexity(value);
-			desiredComplexity->setValue(alg->getComplexity());
-			complexitySlider->setValue(alg->getComplexity());
-			m_renderer->repaint();
+			runAlg(alg, value);
 		}
 		});
 }
@@ -219,7 +255,25 @@ void SimplificationGUI::addPostprocessTab() {
 	auto smoothChange = [this, smoothSlider, samplesSpin]() {
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
-			alg->smooth(Number<Inexact>(smoothSlider->value() / (double)smoothSlider->maximum()), samplesSpin->value());
+
+			int c = alg->getComplexity();
+
+			QProgressDialog progress("Smoothing", nullptr, 0, c, this);
+			progress.setWindowModality(Qt::WindowModal);
+			progress.setMinimumDuration(1000);
+
+			alg->smooth(Number<Inexact>(smoothSlider->value() / (double)smoothSlider->maximum()), samplesSpin->value(),
+				[&progress](std::string phase, int index, int max) {
+					if (index % 100 == 0) { // dont perform all updates to gui...
+						progress.setLabelText(QString::fromStdString(phase));
+						progress.setMaximum(max);
+						progress.setValue(index);
+					}
+
+				});
+
+			progress.setValue(progress.maximum());
+
 			updatePaintings();
 		}
 		};
@@ -267,9 +321,17 @@ void SimplificationGUI::addOutputTab() {
 		if (filePath == "") return;
 		curr_dir = QString::fromStdU16String(filePath.parent_path().u16string());
 
+
+		QProgressDialog progress("Exporting", nullptr, 0, 2, this);
+		progress.setWindowModality(Qt::WindowModal);
+		progress.setMinimumDuration(1000);
+		progress.setValue(1);
+
 		InputGraph* graph = alg->resultToGraph();
 
 		exportRegionSetUsingGDAL<InputGraph>(filePath, graph, *m_regions, m_spatialRef);
+
+		progress.setValue(2);
 
 		//std::filesystem::path filePath = QFileDialog::getExistingDirectory(this, tr("Select folder for Shp file"), curr_dir).toStdString();
 		//if (filePath == "") return;
@@ -348,7 +410,6 @@ SimplificationGUI::~SimplificationGUI() {
 	}
 	if (m_regions != nullptr) {
 		delete m_regions;
-		delete m_spatialRef;
 	}
 }
 
@@ -364,8 +425,6 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path, const int d
 	if (m_regions != nullptr) {
 		delete m_regions;
 		m_regions = nullptr;
-		delete m_spatialRef;
-		m_spatialRef = nullptr;
 	}
 
 	if (path.extension() == ".ipe") {

@@ -24,7 +24,7 @@ class SimplificationGUI : public QMainWindow {
 private:
 	GeometryWidget* m_renderer = nullptr;
 	RegionSet<Exact>* m_regions = nullptr;
-	OGRSpatialReference* m_spatialRef = nullptr;
+	std::optional<std::string> m_spatialRef;
 	InputGraph* input = nullptr;
 	std::vector<SimplificationAlgorithm*> algorithms;
 

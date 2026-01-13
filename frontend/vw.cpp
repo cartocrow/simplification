@@ -16,6 +16,7 @@ static VWGraph* m_graph = nullptr;
 static VWPQT* m_pqt = nullptr;
 static VW* m_alg = nullptr;
 static SmoothGraph* m_smooth = nullptr;
+static bool m_reinit = false;
 
 VWSimplifier& VWSimplifier::getInstance() {
 	if (instance == nullptr) {
@@ -39,34 +40,45 @@ void VWSimplifier::initialize(InputGraph* graph, const int depth) {
 
 	m_alg = new VW(*m_graph, *m_pqt);
 	m_alg->initialize(true);
+	m_reinit = false;
 }
 
-void VWSimplifier::runToComplexity(const int k) {
+void VWSimplifier::runToComplexity(const int k, std::optional<std::function<void(int)>> progress,
+	std::optional<std::function<bool()>> cancelled) {
 	if (hasResult()) {
-		if (hasSmoothResult()) {
-			delete m_smooth;
-		}
+		clearSmoothResult();
 
 		if (k > m_graph->getEdgeCount()) {
 			// revert
 			m_graph->recallComplexity(k);
+			m_reinit = true;
 		}
 		else if (k < m_graph->getEdgeCount()) {
-			if (m_graph->atPresent()) {
-				// already at present, run algorithm further
-				m_alg->runToComplexity(k);
-			}
-			else {
-				// in the past, go forward
+			if (!m_graph->atPresent()) {
+				// first redo known operations
 				m_graph->recallComplexity(k);
-				if (m_graph->atPresent()) {
-					// reached last result, reinit algorithm
+				m_reinit = true;
+			}
+
+			if (m_graph->atPresent() && k < m_graph->getEdgeCount()) {
+				// see if there's more to perform
+				if (m_reinit) {
+					// recallComplexity was invoked, reinitialize algorithm
 					m_alg->initialize(true);
-					if (k < m_graph->getEdgeCount()) {
-						// still more steps to try
-						m_alg->runToComplexity(k);
-					}
+					m_reinit = false;
 				}
+
+				// already at present, run algorithm further
+				m_alg->run([&](int complexity, Number<Exact> cost) {
+					if (progress.has_value()) {
+						(*progress)(complexity);
+					}
+					if (cancelled.has_value() && (*cancelled)()) {
+						return true;
+					}
+
+					return complexity <= k;
+					});
 			}
 		}
 	}
@@ -109,18 +121,13 @@ void VWSimplifier::clear() {
 		m_pqt = nullptr;
 	}
 
-	if (hasSmoothResult()) {
-		delete m_smooth;
-		m_smooth = nullptr;
-	}
+	clearSmoothResult();
 }
 
-void VWSimplifier::smooth(Number<Inexact> radius, int edges_on_semicircle) {
-	if (hasSmoothResult()) {
-		delete m_smooth;
-	}
+void VWSimplifier::smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
+	clearSmoothResult();
 
-	m_smooth = smoothGraph<VWGraph::BaseGraph>(&(m_graph->getBaseGraph()), radius, edges_on_semicircle);
+	m_smooth = smoothGraph<VWGraph::BaseGraph>(&(m_graph->getBaseGraph()), radius, edges_on_semicircle, progress);
 }
 
 bool VWSimplifier::hasSmoothResult() {

@@ -185,23 +185,30 @@ namespace cartocrow::simplification {
 	}
 
 	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
-	bool EdgeCollapse<MG, ECT>::runToComplexity(int k) {
-		while (graph.getEdgeCount() > k) {
+	bool EdgeCollapse<MG, ECT>::run(std::optional<std::function<bool(int, Number<Kernel>)>> stop) {
+		while (true) {
 			assert(validateState());
-			if (!step()) {
+
+			Edge* next = findNextStep();
+			if (next == nullptr) {
 				return false;
 			}
+
+			if (!stop.has_value() || (*stop)(graph.getEdgeCount(), next->data().cost)) {
+				return true;
+			}
+
+			performStep(next);
 
 			// useful for debugging: stop when an invalid state is reached, without erroring
 			//if (!validateState()) {
 			//	return false;
 			//}
 		}
-		return true;
 	}
 
 	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
-	bool EdgeCollapse<MG, ECT>::step() {
+	MG::Edge* EdgeCollapse<MG, ECT>::findNextStep() {
 		if constexpr (ModifiableGraphWithHistory<MG>) {
 			assert(graph.atPresent());
 		}
@@ -239,104 +246,127 @@ namespace cartocrow::simplification {
 			} // else: no difference, cannot be blocked
 
 			if (!edata.blocked_by_degzero && edata.blocked_by.empty()) {
+				// not blocked, this is the next step
+				return e;
+			} // else: continue searching
+		}
 
-				// not blocked, executing!
+		// no steps exist
+		return nullptr;
+	}
+
+	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
+	void EdgeCollapse<MG, ECT>::performStep(Edge* e) {
+		if constexpr (ModifiableGraphWithHistory<MG>) {
+			assert(graph.atPresent());
+		}
+
+		auto& edata = e->data();
 
 				// remove from blocking lists and search structure
-				Edge* prev = e->previous();
-				Edge* next = e->next();
-				sqt.remove(*e);
-				sqt.remove(*prev);
-				sqt.remove(*next);
+		Edge* prev = e->previous();
+		Edge* next = e->next();
+		sqt.remove(*e);
+		sqt.remove(*prev);
+		sqt.remove(*next);
 
-				queue.remove(prev);
-				queue.remove(next);
+		queue.remove(prev);
+		queue.remove(next);
 
-				for (Edge* b : edata.blocking) {
-					if (utils::listRemove(e, b->data().blocked_by)) {
-						if (b->data().blocked_by.empty() && !b->data().blocked_by_degzero) {
-							queue.push(b);
-						}
-					}
+		for (Edge* b : edata.blocking) {
+			if (utils::listRemove(e, b->data().blocked_by)) {
+				if (b->data().blocked_by.empty() && !b->data().blocked_by_degzero) {
+					queue.push(b);
 				}
-				edata.blocking.clear();
+			}
+		}
+		edata.blocking.clear();
 
-				for (Edge* b : prev->data().blocking) {
-					if (utils::listRemove(prev, b->data().blocked_by)) {
-						if (b->data().blocked_by.empty() && !b->data().blocked_by_degzero) {
-							queue.push(b);
-						}
-					}
+		for (Edge* b : prev->data().blocking) {
+			if (utils::listRemove(prev, b->data().blocked_by)) {
+				if (b->data().blocked_by.empty() && !b->data().blocked_by_degzero) {
+					queue.push(b);
 				}
-				prev->data().blocking.clear();
+			}
+		}
+		prev->data().blocking.clear();
 
-				for (Edge* b : next->data().blocking) {
-					if (utils::listRemove(next, b->data().blocked_by)) {
-						if (b->data().blocked_by.empty() && !b->data().blocked_by_degzero) {
-							queue.push(b);
-						}
-					}
+		for (Edge* b : next->data().blocking) {
+			if (utils::listRemove(next, b->data().blocked_by)) {
+				if (b->data().blocked_by.empty() && !b->data().blocked_by_degzero) {
+					queue.push(b);
 				}
-				next->data().blocking.clear();
+			}
+		}
+		next->data().blocking.clear();
 
-				if constexpr (ModifiableGraphWithHistory<MG>) {
-					graph.startBatch(edata.cost);
-				}
+		if constexpr (ModifiableGraphWithHistory<MG>) {
+			graph.startBatch(edata.cost);
+		}
 
-				Vertex* src = e->getSource();
-				Vertex* tar = e->getTarget();
+		Vertex* src = e->getSource();
+		Vertex* tar = e->getTarget();
 
-				if (edata.erase_both) {
+		if (edata.erase_both) {
 
-					graph.mergeVertex(src);
-					Edge* ne = graph.mergeVertex(tar);
+			graph.mergeVertex(src);
+			Edge* ne = graph.mergeVertex(tar);
 
-					// insert the one new edge
-					sqt.insert(*ne);
+			// insert the one new edge
+			sqt.insert(*ne);
 
-					// update it and its neighbors, if applicable
-					update(ne);
-					if (ne->getSource()->degree() == 2) {
-						update(ne->previous());
-					}
-					if (ne->getTarget()->degree() == 2) {
-						update(ne->next());
-					}
-				}
-				else {
+			// update it and its neighbors, if applicable
+			update(ne);
+			if (ne->getSource()->degree() == 2) {
+				update(ne->previous());
+			}
+			if (ne->getTarget()->degree() == 2) {
+				update(ne->next());
+			}
+		}
+		else {
 
-					// NB: edata will be erased on removing vertex b, hence, we need a local copy
-					Point<Kernel> pt = edata.point;
+			// NB: edata will be erased on removing vertex b, hence, we need a local copy
+			Point<Kernel> pt = edata.point;
 
-					// perform the collapse
-					graph.mergeVertex(src);
-					graph.shiftVertex(tar, pt);
+			// perform the collapse
+			graph.mergeVertex(src);
+			graph.shiftVertex(tar, pt);
 
-					// insert the two new edges
-					sqt.insert(*tar->incoming());
-					sqt.insert(*tar->outgoing());
+			// insert the two new edges
+			sqt.insert(*tar->incoming());
+			sqt.insert(*tar->outgoing());
 
-					// update them and their neighbors, if applicable
-					update(tar->incoming());
-					update(tar->outgoing());
+			// update them and their neighbors, if applicable
+			update(tar->incoming());
+			update(tar->outgoing());
 
-					if (tar->previous()->degree() == 2) {
-						update(tar->previous()->incoming());
-					}
-					if (tar->next()->degree() == 2) {
-						update(tar->next()->outgoing());
-					}
-				}
-
-				if constexpr (ModifiableGraphWithHistory<MG>) {
-					graph.endBatch();
-				}
-
-				return true;
+			if (tar->previous()->degree() == 2) {
+				update(tar->previous()->incoming());
+			}
+			if (tar->next()->degree() == 2) {
+				update(tar->next()->outgoing());
 			}
 		}
 
-		return false;
+		if constexpr (ModifiableGraphWithHistory<MG>) {
+			graph.endBatch();
+		}
+	}
+
+	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
+	bool EdgeCollapse<MG, ECT>::step() {
+		if constexpr (ModifiableGraphWithHistory<MG>) {
+			assert(graph.atPresent());
+		}
+
+		Edge* e = findNextStep();
+		if (e == nullptr) {
+			return false;
+		}
+
+		performStep(e);
+		return true;
 	}
 
 	template <typename G>

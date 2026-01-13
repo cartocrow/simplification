@@ -83,12 +83,15 @@ namespace cartocrow::simplification {
 			IndexedPriorityQueue<GraphQueueTraits<Vertex, Kernel>> queue;
 
 			void update(Vertex* v);
+
+			Vertex* findNextStep();
+			void performStep(Vertex* v);
 		public:
 			VertexRemoval(MG& g, PointQuadTree<Vertex, Kernel>& qt) : graph(g), pqt(qt) {}
 			~VertexRemoval() {}
 
 			void initialize(bool initQuadTree);
-			bool runToComplexity(int k);
+			bool run(std::optional<std::function<bool(int, Number<Kernel>)>> stop = std::nullopt);
 			bool step();
 	};
 

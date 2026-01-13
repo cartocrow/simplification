@@ -18,6 +18,7 @@ static KSBBPQT* m_pqt = nullptr;
 static KSBBSQT* m_sqt = nullptr;
 static KSBB* m_alg = nullptr;
 static SmoothGraph* m_smooth = nullptr;
+static bool m_reinit = false;
 
 KSBBSimplifier& KSBBSimplifier::getInstance() {
 	if (instance == nullptr) {
@@ -32,7 +33,7 @@ void KSBBSimplifier::initialize(InputGraph* graph, const int depth) {
 		clear();
 	}
 
-	m_base = copyGraph<InputGraph,KSBBGraph::BaseGraph>(graph);
+	m_base = copyGraph<InputGraph, KSBBGraph::BaseGraph>(graph);
 
 	Rectangle<MyKernel> box = utils::boxOf<KSBBGraph::Vertex, MyKernel>(m_base->getVertices());
 	m_pqt = new KSBBPQT(box, depth);
@@ -42,35 +43,45 @@ void KSBBSimplifier::initialize(InputGraph* graph, const int depth) {
 
 	m_alg = new KSBB(*m_graph, *m_sqt, *m_pqt);
 	m_alg->initialize(true, true);
+	m_reinit = false;
 }
 
-void KSBBSimplifier::runToComplexity(const int k) {
+void KSBBSimplifier::runToComplexity(const int k, std::optional<std::function<void(int)>> progress,
+	std::optional<std::function<bool()>> cancelled) {
 	if (hasResult()) {
-		if (hasSmoothResult()) {
-			delete m_smooth;
-			m_smooth = nullptr;
-		}
+		clearSmoothResult();
 
 		if (k > m_graph->getEdgeCount()) {
 			// revert
 			m_graph->recallComplexity(k);
+			m_reinit = true;
 		}
 		else if (k < m_graph->getEdgeCount()) {
-			if (m_graph->atPresent()) {
-				// already at present, run algorithm further
-				m_alg->runToComplexity(k);
-			}
-			else {
-				// in the past, go forward
+			if (!m_graph->atPresent()) {
+				// first redo known operations
 				m_graph->recallComplexity(k);
-				if (m_graph->atPresent()) {
-					// reached last result, reinit algorithm
+				m_reinit = true;
+			}
+
+			if (m_graph->atPresent() && k < m_graph->getEdgeCount()) {
+				// see if there's more to perform
+				if (m_reinit) {
+					// recallComplexity was invoked, reinitialize algorithm
 					m_alg->initialize(true, true);
-					if (k < m_graph->getEdgeCount()) {
-						// still more steps to try
-						m_alg->runToComplexity(k);
-					}
+					m_reinit = false;
 				}
+
+				// already at present, run algorithm further
+				m_alg->run([&](int complexity, Number<Exact> cost) {
+					if (progress.has_value()) {
+						(*progress)(complexity);
+					}
+					if (cancelled.has_value() && (*cancelled)()) {
+						return true;
+					}
+
+					return complexity <= k;
+					});
 			}
 		}
 	}
@@ -116,19 +127,13 @@ void KSBBSimplifier::clear() {
 		m_sqt = nullptr;
 	}
 
-	if (hasSmoothResult()) {
-		delete m_smooth;
-		m_smooth = nullptr;
-	}
+	clearSmoothResult();
 }
 
-void KSBBSimplifier::smooth(Number<Inexact> radius, int edges_on_semicircle) {
-	if (hasSmoothResult()) {
-		delete m_smooth;
-		m_smooth = nullptr;
-	}
+void KSBBSimplifier::smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
+	clearSmoothResult();
 
-	m_smooth = smoothGraph<KSBBGraph::BaseGraph>(&(m_graph->getBaseGraph()), radius, edges_on_semicircle);
+	m_smooth = smoothGraph<KSBBGraph::BaseGraph>(&(m_graph->getBaseGraph()), radius, edges_on_semicircle, progress);
 }
 
 bool KSBBSimplifier::hasSmoothResult() {
@@ -152,9 +157,9 @@ InputGraph* KSBBSimplifier::resultToGraph() {
 		return nullptr;
 	}
 	if (m_smooth == nullptr) {
-		return copyGraph<KSBBGraph::BaseGraph,InputGraph>(m_base);
+		return copyGraph<KSBBGraph::BaseGraph, InputGraph>(m_base);
 	}
 	else {
-		return copyExactGraph<SmoothGraph,InputGraph>(m_smooth);
+		return copyExactGraph<SmoothGraph, InputGraph>(m_smooth);
 	}
 }

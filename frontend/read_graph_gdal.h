@@ -8,10 +8,10 @@
 
 #include <ogrsf_frmts.h>
 
-std::pair<RegionSet<Exact>*, OGRSpatialReference*> readRegionSetUsingGDAL(const std::filesystem::path& path);
+std::pair<RegionSet<Exact>*, std::optional<std::string>> readRegionSetUsingGDAL(const std::filesystem::path& path);
 
 template<class Graph>
-void exportRegionSetUsingGDAL(const std::filesystem::path& path, Graph* graph, const RegionSet<Exact>& regions, OGRSpatialReference* spatialReference) {
+void exportRegionSetUsingGDAL(const std::filesystem::path& path, Graph* graph, const RegionSet<Exact>& regions, std::optional<std::string> spatialReference) {
 
     const char* pszDriverName = "ESRI Shapefile";
     GDALDriver* poDriver;
@@ -36,7 +36,16 @@ void exportRegionSetUsingGDAL(const std::filesystem::path& path, Graph* graph, c
 
     OGRLayer* poLayer;
 
-    poLayer = poDS->CreateLayer(path.stem().string().c_str(), spatialReference, wkbMultiPolygon, NULL);
+    OGRSpatialReference* srs;
+    if (spatialReference.has_value()) {
+        srs = new OGRSpatialReference();
+        srs->importFromWkt((*spatialReference).c_str());
+    }
+    else {
+        srs = nullptr;
+    }
+
+    poLayer = poDS->CreateLayer(path.stem().string().c_str(), srs, wkbMultiPolygon, NULL);
     if (poLayer == NULL)
     {
         std::cout << "Layer creation failed." << std::endl;

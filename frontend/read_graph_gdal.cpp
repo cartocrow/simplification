@@ -3,7 +3,7 @@
 #include <cartocrow/reader/gdal_conversion.h>
 #include <cartocrow/core/transform_helpers.h>
 
-std::pair<RegionSet<Exact>*, OGRSpatialReference*> readRegionSetUsingGDAL(const std::filesystem::path& path) {
+std::pair<RegionSet<Exact>*, std::optional<std::string>> readRegionSetUsingGDAL(const std::filesystem::path& path) {
 	GDALAllRegister();
 	GDALDataset* poDS;
 
@@ -91,5 +91,15 @@ std::pair<RegionSet<Exact>*, OGRSpatialReference*> readRegionSetUsingGDAL(const 
 		regionSet->push_back(region);
 	}
 
-	return { regionSet, poLayer->GetSpatialRef() };
+	std::optional<std::string> refstr;
+	if (poLayer->GetSpatialRef() == nullptr) {
+		refstr = std::nullopt;
+	}
+	else {
+		refstr = poLayer->GetSpatialRef()->exportToWkt();
+	}
+
+	GDALClose(poDS);
+
+	return { regionSet, refstr };
 }

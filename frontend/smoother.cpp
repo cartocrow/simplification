@@ -2,7 +2,7 @@
 
 template class StraightGraph<VoidData, VoidData, Inexact>;
 
-void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edges_on_semicircle) {
+void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
 
 	using Vertex = SmoothGraph::Vertex;
 	using Edge = SmoothGraph::Edge;
@@ -14,13 +14,15 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 	Rectangle<Inexact> bbox = utils::boxOf<Vertex, Inexact>(graph->getVertices());
 	Num radius = radiusfrac * std::sqrt(bbox.area());
 
-
 	int vtx_cnt = graph->getVertexCount();
 
 	std::vector<Num> rads(vtx_cnt, 0);
 
 	// determine smoothing radii
 	for (int i = 0; i < vtx_cnt; i++) {
+		if (progress.has_value()) {
+			(*progress)("Determining radii", i, vtx_cnt);
+		}
 
 		Vertex* v = graph->getVertices()[i];
 
@@ -39,6 +41,9 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 
 	// apply smoothing
 	for (int i = 0; i < vtx_cnt; i++) {
+		if (progress.has_value()) {
+			(*progress)("Applying smoothing", i, vtx_cnt);
+		}
 
 		Vertex* v = graph->getVertices()[i];
 		if (v->degree() != 2) continue;
@@ -112,14 +117,56 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 
 	// erase zero-length edges (if two adjacent vertices are both constrained by their shared edge
 	{
+		int init_edge_count = graph->getEdgeCount();
 		int i = 0;
+		int ii = 0;
+		// invariant: all edges with index < i have sufficient length, except for indices in "revisit"
+		std::vector<int> revisit;
 		while (i < graph->getEdgeCount()) {
-			Edge* e = graph->getEdges()[i];
+			if (progress.has_value()) {
+				(*progress)("Cleaning up geometry", ii, init_edge_count);
+				// number of edges processed
+				ii++;
+			}
+
+			int next_i;
+			if (revisit.empty()) {
+				next_i = i;
+			}
+			else {
+				next_i = revisit.back();
+				revisit.pop_back();
+			}
+
+			Edge* e = graph->getEdges()[next_i];
 
 			if (e->getSegment().squared_length() <= 0.00001) {
-				graph->mergeVertex(e->getSource());
+				// remove unless between degree-3 vertices
+				if (e->getSource()->degree() == 2) {
+					graph->mergeVertex(e->getSource());
+					// this removes e itself
+				}
+				else if (e->getSource()->degree() == 2) {
+					Edge* nxt = e->next();
+					if (nxt->graphIndex() < i) {
+						revisit.push_back(nxt->graphIndex());
+					}
+					graph->mergeVertex(e->getTarget());
+					// this removes the next edge					
+					if (next_i == i)
+						i++;
+				}
+				else {
+					// cannot remove, just go to next edge
+					if (next_i == i)
+						i++;
+				}
 			}
-			i++;
+			else {
+				// keep it
+				if (next_i == i)
+					i++;
+			}
 		}
 	}
 

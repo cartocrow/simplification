@@ -1,5 +1,4 @@
 set(SOURCES
-    debug.cpp
     gui.cpp
     ksbb.cpp
     main.cpp
