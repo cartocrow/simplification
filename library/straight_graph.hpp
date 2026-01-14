@@ -207,7 +207,7 @@ namespace cartocrow::simplification {
 	}
 
 	template <class VD, class ED, typename K>
-	void StraightGraph<VD, ED, K>::orient() {
+	void StraightGraph<VD, ED, K>::orientWithoutBoundaries() {
 		if (oriented) {
 			return;
 		}
@@ -267,6 +267,14 @@ namespace cartocrow::simplification {
 			}
 		}
 
+		oriented = true;
+	}
+
+	template <class VD, class ED, typename K>
+	void StraightGraph<VD, ED, K>::orient() {
+		orientWithoutBoundaries();
+
+		// construct boundaries
 		for (Edge* e : edges) {
 			if (e->boundary != nullptr) continue; // already handled
 
@@ -302,7 +310,6 @@ namespace cartocrow::simplification {
 			}
 		}
 
-		oriented = true;
 		assert(verifyOriented());
 	}
 
@@ -591,129 +598,73 @@ namespace cartocrow::simplification {
 		return target->outgoing();
 	}
 
-	template<class SourceGraph, class TargetGraph>
-	TargetGraph* copyGraph(SourceGraph* src) {
-		TargetGraph* result = new TargetGraph();
 
-		std::vector<typename TargetGraph::Vertex*> vtxmap;
+	template<class InputGraph, class OutputGraph>
+	OutputGraph* copy(InputGraph* input) {
 
-		for (typename SourceGraph::Vertex* v : src->getVertices()) {
-			typename TargetGraph::Vertex* ov = result->addVertex(v->getPoint());
-			vtxmap.push_back(ov);
+		using InVertex = InputGraph::Vertex;
+		using InEdge = InputGraph::Edge;
+		using InBoundary = InputGraph::Boundary;
+		using InKernel = InputGraph::Kernel;
+
+		using OutVertex = OutputGraph::Vertex;
+		using OutEdge = OutputGraph::Edge;
+		using OutBoundary = OutputGraph::Boundary;
+		using OutKernel = OutputGraph::Kernel;
+
+		OutputGraph* output = new OutputGraph();
+
+		if constexpr (std::is_same<InKernel, OutKernel>::value) {
+			for (InVertex* v : input->vertices) {
+				output->addVertex(v->point);
+			}
+		}
+		else {
+			CGAL::Cartesian_converter<InKernel, OutKernel> convert;
+			for (InVertex* v : input->vertices) {
+				output->addVertex(convert(v->point));
+			}
 		}
 
-		for (typename SourceGraph::Edge* e : src->getEdges()) {
-			typename TargetGraph::Vertex* v = vtxmap[e->getSource()->graphIndex()];
-			typename TargetGraph::Vertex* w = vtxmap[e->getTarget()->graphIndex()];
-			result->addEdge(v, w);
+		for (InEdge* e : input->edges) {
+			OutVertex* out_src = output->vertices[e->source->index];
+			OutVertex* out_tar = output->vertices[e->target->index];
+			output->addEdge(out_src, out_tar);
 		}
 
-		if (src->isOriented()) {
-			result->orient();
+		if (input->oriented) {
+			// we oriented without constructing boundaries
+			// to then copy the boundaries explicitly
+			// -- this is done to ensure that indices match afterwards
+			output->orientWithoutBoundaries();
 
-			// ensure same boundary order
-			std::vector<typename TargetGraph::Boundary*>& tarbounds = result->getBoundaries();
-			for (typename SourceGraph::Boundary* srcbd : src->getBoundaries()) {	
-				typename TargetGraph::Boundary* tarbd = result->getEdges()[srcbd->first->graphIndex()]->getBoundary();
-				if (tarbd->index != srcbd->index) {
-					typename TargetGraph::Boundary* otherbd = tarbounds[srcbd->index];
+			for (InBoundary* bd : input->boundaries) {
+				OutBoundary* tarbd = new OutBoundary();
+				tarbd->index = bd->index;
+				tarbd->cyclic = bd->cyclic;
+				tarbd->first = output->edges[bd->first->index];
+				tarbd->last = output->edges[bd->last->index];
+				output->boundaries.push_back(tarbd);
 
-					tarbounds[srcbd->index] = tarbd;
-					tarbounds[tarbd->index] = otherbd;
-
-					otherbd->index = tarbd->index;
-					tarbd->index = srcbd->index;
+				OutEdge* e = tarbd->first;
+				e->boundary = tarbd;
+				while (e != tarbd->last) {
+					e = e->next();
+					e->boundary = tarbd;
 				}
 			}
 		}
-		if (src->isSorted()) {
-			result->sortIncidentEdges();
+
+		if (input->sorted) {
+			output->sortIncidentEdges();
 		}
 
-		return result;
+		return output;
 	}
 
-	template<class SourceGraph, class TargetGraph>
-	TargetGraph* copyApproximateGraph(SourceGraph* src) {
-		TargetGraph* result = new TargetGraph();
-
-		std::vector<typename TargetGraph::Vertex*> vtxmap;
-
-		for (typename SourceGraph::Vertex* v : src->getVertices()) {
-			typename TargetGraph::Vertex* ov = result->addVertex(approximate(v->getPoint()));
-			vtxmap.push_back(ov);
-		}
-
-		for (typename SourceGraph::Edge* e : src->getEdges()) {
-			typename TargetGraph::Vertex* v = vtxmap[e->getSource()->graphIndex()];
-			typename TargetGraph::Vertex* w = vtxmap[e->getTarget()->graphIndex()];
-			result->addEdge(v, w);
-		}
-
-		if (src->isOriented()) {
-			result->orient();
-			
-			// ensure same boundary order
-			std::vector<typename TargetGraph::Boundary*>& tarbounds = result->getBoundaries();
-			for (typename SourceGraph::Boundary* srcbd : src->getBoundaries()) {
-				typename TargetGraph::Boundary* tarbd = result->getEdges()[srcbd->first->graphIndex()]->getBoundary();
-				if (tarbd->index != srcbd->index) {
-					typename TargetGraph::Boundary* otherbd = tarbounds[srcbd->index];
-
-					tarbounds[srcbd->index] = tarbd;
-					tarbounds[tarbd->index] = otherbd;
-
-					otherbd->index = tarbd->index;
-					tarbd->index = srcbd->index;
-				}
-			}
-		}
-		if (src->isSorted()) {
-			result->sortIncidentEdges();
-		}
-
-		return result;
+	template<class InputGraph, class OutputGraph>
+	void copy(InputGraph* input, OutputGraph*& output) {
+		output = copy<InputGraph, OutputGraph>(input);
 	}
 
-	template<class SourceGraph, class TargetGraph>
-	TargetGraph* copyExactGraph(SourceGraph* src) {
-		TargetGraph* result = new TargetGraph();
-
-		std::vector<typename TargetGraph::Vertex*> vtxmap;
-
-		for (typename SourceGraph::Vertex* v : src->getVertices()) {
-			typename TargetGraph::Vertex* ov = result->addVertex(pretendExact(v->getPoint()));
-			vtxmap.push_back(ov);
-		}
-
-		for (typename SourceGraph::Edge* e : src->getEdges()) {
-			typename TargetGraph::Vertex* v = vtxmap[e->getSource()->graphIndex()];
-			typename TargetGraph::Vertex* w = vtxmap[e->getTarget()->graphIndex()];
-			result->addEdge(v, w);
-		}
-
-		if (src->isOriented()) {
-			result->orient();
-
-			// ensure same boundary order
-			std::vector<typename TargetGraph::Boundary*>& tarbounds = result->getBoundaries();
-			for (typename SourceGraph::Boundary* srcbd : src->getBoundaries()) {
-				typename TargetGraph::Boundary* tarbd = result->getEdges()[srcbd->first->graphIndex()]->getBoundary();
-				if (tarbd->index != srcbd->index) {
-					typename TargetGraph::Boundary* otherbd = tarbounds[srcbd->index];
-
-					tarbounds[srcbd->index] = tarbd;
-					tarbounds[tarbd->index] = otherbd;
-
-					otherbd->index = tarbd->index;
-					tarbd->index = srcbd->index;
-				}
-			}
-		}
-		if (src->isSorted()) {
-			result->sortIncidentEdges();
-		}
-
-		return result;
-	}
 } // namespace cartocrow::simplification

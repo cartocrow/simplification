@@ -18,7 +18,7 @@ namespace cartocrow {
 			}
 		}
 
-		Rectangle<MyKernel> box = utils::boxOf<MyKernel>(points);
+		Rectangle<Exact> box = utils::boxOf<Exact>(points);
 
 		// construct the graph
 		PointQuadTree<InputGraph::Vertex, Exact> pqt(box, depth);

@@ -1,6 +1,6 @@
 #include "smoother.h"
 
-template class StraightGraph<VoidData, VoidData, Inexact>;
+template class StraightGraph<std::monostate, std::monostate, Inexact>;
 
 void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
 
@@ -11,8 +11,14 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 	using Num = Number<SmoothGraph::Kernel>;
 
 	// convert radius
-	Rectangle<Inexact> bbox = utils::boxOf<Vertex, Inexact>(graph->getVertices());
-	Num radius = radiusfrac * std::sqrt(bbox.area());
+	Num sqrLongest = 0;
+	for (Edge* e : graph->getEdges()) {
+		Num sqrL = e->getSegment().squared_length();
+		if (sqrL > sqrLongest) {
+			sqrLongest = sqrL;
+		}
+	}
+	Num radius = radiusfrac * std::sqrt(sqrLongest) / 2.0;
 
 	int vtx_cnt = graph->getVertexCount();
 

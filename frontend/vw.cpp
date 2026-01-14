@@ -6,8 +6,8 @@
 
 using namespace cartocrow::simplification;
 
-using VWGraph = HistoricVertexRemovalGraph<MyKernel>;
-using VWPQT = PointQuadTree<VWGraph::Vertex, MyKernel>;
+using VWGraph = HistoricVertexRemovalGraph<Exact>;
+using VWPQT = PointQuadTree<VWGraph::Vertex, Exact>;
 using VW = VisvalingamWhyatt<VWGraph>;
 
 static VWSimplifier* instance = nullptr;
@@ -31,9 +31,9 @@ void VWSimplifier::initialize(InputGraph* graph, const int depth) {
 		clear();
 	}
 
-	m_base = copyGraph<InputGraph, VWGraph::BaseGraph>(graph);
+	copy(graph, m_base);
 
-	Rectangle<MyKernel> box = utils::boxOf<VWGraph::Vertex, MyKernel>(m_base->getVertices());
+	Rectangle<Exact> box = utils::boxOf<VWGraph::Vertex, Exact>(m_base->getVertices());
 	m_pqt = new VWPQT(box, depth);
 
 	m_graph = new VWGraph(*m_base);
@@ -149,10 +149,14 @@ InputGraph* VWSimplifier::resultToGraph() {
 	if (m_graph == nullptr) {
 		return nullptr;
 	}
-	if (m_smooth == nullptr) {
-		return copyGraph<VWGraph::BaseGraph, InputGraph>(m_base);
+	else if (m_smooth == nullptr) {
+		InputGraph* res;
+		copy(m_base, res);
+		return res;
 	}
 	else {
-		return copyExactGraph<SmoothGraph, InputGraph>(m_smooth);
+		InputGraph* res;
+		copy(m_smooth, res);
+		return res;
 	}
 }

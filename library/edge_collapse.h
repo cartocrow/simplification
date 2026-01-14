@@ -46,7 +46,7 @@ namespace cartocrow::simplification {
 		template <typename K> struct HECData;
 
 		template<typename K>
-		using HECGraph = StraightGraph<VoidData, HECData<K>, K>;
+		using HECGraph = StraightGraph<std::monostate, HECData<K>, K>;
 	}
 
 	/// <summary>
@@ -54,7 +54,7 @@ namespace cartocrow::simplification {
 	/// </summary>
 	/// <typeparam name="K">Desired CGAL kernel</typeparam>
 	template<typename K>
-	using EdgeCollapseGraph = StraightGraph<VoidData, detail::ECData<K>, K>;
+	using EdgeCollapseGraph = StraightGraph<std::monostate, detail::ECData<K>, K>;
 
 	/// <summary>
 	/// Graph type that can be used with the EdgeCollapse implementation. This variant is historic: changes made to the graph can be undone and redone to retrieve intermediate steps.

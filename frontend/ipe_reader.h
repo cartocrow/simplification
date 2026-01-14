@@ -9,6 +9,7 @@
 template<class Graph>
 Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
 	using Vertex = Graph::Vertex;
+	using Kernel = Graph::Kernel;
 	std::shared_ptr<ipe::Document> document = IpeReader::loadIpeFile(file);
 
 	if (document->countPages() == 0) {
@@ -24,7 +25,7 @@ Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
 	Graph* graph = new Graph();
 
 	// compute a bounding box
-	std::vector<Point<MyKernel>> points;
+	std::vector<Point<Kernel>> points;
 
 	for (int i = 0; i < page->count(); i++) {
 		auto object = page->object(i);
@@ -40,20 +41,20 @@ Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
 			for (int k = 0; k < curve->countSegments(); k++) {
 				auto segment = curve->segment(k);
 				auto pt = matrix * segment.cp(0);
-				Point<MyKernel> point(pt.x, pt.y);
+				Point<Kernel> point(pt.x, pt.y);
 				points.push_back(point);
 			}
 
 			auto pt = matrix * curve->segment(curve->countSegments() - 1).last();
-			Point<MyKernel> point(pt.x, pt.y);
+			Point<Kernel> point(pt.x, pt.y);
 			points.push_back(point);
 		}
 	}
 
-	Rectangle<MyKernel> box = utils::boxOf<MyKernel>(points);
+	Rectangle<Kernel> box = utils::boxOf<Kernel>(points);
 
 	// construct the graph
-	PointQuadTree<Vertex, MyKernel> pqt(box, depth);
+	PointQuadTree<Vertex, Kernel> pqt(box, depth);
 
 	for (int i = 0; i < page->count(); i++) {
 		auto object = page->object(i);
@@ -71,7 +72,7 @@ Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
 				auto segment = curve->segment(k);
 				auto pt = matrix * segment.cp(0);
 
-				Point<MyKernel> point(pt.x, pt.y);
+				Point<Kernel> point(pt.x, pt.y);
 
 				Vertex* next = pqt.findElement(point, 0.00001);
 				if (next == nullptr) {
@@ -86,7 +87,7 @@ Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
 
 			auto pt = matrix * curve->segment(curve->countSegmentsClosing() - 1).last();
 
-			Point<MyKernel> point(pt.x, pt.y);
+			Point<Kernel> point(pt.x, pt.y);
 
 			Vertex* next = pqt.findElement(point, 0.00001);
 			if (next == nullptr) {

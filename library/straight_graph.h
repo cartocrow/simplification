@@ -4,9 +4,6 @@
 
 namespace cartocrow::simplification {
 
-	// for not storing anything in a vertex or edge
-	struct VoidData {};
-
 	template <class VD, class ED, typename K> class StraightVertex;
 	template <class VD, class ED, typename K> class StraightEdge;
 	template <class VD, class ED, typename K> class StraightBoundary;
@@ -16,6 +13,7 @@ namespace cartocrow::simplification {
 		template <class VD, class ED, typename K> friend class StraightVertex;
 		template <class VD, class ED, typename K> friend class StraightEdge;
 		template <class VD, class ED, typename K> friend class StraightBoundary;
+		template <class InputGraph, class OutputGraph> friend OutputGraph* copy(InputGraph* input);
 
 	public:
 		using Kernel = K;
@@ -34,6 +32,7 @@ namespace cartocrow::simplification {
 		bool verifySorted();
 
 		void clearBoundaries();
+		void orientWithoutBoundaries();
 
 	public:
 		StraightGraph();
@@ -74,6 +73,7 @@ namespace cartocrow::simplification {
 		template <class VD, class ED, typename K> friend class StraightGraph;
 		template <class VD, class ED, typename K> friend class StraightEdge;
 		template <class VD, class ED, typename K> friend class StraightBoundary;
+		template <class InputGraph, class OutputGraph> friend OutputGraph* copy(InputGraph* input);
 
 	public:
 		using Kernel = K;
@@ -116,9 +116,10 @@ namespace cartocrow::simplification {
 
 	template <class VD, class ED, typename K> class StraightEdge {
 
-		template <class VD, class ED, typename K> friend class StraightGraph;
-		template <class VD, class ED, typename K> friend class StraightVertex;
-		template <class VD, class ED, typename K> friend class StraightBoundary;
+		template <class VD2, class ED2, typename K2> friend class StraightGraph;
+		template <class VD2, class ED2, typename K2> friend class StraightVertex;
+		template <class VD2, class ED2, typename K2> friend class StraightBoundary;
+		template <class InputGraph, class OutputGraph> friend OutputGraph* copy(InputGraph* input);
 
 	public:
 		using Kernel = K;
@@ -164,12 +165,10 @@ namespace cartocrow::simplification {
 
 	template <class VD, class ED, typename K> class StraightBoundary {
 
-		template <class VD, class ED, typename K> friend class StraightGraph;
-		template <class VD, class ED, typename K> friend class StraightVertex;
-		template <class VD, class ED, typename K> friend class StraightEdge;
-		template <class SourceGraph, class TargetGraph> friend TargetGraph* copyGraph(SourceGraph* src);
-		template <class SourceGraph, class TargetGraph> friend TargetGraph* copyApproximateGraph(SourceGraph* src);
-		template <class SourceGraph, class TargetGraph> friend TargetGraph* copyExactGraph(SourceGraph* src);
+		template <class VD2, class ED2, typename K2> friend class StraightGraph;
+		template <class VD2, class ED2, typename K2> friend class StraightVertex;
+		template <class VD2, class ED2, typename K2> friend class StraightEdge;
+		template <class InputGraph, class OutputGraph> friend OutputGraph* copy(InputGraph* input);
 
 	public:
 		using Kernel = K;
@@ -200,15 +199,12 @@ namespace cartocrow::simplification {
 		}
 	};
 
+	template<class InputGraph, class OutputGraph>
+	OutputGraph* copy(InputGraph* input);
 
-	template<class SourceGraph, class TargetGraph>
-	TargetGraph* copyGraph(SourceGraph* src);
+	template<class InputGraph, class OutputGraph>
+	void copy(InputGraph* input, OutputGraph*&);
 
-	template<class SourceGraph, class TargetGraph>
-	TargetGraph* copyApproximateGraph(SourceGraph* src);
-
-	template<class SourceGraph, class TargetGraph>
-	TargetGraph* copyExactGraph(SourceGraph* src);
 } // namespace cartocrow::simplification
 
 #include "straight_graph.hpp"

@@ -1,6 +1,7 @@
 set(SOURCES
     gui.cpp
     ksbb.cpp
+    ksbb_inexact.cpp
     main.cpp
     read_graph_gdal.cpp
     region_set.cpp

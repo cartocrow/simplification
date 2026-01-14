@@ -13,6 +13,7 @@
 
 #include "vw.h"
 #include "ksbb.h"
+#include "ksbb_inexact.h"
 #include "graph_painter.h"
 #include "ipe_reader.h"
 #include "read_graph_gdal.h"
@@ -228,17 +229,17 @@ void SimplificationGUI::addPostprocessTab() {
 
 	layout->addWidget(new QLabel("<h3>Postprocess</h3>"));
 
-	auto* smoothLabel = new QLabel("Smooth radius: % of sqrt(bbox area)");
+	auto* smoothLabel = new QLabel("Smooth radius: % of half the longest edge");
 	layout->addWidget(smoothLabel);
 	auto* smoothSlider = new QSlider();
 	smoothSlider->setFocusPolicy(Qt::StrongFocus);
 	smoothSlider->setTickPosition(QSlider::TicksBothSides);
-	smoothSlider->setTickInterval(1000);
+	smoothSlider->setTickInterval(10);
 	smoothSlider->setSingleStep(1);
 	smoothSlider->setOrientation(Qt::Horizontal);
 	smoothSlider->setMinimum(1);
-	smoothSlider->setMaximum(10000);
-	smoothSlider->setValue(500);
+	smoothSlider->setMaximum(100);
+	smoothSlider->setValue(50);
 	layout->addWidget(smoothSlider);
 
 	auto* samplesLabel = new QLabel("Edges on semicircle");
@@ -253,6 +254,7 @@ void SimplificationGUI::addPostprocessTab() {
 	layout->addWidget(smoothButton);
 
 	auto smoothChange = [this, smoothSlider, samplesSpin]() {
+		
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
 
@@ -375,6 +377,7 @@ SimplificationGUI::SimplificationGUI() {
 
 	algorithms.push_back(&VWSimplifier::getInstance());
 	algorithms.push_back(&KSBBSimplifier::getInstance());
+	algorithms.push_back(&KSBBInexactSimplifier::getInstance());
 
 	auto* dockWidget = new QDockWidget();
 	addDockWidget(Qt::LeftDockWidgetArea, dockWidget);
@@ -446,6 +449,6 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path, const int d
 		input->orient();
 		desiredComplexity->setMaximum(input->getEdgeCount());
 		complexitySlider->setMaximum(input->getEdgeCount());
-		m_renderer->fitInView(utils::boxOf<InputGraph::Vertex, MyKernel>(input->getVertices()).bbox());
+		m_renderer->fitInView(utils::boxOf<InputGraph::Vertex, Exact>(input->getVertices()).bbox());
 	}
 }
