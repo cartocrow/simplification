@@ -29,6 +29,17 @@ namespace cartocrow::simplification {
 			}
 		}
 
+		for (Boundary* bd : boundaries) {
+			if (bd->first->index < 0) {
+				std::cout << "first edge of boundary not in graph" << std::endl;
+				return false;
+			}
+			if (bd->last->index < 0) {
+				std::cout << "last edge of boundary not in graph" << std::endl;
+				return false;
+			}
+		}
+
 		return true;
 	}
 
@@ -370,9 +381,13 @@ namespace cartocrow::simplification {
 		Edge* edge = v->incident[0]; // (u,v)
 		Edge* other = v->incident[1]; // (v,w)
 
+		assert(edge->boundary == other->boundary);
+
+		assert(edge->boundary->first != edge->boundary->last);
+
 		// "other" can be the first edge for cyclic boundaries (cycle of purely deg-2 vertices)
 		if (other->boundary->first == other) {
-			other->boundary->first = edge;
+			other->boundary->first = other->next();
 		} else if (other->boundary->last == other) {
 			other->boundary->last = edge;
 		}

@@ -276,8 +276,12 @@ void SimplificationGUI::addPostprocessTab() {
 
 	layout->addWidget(new QLabel("<h3>Postprocess</h3>"));
 
-	auto* smoothLabel = new QLabel("Smooth radius (% of max)");
-	layout->addWidget(smoothLabel);
+	layout->addWidget(new QLabel("Smooth radius (% of max)"));
+	auto* smoothSpin = new QSpinBox();
+    smoothSpin->setMinimum(1);
+    smoothSpin->setMaximum(100);
+    smoothSpin->setValue(50);
+	layout->addWidget(smoothSpin);
 	auto* smoothSlider = new QSlider();
 	smoothSlider->setFocusPolicy(Qt::StrongFocus);
 	smoothSlider->setTickPosition(QSlider::TicksBothSides);
@@ -289,8 +293,8 @@ void SimplificationGUI::addPostprocessTab() {
 	smoothSlider->setValue(50);
 	layout->addWidget(smoothSlider);
 
-	auto* samplesLabel = new QLabel("Edges on semicircle");
-	layout->addWidget(samplesLabel);
+
+	layout->addWidget(new QLabel("Edges on semicircle"));
 	auto* samplesSpin = new QSpinBox();
 	samplesSpin->setMinimum(1);
 	samplesSpin->setMaximum(1000);
@@ -300,7 +304,7 @@ void SimplificationGUI::addPostprocessTab() {
 	auto* smoothButton = new QPushButton("Smooth");
 	layout->addWidget(smoothButton);
 
-	auto smoothChange = [this, smoothSlider, samplesSpin]() {
+	auto smoothChange = [this, smoothSpin, smoothSlider, samplesSpin]() {
 		
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
@@ -310,6 +314,7 @@ void SimplificationGUI::addPostprocessTab() {
 			QProgressDialog progress("Smoothing", nullptr, 0, c, this);
 			progress.setWindowModality(Qt::WindowModal);
 			progress.setMinimumDuration(1000);
+			progress.setValue(0);
 
 			alg->smooth(Number<Inexact>(smoothSlider->value() / (double)smoothSlider->maximum()), samplesSpin->value(),
 				[&progress](std::string phase, int index, int max) {
@@ -326,7 +331,12 @@ void SimplificationGUI::addPostprocessTab() {
 			updatePaintings();
 		}
 		};
-	connect(smoothSlider, &QSlider::valueChanged, smoothChange);
+	connect(smoothSpin, &QSpinBox::textChanged, [this, smoothSpin, smoothSlider, smoothChange] {
+		smoothSlider->setValue(smoothSpin->value());
+		smoothChange(); });
+	connect(smoothSlider, &QSlider::valueChanged, [this, smoothSpin, smoothSlider, smoothChange] {
+		smoothSpin->setValue(smoothSlider->value());
+		smoothChange(); });
 	connect(samplesSpin, &QSpinBox::textChanged, smoothChange);
 	connect(smoothButton, &QPushButton::clicked, smoothChange);
 
