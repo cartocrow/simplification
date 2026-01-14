@@ -33,6 +33,7 @@ namespace cartocrow::simplification {
 
 		void push(Element* elt);
 		Element* pop();
+		Element* peek();
 
 		bool remove(Element* elt);
 		bool contains(Element* elt);

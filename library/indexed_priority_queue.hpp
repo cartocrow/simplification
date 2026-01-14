@@ -79,6 +79,14 @@ namespace cartocrow::simplification {
 	}
 
 	template <QueueTraits QT>
+	QT::Element* IndexedPriorityQueue<QT>::peek() {
+		if (queue.empty()) {
+			return nullptr;
+		}
+		return queue[0];
+	}
+
+	template <QueueTraits QT>
 	bool IndexedPriorityQueue<QT>::remove(Element* elt) {
 		int id = QT::getIndex(elt);
 		if (id < 0 || id >= queue.size() || queue[id] != elt) {

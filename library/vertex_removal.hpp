@@ -63,7 +63,7 @@ namespace cartocrow::simplification {
 	MG::Vertex* VertexRemoval<MG, VRT>::findNextStep() {
 
 		while (!queue.empty()) {
-			Vertex* v = queue.pop();
+			Vertex* v = queue.peek();
 
 			Vertex* u = v->previous();
 			Vertex* w = v->next();
@@ -87,7 +87,11 @@ namespace cartocrow::simplification {
 			if (v->data().blocked_by.empty()) {
 				// not blocked, this is the next step
 				return v;
-			} // else: continue searching
+			}
+			else { 
+				// remove the element from the queue as it's not valid and continue searching
+				queue.pop();
+			}
 		}
 
 		// no valid steps exist
@@ -96,6 +100,10 @@ namespace cartocrow::simplification {
 
 	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
 	void VertexRemoval<MG, VRT>::performStep(Vertex* v) {
+
+		assert(queue.peek() == v);
+
+		queue.pop();
 
 		// remove from blocking lists and search structure
 		pqt.remove(*v);

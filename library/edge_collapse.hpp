@@ -214,7 +214,7 @@ namespace cartocrow::simplification {
 		}
 
 		while (!queue.empty()) {
-			Edge* e = queue.pop();
+			Edge* e = queue.peek();
 
 			auto& edata = e->data();
 
@@ -248,7 +248,11 @@ namespace cartocrow::simplification {
 			if (!edata.blocked_by_degzero && edata.blocked_by.empty()) {
 				// not blocked, this is the next step
 				return e;
-			} // else: continue searching
+			}
+			else {
+				// remove the element from the queue as it's not valid and continue searching
+				queue.pop();
+			}
 		}
 
 		// no steps exist
@@ -261,9 +265,13 @@ namespace cartocrow::simplification {
 			assert(graph.atPresent());
 		}
 
+		assert(queue.peek() == e);
+
+		queue.pop();
+
 		auto& edata = e->data();
 
-				// remove from blocking lists and search structure
+		// remove from blocking lists and search structure
 		Edge* prev = e->previous();
 		Edge* next = e->next();
 		sqt.remove(*e);
