@@ -10,21 +10,12 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 	using Vec = Vector<SmoothGraph::Kernel>;
 	using Num = Number<SmoothGraph::Kernel>;
 
-	// convert radius
-	Num sqrLongest = 0;
-	for (Edge* e : graph->getEdges()) {
-		Num sqrL = e->getSegment().squared_length();
-		if (sqrL > sqrLongest) {
-			sqrLongest = sqrL;
-		}
-	}
-	Num radius = radiusfrac * std::sqrt(sqrLongest) / 2.0;
-
 	int vtx_cnt = graph->getVertexCount();
 
 	std::vector<Num> rads(vtx_cnt, 0);
 
 	// determine smoothing radii
+	Num max_rad = 0;
 	for (int i = 0; i < vtx_cnt; i++) {
 		if (progress.has_value()) {
 			(*progress)("Determining radii", i, vtx_cnt);
@@ -40,10 +31,14 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 		Num in_len = std::sqrt(inc->getSegment().squared_length());
 		Num out_len = std::sqrt(out->getSegment().squared_length());
 
-		Num v_rad = std::min(radius, std::min(in_len, out_len) / 2.0);
+		Num v_rad = std::min(in_len, out_len) / 2.0;
+		if (v_rad > max_rad) max_rad = v_rad;
 
 		rads[i] = v_rad;
 	}
+
+	// impose max
+	max_rad *= radiusfrac;
 
 	// apply smoothing
 	for (int i = 0; i < vtx_cnt; i++) {
@@ -54,8 +49,7 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 		Vertex* v = graph->getVertices()[i];
 		if (v->degree() != 2) continue;
 
-
-		Num v_rad = rads[i];
+		Num v_rad = std::min(rads[i], max_rad);
 
 		Edge* inc = v->incoming();
 		Edge* out = v->outgoing();

@@ -43,11 +43,10 @@ private:
 	QComboBox* vertexMode;
 	QSpinBox* depthSpin;
 
-	void addInputTab();
+	void addIOTab();
 	void addPreprocessTab();
 	void addSimplifyTab();
 	void addPostprocessTab();
-	void addOutputTab();
 	void addSettingsTab();
 
 	void updatePaintings();

@@ -47,9 +47,9 @@ void SimplificationGUI::updatePaintings() {
 	m_renderer->update();
 }
 
-void SimplificationGUI::addInputTab() {
+void SimplificationGUI::addIOTab() {
 	auto* tab = new QWidget();
-	tabs->addTab(tab, tr("Input"));
+	tabs->addTab(tab, tr("I/O"));
 	auto* layout = new QVBoxLayout(tab);
 	layout->setAlignment(Qt::AlignTop);
 
@@ -76,6 +76,53 @@ void SimplificationGUI::addInputTab() {
 		loadInput(filePath, this->depthSpin->value());
 
 		progress.setValue(2);
+		});
+
+	layout->addWidget(new QLabel("<h3>Output</h3>"));
+
+	auto* txt2 = new QLabel("<p>This only works if a Shp/Geojson file was loaded. It saves the result of the currently selected algorithm in the Simplify tab; its postprocessed variant, if available, and its unprocessed result otherwise.</p>");
+	txt2->setWordWrap(true);
+	layout->addWidget(txt2);
+
+	auto* saveShpbutton = new QPushButton("Save SHP file");
+	layout->addWidget(saveShpbutton);
+
+	connect(saveShpbutton, &QPushButton::clicked, [this]() {
+		if (m_regions == nullptr) {
+			std::cout << "Cannot save Shp file, no regions were loaded." << std::endl;
+			return;
+		}
+
+		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		if (!alg->hasResult()) {
+			std::cout << "Cannot save Shp file, current algorithm has no result." << std::endl;
+			return;
+		}
+
+		std::filesystem::path filePath = QFileDialog::getSaveFileName(this, tr("Select Shapefile"), curr_dir, tr("Shapefile (*.shp)")).toStdString();
+		if (filePath == "") return;
+		curr_dir = QString::fromStdU16String(filePath.parent_path().u16string());
+
+
+		QProgressDialog progress("Exporting", nullptr, 0, 2, this);
+		progress.setWindowModality(Qt::WindowModal);
+		progress.setMinimumDuration(1000);
+		progress.setValue(1);
+
+		InputGraph* graph = alg->resultToGraph();
+
+		exportRegionSetUsingGDAL<InputGraph>(filePath, graph, *m_regions, m_spatialRef);
+
+		progress.setValue(2);
+
+		//std::filesystem::path filePath = QFileDialog::getExistingDirectory(this, tr("Select folder for Shp file"), curr_dir).toStdString();
+		//if (filePath == "") return;
+		//curr_dir = QString::fromStdU16String(filePath.u16string());
+
+		//InputGraph* graph = alg->resultToGraph();
+		//
+		//exportRegionSetUsingGDAL<InputGraph>(filePath, graph, *m_regions, m_spatialRef);
+
 		});
 }
 
@@ -229,7 +276,7 @@ void SimplificationGUI::addPostprocessTab() {
 
 	layout->addWidget(new QLabel("<h3>Postprocess</h3>"));
 
-	auto* smoothLabel = new QLabel("Smooth radius: % of half the longest edge");
+	auto* smoothLabel = new QLabel("Smooth radius (% of max)");
 	layout->addWidget(smoothLabel);
 	auto* smoothSlider = new QSlider();
 	smoothSlider->setFocusPolicy(Qt::StrongFocus);
@@ -247,7 +294,7 @@ void SimplificationGUI::addPostprocessTab() {
 	auto* samplesSpin = new QSpinBox();
 	samplesSpin->setMinimum(1);
 	samplesSpin->setMaximum(1000);
-	samplesSpin->setValue(90);
+	samplesSpin->setValue(45);
 	layout->addWidget(samplesSpin);
 
 	auto* smoothButton = new QPushButton("Smooth");
@@ -295,57 +342,6 @@ void SimplificationGUI::addPostprocessTab() {
 		});
 }
 
-void SimplificationGUI::addOutputTab() {
-
-	auto* tab = new QWidget();
-	tabs->addTab(tab, tr("Output"));
-	auto* layout = new QVBoxLayout(tab);
-	layout->setAlignment(Qt::AlignTop);
-
-	layout->addWidget(new QLabel("<h3>Output</h3>"));
-
-	auto* saveShpbutton = new QPushButton("Save SHP file");
-	layout->addWidget(saveShpbutton);
-
-	connect(saveShpbutton, &QPushButton::clicked, [this]() {
-		if (m_regions == nullptr) {
-			std::cout << "Cannot save Shp file, no regions were loaded." << std::endl;
-			return;
-		}
-
-		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
-		if (!alg->hasResult()) {
-			std::cout << "Cannot save Shp file, current algorithm has no result." << std::endl;
-			return;
-		}
-
-		std::filesystem::path filePath = QFileDialog::getSaveFileName(this, tr("Select Shapefile"), curr_dir, tr("Shapefile (*.shp)")).toStdString();
-		if (filePath == "") return;
-		curr_dir = QString::fromStdU16String(filePath.parent_path().u16string());
-
-
-		QProgressDialog progress("Exporting", nullptr, 0, 2, this);
-		progress.setWindowModality(Qt::WindowModal);
-		progress.setMinimumDuration(1000);
-		progress.setValue(1);
-
-		InputGraph* graph = alg->resultToGraph();
-
-		exportRegionSetUsingGDAL<InputGraph>(filePath, graph, *m_regions, m_spatialRef);
-
-		progress.setValue(2);
-
-		//std::filesystem::path filePath = QFileDialog::getExistingDirectory(this, tr("Select folder for Shp file"), curr_dir).toStdString();
-		//if (filePath == "") return;
-		//curr_dir = QString::fromStdU16String(filePath.u16string());
-
-		//InputGraph* graph = alg->resultToGraph();
-		//
-		//exportRegionSetUsingGDAL<InputGraph>(filePath, graph, *m_regions, m_spatialRef);
-
-		});
-}
-
 void SimplificationGUI::addSettingsTab() {
 	auto* tab = new QWidget();
 	tabs->addTab(tab, tr("Settings"));
@@ -384,11 +380,10 @@ SimplificationGUI::SimplificationGUI() {
 	tabs = new QTabWidget();
 	dockWidget->setWidget(tabs);
 
-	addInputTab();
-	addPreprocessTab();
+	addIOTab();
+	//addPreprocessTab();
 	addSimplifyTab();
 	addPostprocessTab();
-	addOutputTab();
 	addSettingsTab();
 
 	m_renderer = new GeometryWidget();
