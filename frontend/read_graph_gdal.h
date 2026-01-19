@@ -64,8 +64,11 @@ void exportRegionSetUsingGDAL(const std::filesystem::path& path, Graph* graph, c
             else if (std::holds_alternative<int64_t>(value)) {
                 return OGRFieldDefn(attribute.c_str(), OFTInteger64);
             }
+            else if (std::holds_alternative<std::string>(value)) {
+                return OGRFieldDefn(attribute.c_str(), OFTString);
+            } 
             else {
-                std::cerr << "Did not handle attribute type." << std::endl;
+                std::cerr << "Did not handle attribute type of field " << attribute << std::endl;
             }
             // todo: other attributes
             }();
@@ -150,8 +153,11 @@ void exportRegionSetUsingGDAL(const std::filesystem::path& path, Graph* graph, c
                 else if (auto vInt64 = std::get_if<int64_t>(&data)) {
                     poFeature->SetField(attribute.c_str(), static_cast<GIntBig>(*vInt64));
                 }
+                else if (auto vStr = std::get_if<std::string>(&data)) {
+                    poFeature->SetField(attribute.c_str(), (*vStr).c_str());
+                }
                 else {
-                    std::cout << "Did not handle attribute value." << std::endl;
+                    std::cout << "Did not handle attribute value of field " << attribute << std::endl;
                 }
             }
 
