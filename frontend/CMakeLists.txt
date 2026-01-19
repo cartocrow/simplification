@@ -8,6 +8,7 @@ set(SOURCES
     simplification_algorithm.cpp
     smoother.cpp
     vw.cpp
+    vw_inexact.cpp
 )
 add_executable(simplification ${SOURCES})
 target_link_libraries(

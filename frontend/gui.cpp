@@ -11,6 +11,7 @@
 #include "library/utils.h"
 
 #include "vw.h"
+#include "vw_inexact.h"
 #include "ksbb.h"
 #include "ksbb_inexact.h"
 #include "graph_painter.h"
@@ -61,15 +62,9 @@ void SimplificationGUI::addIOTab() {
 	txt->setWordWrap(true);
 	layout->addWidget(txt);
 
-	layout->addWidget(new QLabel("<h3>Currently loaded</h3>"));
 
-	curr_file = new QLabel("<i>No file</i>");
-	curr_file->setWordWrap(true);
-	layout->addWidget(curr_file);
-	curr_srs = new QLabel("<i>No spatial reference</i>");
-	curr_srs->setWordWrap(true);
-	layout->addWidget(curr_srs);
-
+	auto* outToInButton = new QPushButton("Set current result to input");
+	layout->addWidget(outToInButton);
 
 	connect(loadFileButton, &QPushButton::clicked, [this]() {
 		std::filesystem::path filePath = QFileDialog::getOpenFileName(this, tr("Select map"), curr_dir, tr("Accepted formats (*.shp *.geojson *.ipe);;Shapefiles (*.shp);;Geojson (*.geojson);;IPE files(*.ipe)")).toStdString();
@@ -85,6 +80,36 @@ void SimplificationGUI::addIOTab() {
 
 		progress.setValue(2);
 		});
+
+
+
+	connect(outToInButton, &QPushButton::clicked, [this]() {
+		
+		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		if (!alg->hasResult()) {
+			std::cout << "No result available for current algorithm." << std::endl;
+			return;
+		}
+
+		QProgressDialog progress("Converting", nullptr, 0, 2, this);
+		progress.setWindowModality(Qt::WindowModal);
+		progress.setMinimumDuration(1000);
+		progress.setValue(1);
+				
+		loadInput(alg->resultToGraph(), true);
+
+		progress.setValue(2);
+		});
+
+	layout->addWidget(new QLabel("<h3>Currently loaded</h3>"));
+
+	curr_file = new QLabel("<i>No file</i>");
+	curr_file->setWordWrap(true);
+	layout->addWidget(curr_file);
+	curr_srs = new QLabel("<i>No spatial reference</i>");
+	curr_srs->setWordWrap(true);
+	layout->addWidget(curr_srs);
+
 
 	layout->addWidget(new QLabel("<h3>Output</h3>"));
 
@@ -147,7 +172,7 @@ void SimplificationGUI::addSimplifyTab() {
 
 	layout->addWidget(new QLabel("<h3>Simplify</h3>"));
 
-	int default_alg = 1; // KSBB
+	int default_alg = 3; // inexact KSBB
 	algorithmSelector = new QComboBox();
 	layout->addWidget(algorithmSelector);
 	for (SimplificationAlgorithm* alg : algorithms) {
@@ -384,6 +409,7 @@ SimplificationGUI::SimplificationGUI() {
 	setWindowTitle("Simplification");
 
 	algorithms.push_back(&VWSimplifier::getInstance());
+	algorithms.push_back(&VWInexactSimplifier::getInstance());
 	algorithms.push_back(&KSBBSimplifier::getInstance());
 	algorithms.push_back(&KSBBInexactSimplifier::getInstance());
 
@@ -423,7 +449,7 @@ SimplificationGUI::~SimplificationGUI() {
 	}
 }
 
-void SimplificationGUI::loadInput(const std::filesystem::path& path, const int depth) {
+void SimplificationGUI::loadInput(InputGraph* graph, const bool keepregions) {
 	if (input != nullptr) {
 		delete input;
 
@@ -433,14 +459,37 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path, const int d
 		input = nullptr;
 	}
 
+	if (!keepregions) {
+		if (m_regions != nullptr) {
+			delete m_regions;
+			m_regions = nullptr;
+			m_spatialRef = std::nullopt;
+		}
+	}
+
+	input = graph;
+
+	updatePaintings();
+
+	if (input != nullptr) {
+		input->orient();
+		desiredComplexity->setMaximum(input->getEdgeCount());
+		complexitySlider->setMaximum(input->getEdgeCount());
+		m_renderer->fitInView(utils::boxOf<InputGraph::Vertex, Exact>(input->getVertices()).bbox());
+	}
+}
+
+void SimplificationGUI::loadInput(const std::filesystem::path& path, const int depth) {
+
 	if (m_regions != nullptr) {
 		delete m_regions;
 		m_regions = nullptr;
 		m_spatialRef = std::nullopt;
 	}
 
+	InputGraph* graph;
 	if (path.extension() == ".ipe") {
-		input = readIpeFile<InputGraph>(path, depth);
+		graph = readIpeFile<InputGraph>(path, depth);
 		curr_file->setText(QString::fromStdString(path.filename().string()));
 		curr_srs->setText(QString::fromStdString("<i>No spatial reference</i>"));
 	}
@@ -462,20 +511,14 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path, const int d
 		else {
 			curr_srs->setText(QString::fromStdString("<i>No spatial reference</i>"));
 		}
-		input = constructGraphAndRegisterBoundaries(*m_regions, depth);
+		graph = constructGraphAndRegisterBoundaries(*m_regions, depth);
 	}
 	else {
 		std::cout << "Unexpected file extension: " << path.extension() << std::endl;
 		curr_file->setText(QString::fromStdString("<i>No file</i>"));
 		curr_srs->setText(QString::fromStdString("<i>No spatial reference</i>"));
+		graph = nullptr;
 	}
 
-	updatePaintings();
-
-	if (input != nullptr) {
-		input->orient();
-		desiredComplexity->setMaximum(input->getEdgeCount());
-		complexitySlider->setMaximum(input->getEdgeCount());
-		m_renderer->fitInView(utils::boxOf<InputGraph::Vertex, Exact>(input->getVertices()).bbox());
-	}
+	loadInput(graph, true);
 }

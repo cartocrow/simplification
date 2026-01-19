@@ -58,6 +58,7 @@ public:
 	SimplificationGUI();
 	~SimplificationGUI();
 
+	void loadInput(InputGraph* graph, const bool keepregions);
 	void loadInput(const std::filesystem::path& path, const int depth);
 };
 

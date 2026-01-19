@@ -78,35 +78,80 @@ namespace cartocrow::simplification {
 		bool source_shared = edge.getSource() == prev_v || edge.getSource() == next_v;
 		bool target_shared = edge.getTarget() == prev_v || edge.getTarget() == next_v;
 
-		auto is_1 = CGAL::intersection(collapse->data().T1, edge.getSegment());
-		if (is_1) {
-			if (Point<Kernel>* pt = std::get_if<Point<Kernel>>(&*is_1)) {
-				// make sure it's not the common point
-				if (!(source_shared && *pt == edge.getSource()->getPoint()) &&
-					!(target_shared && *pt == edge.getTarget()->getPoint())) {
-					return true;
-				}
+		auto test_is = [&](std::optional<std::variant<Point<Kernel>, Segment<Kernel>>> is) {
+			if (!is.has_value()) {
+				// certainly no intersection
+				return false;
 			}
-			else {
-				// proper overlap, definitely blocking
-				return true;
-			}
-		} // no intersection
+			
+			if constexpr (std::is_same<Inexact, Kernel>::value) {
+				// running in inexact mode: 
+				// -- perform approximate point equality tests
+				// -- check segments originating from shared endpoints
 
-		auto is_2 = CGAL::intersection(collapse->data().T2, edge.getSegment());
-		if (is_2) {
-			if (Point<Kernel>* pt = std::get_if<Point<Kernel>>(&*is_2)) {
-				// make sure it's not the common point
-				if (!(source_shared && *pt == edge.getSource()->getPoint()) &&
-					!(target_shared && *pt == edge.getTarget()->getPoint())) {
-					return true;
+				auto close = [](const Point<Kernel>& a, const Point<Kernel>& b) {
+					return std::abs(a.x() - b.x()) < 0.000001 
+						&& std::abs(a.y() - b.y()) < 0.000001;
+					};
+
+				if (Point<Kernel>* pt = std::get_if<Point<Kernel>>(&*is)) {
+
+					// make sure it's not the common point
+					if (source_shared && close(*pt, edge.getSource()->getPoint())) {
+						return false;
+					}
+					if (target_shared && close(*pt, edge.getTarget()->getPoint())) {
+						return false;
+					}
 				}
-			}
-			else {
-				// proper overlap, definitely blocking
+				else {
+					// running in inexact mode: may need to account for the intersection being a tiny segment near the start vertex
+
+					Segment<Kernel>* ls = std::get_if<Segment<Kernel>>(&*is);
+
+					if (source_shared 
+						&& close(ls->source(), edge.getSource()->getPoint()) 
+						&& close(ls->target(), edge.getSource()->getPoint())) {
+						return false;
+					}
+
+					if (target_shared
+						&& close(ls->source(), edge.getTarget()->getPoint())
+						&& close(ls->target(), edge.getTarget()->getPoint())) {
+						return false;
+					}
+				}
+
+				// intersection doesnt reflect a shared endpoint
 				return true;
 			}
-		} // no intersection
+			else {
+				// running in exact mode: 
+				// -- direct point equality tests 
+				// -- segments always intersect
+
+				if (Point<Kernel>* pt = std::get_if<Point<Kernel>>(&*is)) {
+					// make sure it's not the common point
+					if (source_shared && *pt == edge.getSource()->getPoint()) {
+						return false;
+					}
+					if (target_shared && *pt == edge.getTarget()->getPoint()) {
+						return false;
+					}
+				}
+
+				// segment overlap, or the point is not a shared endpoint
+				return true;
+			}
+			};
+
+		if (test_is(CGAL::intersection(collapse->data().T1, edge.getSegment()))) {
+			return true;
+		}
+
+		if (test_is(CGAL::intersection(collapse->data().T2, edge.getSegment()))) {
+			return true;
+		}
 
 		return false;
 	}
@@ -236,6 +281,7 @@ namespace cartocrow::simplification {
 				if (!edata.blocked_by_degzero) {
 
 					sqt.findOverlapped(rect, [this, &e](Edge& b) {
+
 						if (blocks(b, e)) {
 							b.data().blocking.push_back(e);
 							e->data().blocked_by.push_back(&b);
