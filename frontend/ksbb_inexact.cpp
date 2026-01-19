@@ -20,6 +20,9 @@ static KSBB* m_alg = nullptr;
 static SmoothGraph* m_smooth = nullptr;
 static bool m_reinit = false;
 
+static Color m_color{ 220, 80, 80 };
+static Color m_smooth_color = Color{ 100, 40, 40 };
+
 KSBBInexactSimplifier& KSBBInexactSimplifier::getInstance() {
 	if (instance == nullptr) {
 		instance = new KSBBInexactSimplifier();
@@ -102,7 +105,7 @@ int KSBBInexactSimplifier::getComplexity() {
 
 std::shared_ptr<GeometryPainting> KSBBInexactSimplifier::getPainting(const VertexMode vmode) {
 	if (hasResult()) {
-		return std::make_shared<GraphPainting<KSBBGraph>>(*m_graph, Color{ 200, 80, 80 }, 2, vmode);
+		return std::make_shared<GraphPainting<KSBBGraph>>(*m_graph, m_color, 2, vmode);
 	}
 	else {
 		return nullptr;
@@ -141,7 +144,7 @@ bool KSBBInexactSimplifier::hasSmoothResult() {
 }
 
 std::shared_ptr<GeometryPainting> KSBBInexactSimplifier::getSmoothPainting() {
-	return std::make_shared<GraphPainting<SmoothGraph>>(*m_smooth, Color{ 150, 50, 50 }, 2, VertexMode::DEG0_ONLY);
+	return std::make_shared<GraphPainting<SmoothGraph>>(*m_smooth, m_smooth_color, 2, VertexMode::DEG0_ONLY);
 }
 
 void KSBBInexactSimplifier::clearSmoothResult() {

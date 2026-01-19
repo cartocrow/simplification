@@ -4,7 +4,6 @@
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QProgressDialog>
-#include <QLabel>
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QMessageBox>
@@ -31,7 +30,7 @@ void SimplificationGUI::updatePaintings() {
 	VertexMode vmode = static_cast<VertexMode>(vertexMode->currentIndex());
 
 	if (input != nullptr) {
-		auto paint = std::make_shared<GraphPainting<InputGraph>>(*input, Color{ 30, 30, 30 }, 1, vmode);
+		auto paint = std::make_shared<GraphPainting<InputGraph>>(*input, m_input_color, 1, vmode);
 		m_renderer->addPainting(paint, "Input");
 	}
 
@@ -61,6 +60,15 @@ void SimplificationGUI::addIOTab() {
 	auto* txt = new QLabel("<p>Currently supported file formats:</p><ul><li>Shapefiles (*.shp) containing (multi)polygons with holes.</li><li>Geojson files (*.geojson) containing (multi)polygons with holes.</li><li>IPE files (*.ipe) containing polygons, polylines and points. Note that these cannot be saved to a Shapefile currently.</li></ul>");
 	txt->setWordWrap(true);
 	layout->addWidget(txt);
+
+	layout->addWidget(new QLabel("<h3>Currently loaded</h3>"));
+
+	curr_file = new QLabel("<i>No file</i>");
+	curr_file->setWordWrap(true);
+	layout->addWidget(curr_file);
+	curr_srs = new QLabel("<i>No spatial reference</i>");
+	curr_srs->setWordWrap(true);
+	layout->addWidget(curr_srs);
 
 
 	connect(loadFileButton, &QPushButton::clicked, [this]() {
@@ -93,12 +101,6 @@ void SimplificationGUI::addIOTab() {
 			return;
 		}
 
-		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
-		if (!alg->hasResult()) {
-			std::cout << "Cannot save Shp file, current algorithm has no result." << std::endl;
-			return;
-		}
-
 		std::filesystem::path filePath = QFileDialog::getSaveFileName(this, tr("Select Shapefile"), curr_dir, tr("Shapefile (*.shp)")).toStdString();
 		if (filePath == "") return;
 		curr_dir = QString::fromStdU16String(filePath.parent_path().u16string());
@@ -109,19 +111,19 @@ void SimplificationGUI::addIOTab() {
 		progress.setMinimumDuration(1000);
 		progress.setValue(1);
 
-		InputGraph* graph = alg->resultToGraph();
+		InputGraph* graph;
+		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		if (!alg->hasResult()) {
+			std::cout << "Warning: selected algorithm has no result -- exporting input graph instead." << std::endl;
+			graph = input;
+		}
+		else {
+			graph = alg->resultToGraph();
+		}
 
 		exportRegionSetUsingGDAL<InputGraph>(filePath, graph, *m_regions, m_spatialRef);
 
 		progress.setValue(2);
-
-		//std::filesystem::path filePath = QFileDialog::getExistingDirectory(this, tr("Select folder for Shp file"), curr_dir).toStdString();
-		//if (filePath == "") return;
-		//curr_dir = QString::fromStdU16String(filePath.u16string());
-
-		//InputGraph* graph = alg->resultToGraph();
-		//
-		//exportRegionSetUsingGDAL<InputGraph>(filePath, graph, *m_regions, m_spatialRef);
 
 		});
 }
@@ -278,9 +280,9 @@ void SimplificationGUI::addPostprocessTab() {
 
 	layout->addWidget(new QLabel("Smooth radius (% of max)"));
 	auto* smoothSpin = new QSpinBox();
-    smoothSpin->setMinimum(1);
-    smoothSpin->setMaximum(100);
-    smoothSpin->setValue(50);
+	smoothSpin->setMinimum(1);
+	smoothSpin->setMaximum(100);
+	smoothSpin->setValue(50);
 	layout->addWidget(smoothSpin);
 	auto* smoothSlider = new QSlider();
 	smoothSlider->setFocusPolicy(Qt::StrongFocus);
@@ -305,7 +307,7 @@ void SimplificationGUI::addPostprocessTab() {
 	layout->addWidget(smoothButton);
 
 	auto smoothChange = [this, smoothSpin, smoothSlider, samplesSpin]() {
-		
+
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
 
@@ -428,24 +430,44 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path, const int d
 		for (SimplificationAlgorithm* alg : algorithms) {
 			alg->clear();
 		}
+		input = nullptr;
 	}
 
 	if (m_regions != nullptr) {
 		delete m_regions;
 		m_regions = nullptr;
+		m_spatialRef = std::nullopt;
 	}
 
 	if (path.extension() == ".ipe") {
 		input = readIpeFile<InputGraph>(path, depth);
+		curr_file->setText(QString::fromStdString(path.filename().string()));
+		curr_srs->setText(QString::fromStdString("<i>No spatial reference</i>"));
 	}
 	else if (path.extension() == ".shp" || path.extension() == ".geojson") {
 		auto [rs, sr] = readRegionSetUsingGDAL(path);
 		m_regions = rs;
 		m_spatialRef = sr;
+		curr_file->setText(QString::fromStdString(path.filename().string()));
+		if (sr.has_value()) {
+			if (sr.value().size() > 40) {
+				curr_srs->setText(QString::fromStdString(sr.value().substr(0, 37) + "..."));
+			}
+			else {
+				curr_srs->setText(QString::fromStdString(sr.value()));
+
+			}
+			
+		}
+		else {
+			curr_srs->setText(QString::fromStdString("<i>No spatial reference</i>"));
+		}
 		input = constructGraphAndRegisterBoundaries(*m_regions, depth);
 	}
 	else {
 		std::cout << "Unexpected file extension: " << path.extension() << std::endl;
+		curr_file->setText(QString::fromStdString("<i>No file</i>"));
+		curr_srs->setText(QString::fromStdString("<i>No spatial reference</i>"));
 	}
 
 	updatePaintings();

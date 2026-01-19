@@ -18,6 +18,9 @@ static VW* m_alg = nullptr;
 static SmoothGraph* m_smooth = nullptr;
 static bool m_reinit = false;
 
+static Color m_color{ 80, 80, 220 };
+static Color m_smooth_color = Color{ 40, 40, 100 };
+
 VWSimplifier& VWSimplifier::getInstance() {
 	if (instance == nullptr) {
 		instance = new VWSimplifier();
@@ -99,7 +102,7 @@ int VWSimplifier::getComplexity() {
 
 std::shared_ptr<GeometryPainting> VWSimplifier::getPainting(const VertexMode vmode) {
 	if (hasResult()) {
-		return std::make_shared<GraphPainting<VWGraph>>(*m_graph, Color{ 80, 80, 200 }, 2, vmode);
+		return std::make_shared<GraphPainting<VWGraph>>(*m_graph, m_color, 2, vmode);
 	}
 	else {
 		return nullptr;
@@ -135,7 +138,7 @@ bool VWSimplifier::hasSmoothResult() {
 }
 
 std::shared_ptr<GeometryPainting> VWSimplifier::getSmoothPainting() {
-	return std::make_shared<GraphPainting<SmoothGraph>>(*m_smooth, Color{ 50, 50, 150 }, 2, VertexMode::DEG0_ONLY);
+	return std::make_shared<GraphPainting<SmoothGraph>>(*m_smooth, m_smooth_color, 2, VertexMode::DEG0_ONLY);
 }
 
 void VWSimplifier::clearSmoothResult() {

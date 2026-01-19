@@ -30,7 +30,10 @@ namespace cartocrow {
 		Arc(int bd, bool rev) : boundary(bd), reverse(rev) {}
 	};
 
-	using ArcRegistration = std::vector<Arc>;
+	struct ArcRegistration : public std::vector<Arc> {
+
+		bool validate(InputGraph* graph);
+	};
 
 	template <class K>
 	struct Region {

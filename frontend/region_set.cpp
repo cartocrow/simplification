@@ -2,6 +2,33 @@
 
 namespace cartocrow {
 
+	bool ArcRegistration::validate(InputGraph* graph) {
+
+		using Vtx = InputGraph::Vertex;
+
+		// end of the last arc
+		Vtx* prev = back().reverse 
+			? graph->getBoundaries()[back().boundary]->getFirstEdge()->getSource()
+			: graph->getBoundaries()[back().boundary]->getLastEdge()->getTarget();
+		for (Arc a : *this) {
+
+			Vtx* start = a.reverse
+				? graph->getBoundaries()[a.boundary]->getLastEdge()->getTarget()
+				: graph->getBoundaries()[a.boundary]->getFirstEdge()->getSource();
+			// start of this arc: does it match the end of the previous?
+			if (prev != start) {
+				return false;
+			}
+
+			// end of last ast
+			prev = a.reverse
+				? graph->getBoundaries()[a.boundary]->getFirstEdge()->getSource()
+				: graph->getBoundaries()[a.boundary]->getLastEdge()->getTarget();
+		}
+
+		return true;
+	}
+
 	InputGraph* constructGraphAndRegisterBoundaries(RegionSet<Exact>& rs, const int depth) {
 
 		InputGraph* graph = new InputGraph();
@@ -74,8 +101,11 @@ namespace cartocrow {
 					else if (prev != curr) {
 						InputGraph::Edge* e = prev->edgeTo(curr);
 
-						if (reg.empty() || reg.back().boundary != e->getBoundary()->graphIndex()) {
-							reg.push_back(Arc(e->getBoundary()->graphIndex(), e->getSource() == curr));
+						int bi = e->getBoundary()->graphIndex();
+						bool brev = e->getSource() == curr;
+
+						if (reg.empty() || reg.back().boundary != bi || reg.back().reverse != brev) {
+							reg.push_back(Arc(bi, brev));
 						}
 					}
 
@@ -85,18 +115,29 @@ namespace cartocrow {
 				if (prev != first) {
 					InputGraph::Edge* e = prev->edgeTo(first);
 
-					if (reg.empty() || reg.back().boundary != e->getBoundary()->graphIndex()) {
-						reg.push_back(Arc(e->getBoundary()->graphIndex(), e->getSource() == first));
+					int bi = e->getBoundary()->graphIndex();
+					bool brev = e->getSource() == first;
+					if (reg.empty() || reg.back().boundary != bi || reg.back().reverse != brev) {
+						reg.push_back(Arc(bi, brev));
 					}
+				}
+
+				// cleanup, in case we didnt start at a boundary start...
+				while (reg.size() > 1 
+					&& reg.back().boundary == reg.front().boundary 
+					&& reg.back().reverse == reg.front().reverse) {
+					reg.pop_back();
 				}
 
 				r.arcs.push_back(reg);
 
+				assert(reg.validate(graph));
 			}
 		}
 
 		return graph;
-
 	}
+
+	
 
 }

@@ -5,6 +5,7 @@
 #include <QSpinBox>
 #include <QComboBox>
 #include <QSlider>
+#include <QLabel>
 
 #include <ogrsf_frmts.h>
 
@@ -31,6 +32,8 @@ private:
 	QTabWidget* tabs;
 	// IO
 	QString curr_dir = ".";
+	QLabel* curr_file;
+	QLabel* curr_srs;
 	// preprocess
 	
 	// simplify
@@ -42,6 +45,7 @@ private:
 	// settings
 	QComboBox* vertexMode;
 	QSpinBox* depthSpin;
+	Color m_input_color = Color{50,50,50};
 
 	void addIOTab();
 	void addPreprocessTab();
