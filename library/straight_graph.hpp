@@ -329,8 +329,9 @@ namespace cartocrow::simplification {
 		for (Vertex* v : vertices) {
 			if (v->degree() > 2) {
 				std::ranges::sort(v->incident, [&v](Edge* e, Edge* f) {
-					CGAL::Direction_2<Kernel> dir_e = CGAL::Direction_2<Kernel>(e->other(v)->getPoint() - v->getPoint());
-					CGAL::Direction_2<Kernel> dir_f = CGAL::Direction_2<Kernel>(f->other(v)->getPoint() - v->getPoint());
+					using Dir = Direction<K>;
+					Dir dir_e = Dir(e->other(v)->getPoint() - v->getPoint());
+					Dir dir_f = Dir(f->other(v)->getPoint() - v->getPoint());
 					return dir_e < dir_f;
 					});
 			}
@@ -535,6 +536,11 @@ namespace cartocrow::simplification {
 	template <class VD, class ED, typename K>
 	ED& StraightEdge<VD, ED, K>::data() {
 		return d;
+	}
+
+	template <class VD, class ED, typename K>
+	Number<K> StraightEdge<VD, ED, K>::squared_length() {
+		return CGAL::squared_distance(source->point, target->point);
 	}
 
 	template <class VD, class ED, typename K>

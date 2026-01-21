@@ -17,6 +17,7 @@
 #include "graph_painter.h"
 #include "ipe_reader.h"
 #include "read_graph_gdal.h"
+#include "restrictor.h"
 
 void launchGUI(int argc, char* argv[]) {
 	QApplication app(argc, argv);
@@ -160,7 +161,20 @@ void SimplificationGUI::addPreprocessTab() {
 	auto* layout = new QVBoxLayout(tab);
 	layout->setAlignment(Qt::AlignTop);
 
-	layout->addWidget(new QLabel("<h3>Preprocess</h3>"));
+	layout->addWidget(new QLabel("<h3>Angular restriction</h3>"));
+
+	auto* button = new QPushButton("Rectilinear");
+	layout->addWidget(button);
+
+	connect(button, &QPushButton::clicked, [this]() {
+		restrict(input, {
+			0, 
+			std::numbers::pi * 0.5, 
+			std::numbers::pi, 
+			std::numbers::pi * 1.5
+			});
+		m_renderer->repaint();
+		});
 }
 
 void SimplificationGUI::addSimplifyTab() {
@@ -419,7 +433,7 @@ SimplificationGUI::SimplificationGUI() {
 	dockWidget->setWidget(tabs);
 
 	addIOTab();
-	//addPreprocessTab();
+	addPreprocessTab();
 	addSimplifyTab();
 	addPostprocessTab();
 	addSettingsTab();
@@ -473,6 +487,7 @@ void SimplificationGUI::loadInput(InputGraph* graph, const bool keepregions) {
 
 	if (input != nullptr) {
 		input->orient();
+		input->sortIncidentEdges();
 		desiredComplexity->setMaximum(input->getEdgeCount());
 		complexitySlider->setMaximum(input->getEdgeCount());
 		m_renderer->fitInView(utils::boxOf<InputGraph::Vertex, Exact>(input->getVertices()).bbox());

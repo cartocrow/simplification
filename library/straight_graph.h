@@ -143,6 +143,7 @@ namespace cartocrow::simplification {
 		Vertex* getTarget();
 		void reverse();
 
+		Number<K> squared_length();
 		Segment<K> getSegment();
 
 		Vertex* other(Vertex* v);

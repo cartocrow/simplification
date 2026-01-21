@@ -5,6 +5,7 @@ set(SOURCES
     main.cpp
     read_graph_gdal.cpp
     region_set.cpp
+    restrictor.cpp
     simplification_algorithm.cpp
     smoother.cpp
     vw.cpp
