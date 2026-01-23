@@ -19,6 +19,7 @@ static KSBBSQT* m_sqt = nullptr;
 static KSBB* m_alg = nullptr;
 static SmoothGraph* m_smooth = nullptr;
 static bool m_reinit = false;
+static int m_init_complexity = -1;
 
 static Color m_color{ 220, 80, 80 };
 static Color m_smooth_color = Color{ 100, 40, 40 };
@@ -47,6 +48,8 @@ void KSBBInexactSimplifier::initialize(InputGraph* graph, const int depth) {
 	m_alg = new KSBB(*m_graph, *m_sqt, *m_pqt);
 	m_alg->initialize(true, true);
 	m_reinit = false;
+
+	m_init_complexity = getComplexity();
 }
 
 void KSBBInexactSimplifier::runToComplexity(const int k, std::optional<std::function<void(int)>> progress,
@@ -101,6 +104,10 @@ int KSBBInexactSimplifier::getComplexity() {
 	else {
 		return -1;
 	}
+}
+
+int KSBBInexactSimplifier::getMaximumComplexity() {
+	return m_init_complexity;
 }
 
 std::shared_ptr<GeometryPainting> KSBBInexactSimplifier::getPainting(const VertexMode vmode) {

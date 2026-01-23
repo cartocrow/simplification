@@ -17,6 +17,7 @@ static VWPQT* m_pqt = nullptr;
 static VW* m_alg = nullptr;
 static SmoothGraph* m_smooth = nullptr;
 static bool m_reinit = false;
+static int m_init_complexity = -1;
 
 static Color m_color{ 80, 220, 220 };
 static Color m_smooth_color = Color{ 40, 100, 100 };
@@ -44,6 +45,8 @@ void VWInexactSimplifier::initialize(InputGraph* graph, const int depth) {
 	m_alg = new VW(*m_graph, *m_pqt);
 	m_alg->initialize(true);
 	m_reinit = false;
+
+	m_init_complexity = getComplexity();
 }
 
 void VWInexactSimplifier::runToComplexity(const int k, std::optional<std::function<void(int)>> progress,
@@ -98,6 +101,10 @@ int VWInexactSimplifier::getComplexity() {
 	else {
 		return -1;
 	}
+}
+
+int VWInexactSimplifier::getMaximumComplexity() {
+	return m_init_complexity;
 }
 
 std::shared_ptr<GeometryPainting> VWInexactSimplifier::getPainting(const VertexMode vmode) {

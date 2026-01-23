@@ -15,6 +15,7 @@ public:
 	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
 		std::optional<std::function<bool()>> cancelled = std::nullopt)  override;
 	int getComplexity() override;
+	int getMaximumComplexity() override;
 	std::shared_ptr<GeometryPainting> getPainting(const VertexMode vmode) override;
 	void clear() override;
 	bool hasResult() override;

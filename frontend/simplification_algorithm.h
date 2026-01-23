@@ -18,6 +18,7 @@ public:
 	virtual void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
 		std::optional<std::function<bool()>> cancelled = std::nullopt) = 0;
 	virtual int getComplexity() = 0;
+	virtual int getMaximumComplexity() = 0;
 	virtual std::shared_ptr<GeometryPainting> getPainting(const VertexMode vmode) = 0;
 	virtual void clear() = 0;
 	virtual bool hasResult() = 0;

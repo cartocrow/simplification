@@ -85,7 +85,7 @@ void SimplificationGUI::addIOTab() {
 
 
 	connect(outToInButton, &QPushButton::clicked, [this]() {
-		
+
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (!alg->hasResult()) {
 			std::cout << "No result available for current algorithm." << std::endl;
@@ -96,7 +96,7 @@ void SimplificationGUI::addIOTab() {
 		progress.setWindowModality(Qt::WindowModal);
 		progress.setMinimumDuration(1000);
 		progress.setValue(1);
-				
+
 		loadInput(alg->resultToGraph(), true);
 
 		progress.setValue(2);
@@ -168,9 +168,9 @@ void SimplificationGUI::addPreprocessTab() {
 
 	connect(button, &QPushButton::clicked, [this]() {
 		restrict(input, {
-			0, 
-			std::numbers::pi * 0.5, 
-			std::numbers::pi, 
+			0,
+			std::numbers::pi * 0.5,
+			std::numbers::pi,
 			std::numbers::pi * 1.5
 			});
 		m_renderer->repaint();
@@ -269,8 +269,11 @@ void SimplificationGUI::addSimplifyTab() {
 
 			progress.setValue(2);
 
-			desiredComplexity->setValue(alg->getComplexity());
-			complexitySlider->setValue(alg->getComplexity());
+			int c = alg->getComplexity();
+			desiredComplexity->setMaximum(c);
+			desiredComplexity->setValue(c);
+			complexitySlider->setMaximum(c);
+			complexitySlider->setValue(c);
 			updatePaintings();
 		}
 		});
@@ -305,6 +308,23 @@ void SimplificationGUI::addSimplifyTab() {
 		if (alg->hasResult()) {
 			runAlg(alg, value);
 		}
+		});
+
+	connect(algorithmSelector, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), [this](int value) {
+
+		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		int mc, c;
+		if (alg->hasResult()) {
+			mc = alg->getMaximumComplexity();
+			c = alg->getComplexity();
+		}
+		else {
+			mc = c = 1;
+		}
+		desiredComplexity->setMaximum(mc);
+		desiredComplexity->setValue(c);
+		complexitySlider->setMaximum(mc);
+		complexitySlider->setValue(c);
 		});
 }
 
@@ -521,7 +541,7 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path, const int d
 				curr_srs->setText(QString::fromStdString(sr.value()));
 
 			}
-			
+
 		}
 		else {
 			curr_srs->setText(QString::fromStdString("<i>No spatial reference</i>"));
