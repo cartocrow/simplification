@@ -331,7 +331,7 @@ namespace cartocrow::simplification {
 				for (int i = 0; i < e_cnt; i++) {
 
 					if (edge_types[i] != EdgeType::UNDETERMINED) {
-						return;
+						continue;
 					}
 
 					Edge* e = graph.getEdges()[i];
