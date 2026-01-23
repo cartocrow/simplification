@@ -167,6 +167,7 @@ namespace cartocrow::simplification {
 
 	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
 	void EdgeCollapse<MG, ECT>::initialize(bool initSQT, bool initPQT) {
+		
 		if (initSQT) {
 			sqt.clear();
 			for (Edge* e : graph.getEdges()) {
@@ -484,7 +485,15 @@ namespace cartocrow::simplification {
 		CGAL::Aff_transformation_2<Kernel> t(CGAL::TRANSLATION, perpv);
 		Line<Kernel> arealine = ad.transform(t);
 
-		if (ad.has_on_boundary(arealine.point())) {
+		bool zero_area;
+		if constexpr (std::is_same<Kernel, Inexact>::value) {
+			zero_area = CGAL::squared_distance(ad, arealine.point()) < 0.00000001;
+		}
+		else {
+			zero_area = ad.has_on_boundary(arealine.point());
+		}
+
+		if (zero_area) {
 
 			// these should be caught already by the collinearity checks earlier
 			assert(!ad.has_on_boundary(b));
@@ -529,6 +538,7 @@ namespace cartocrow::simplification {
 				edata.T2 = Triangle<Kernel>(c, d, is);
 			}
 			else {
+
 				auto intersection = CGAL::intersection(arealine, cd);
 				edata.point = std::get<Point<Kernel>>(*intersection);
 
