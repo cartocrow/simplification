@@ -1,6 +1,6 @@
-#include "restrictor.h";
+#include "restrictor.h"
 
-#include "library/angle_restriction.h";
+#include "library/angle_restriction.h"
 
 using namespace cartocrow::simplification;
 

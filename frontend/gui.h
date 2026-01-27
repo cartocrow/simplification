@@ -27,6 +27,7 @@ private:
 	RegionSet<Exact>* m_regions = nullptr;
 	std::optional<std::string> m_spatialRef;
 	InputGraph* input = nullptr;
+	InputGraph* preprocessed = nullptr;
 	std::vector<SimplificationAlgorithm*> algorithms;
 
 	QTabWidget* tabs;
@@ -45,7 +46,8 @@ private:
 	// settings
 	QComboBox* vertexMode;
 	QSpinBox* depthSpin;
-	Color m_input_color = Color{50,50,50};
+	Color m_input_color = Color{ 60,60,60};
+	Color m_preprocessed_color = Color{ 20,20,20 };
 
 	void addIOTab();
 	void addPreprocessTab();

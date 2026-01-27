@@ -36,6 +36,11 @@ void SimplificationGUI::updatePaintings() {
 		m_renderer->addPainting(paint, "Input");
 	}
 
+	if (preprocessed != nullptr) {
+		auto paint = std::make_shared<GraphPainting<InputGraph>>(*preprocessed, m_preprocessed_color, 2, vmode);
+		m_renderer->addPainting(paint, "Preprocessed");
+	}
+
 	for (SimplificationAlgorithm* alg : algorithms) {
 		if (alg->hasResult()) {
 			m_renderer->addPainting(alg->getPainting(vmode), alg->getName());
@@ -111,7 +116,6 @@ void SimplificationGUI::addIOTab() {
 	curr_srs->setWordWrap(true);
 	layout->addWidget(curr_srs);
 
-
 	layout->addWidget(new QLabel("<h3>Output</h3>"));
 
 	auto* txt2 = new QLabel("<p>This only works if a Shp/Geojson file was loaded. It saves the result of the currently selected algorithm in the Simplify tab; its postprocessed variant, if available, and its unprocessed result otherwise.</p>");
@@ -140,8 +144,13 @@ void SimplificationGUI::addIOTab() {
 		InputGraph* graph;
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (!alg->hasResult()) {
-			std::cout << "Warning: selected algorithm has no result -- exporting input graph instead." << std::endl;
-			graph = input;
+			std::cout << "Warning: selected algorithm has no result -- exporting input / preprocessed graph instead." << std::endl;
+			if (preprocessed == nullptr) {
+				graph = input;
+			}
+			else {
+				graph = preprocessed;
+			}
 		}
 		else {
 			graph = alg->resultToGraph();
@@ -166,14 +175,33 @@ void SimplificationGUI::addPreprocessTab() {
 	auto* button = new QPushButton("Rectilinear");
 	layout->addWidget(button);
 
+	auto* buttonClear = new QPushButton("Clear preprocessed");
+	layout->addWidget(buttonClear);
+
 	connect(button, &QPushButton::clicked, [this]() {
-		restrict(input, {
+		if (input == nullptr) {
+			return;
+		}
+		if (preprocessed != nullptr) {
+			delete preprocessed;
+			preprocessed = nullptr;
+		}
+		copy(input, preprocessed);
+		restrict(preprocessed, {
 			0,
 			std::numbers::pi * 0.5,
 			std::numbers::pi,
 			std::numbers::pi * 1.5
 			});
-		m_renderer->repaint();
+		updatePaintings();
+		});
+
+	connect(buttonClear, &QPushButton::clicked, [this]() {
+		if (preprocessed != nullptr) {
+			delete preprocessed;
+			preprocessed = nullptr;
+		}
+		updatePaintings();
 		});
 }
 
@@ -265,7 +293,13 @@ void SimplificationGUI::addSimplifyTab() {
 			progress.setMinimumDuration(1000);
 			progress.setValue(1);
 
-			alg->initialize(input, depthSpin->value());
+			if (preprocessed == nullptr) {
+				alg->initialize(input, depthSpin->value());
+			}
+			else {
+				alg->initialize(preprocessed, depthSpin->value());
+			}
+
 
 			progress.setValue(2);
 
@@ -478,6 +512,9 @@ SimplificationGUI::~SimplificationGUI() {
 	if (input != nullptr) {
 		delete input;
 	}
+	if (preprocessed != nullptr) {
+		delete preprocessed;
+	}
 	if (m_regions != nullptr) {
 		delete m_regions;
 	}
@@ -491,6 +528,10 @@ void SimplificationGUI::loadInput(InputGraph* graph, const bool keepregions) {
 			alg->clear();
 		}
 		input = nullptr;
+	}
+	if (preprocessed != nullptr) {
+		delete preprocessed;
+		preprocessed = nullptr;
 	}
 
 	if (!keepregions) {
