@@ -55,7 +55,7 @@ void SimplificationGUI::updatePaintings() {
 
 void SimplificationGUI::addIOTab() {
 	auto* tab = new QWidget();
-	tabs->addTab(tab, tr("I/O"));
+	tabs->addTab(tab, tr("IO"));
 	auto* layout = new QVBoxLayout(tab);
 	layout->setAlignment(Qt::AlignTop);
 
@@ -166,19 +166,28 @@ void SimplificationGUI::addIOTab() {
 void SimplificationGUI::addPreprocessTab() {
 
 	auto* tab = new QWidget();
-	tabs->addTab(tab, tr("Preprocess"));
+	tabs->addTab(tab, tr("Prep"));
 	auto* layout = new QVBoxLayout(tab);
 	layout->setAlignment(Qt::AlignTop);
 
-	layout->addWidget(new QLabel("<h3>Angular restriction</h3>"));
+	layout->addWidget(new QLabel("<h3>Preprocessing</h3>"));
 
-	auto* button = new QPushButton("Rectilinear");
-	layout->addWidget(button);
+	auto* buttonRect = new QPushButton("Rectilinear");
+	layout->addWidget(buttonRect);
+
+	auto* buttonHexHorz = new QPushButton("Hexilinear (horizontal)");
+	layout->addWidget(buttonHexHorz);
+
+	auto* buttonHexVert = new QPushButton("Hexilinear (vertical)");
+	layout->addWidget(buttonHexVert);
+
+	auto* buttonOct = new QPushButton("Octilinear");
+	layout->addWidget(buttonOct);
 
 	auto* buttonClear = new QPushButton("Clear preprocessed");
 	layout->addWidget(buttonClear);
 
-	connect(button, &QPushButton::clicked, [this]() {
+	connect(buttonRect, &QPushButton::clicked, [this]() {
 		if (input == nullptr) {
 			return;
 		}
@@ -187,12 +196,46 @@ void SimplificationGUI::addPreprocessTab() {
 			preprocessed = nullptr;
 		}
 		copy(input, preprocessed);
-		restrict(preprocessed, {
-			0,
-			std::numbers::pi * 0.5,
-			std::numbers::pi,
-			std::numbers::pi * 1.5
-			});
+		restrict(preprocessed, 2, 0);
+		updatePaintings();
+		});
+
+	connect(buttonHexHorz, &QPushButton::clicked, [this]() {
+		if (input == nullptr) {
+			return;
+		}
+		if (preprocessed != nullptr) {
+			delete preprocessed;
+			preprocessed = nullptr;
+		}
+		copy(input, preprocessed);
+		restrict(preprocessed, 3, 0);
+		updatePaintings();
+		});
+
+	connect(buttonHexVert, &QPushButton::clicked, [this]() {
+		if (input == nullptr) {
+			return;
+		}
+		if (preprocessed != nullptr) {
+			delete preprocessed;
+			preprocessed = nullptr;
+		}
+		copy(input, preprocessed);
+		restrict(preprocessed, 3, std::numbers::pi / 6.0);
+		updatePaintings();
+		});
+
+	connect(buttonOct, &QPushButton::clicked, [this]() {
+		if (input == nullptr) {
+			return;
+		}
+		if (preprocessed != nullptr) {
+			delete preprocessed;
+			preprocessed = nullptr;
+		}
+		copy(input, preprocessed);
+		restrict(preprocessed, 4, 0);
 		updatePaintings();
 		});
 
@@ -365,7 +408,7 @@ void SimplificationGUI::addSimplifyTab() {
 void SimplificationGUI::addPostprocessTab() {
 
 	auto* tab = new QWidget();
-	tabs->addTab(tab, tr("Postprocess"));
+	tabs->addTab(tab, tr("Post"));
 	auto* layout = new QVBoxLayout(tab);
 	layout->setAlignment(Qt::AlignTop);
 

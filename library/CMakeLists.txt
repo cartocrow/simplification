@@ -9,6 +9,8 @@ set(HEADERS
 	indexed_priority_queue.h
 	indexed_priority_queue.hpp
 	modifiable_graph.h
+	orientation_restriction.h
+	orientation_restriction.hpp
 	point_quad_tree.h
 	point_quad_tree.hpp
 	segment_quad_tree.h
