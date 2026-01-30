@@ -1,6 +1,6 @@
 #pragma once
 
-#include "quad_tree.h"
+#include <cartocrow/datastructures/quad_tree.h>
 
 namespace cartocrow::simplification {
 
@@ -29,5 +29,5 @@ namespace cartocrow::simplification {
 
 	template<typename P, typename K>
 		requires SegmentConvertable<P, K>
-	using SegmentQuadTree = QuadTree<SegmentQuadTreeTraits<P, K>>;
+	using SegmentQuadTree = cartocrow::datastructures::QuadTree<SegmentQuadTreeTraits<P, K>>;
 }

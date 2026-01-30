@@ -1,11 +1,11 @@
 #pragma once
 
 #include <cartocrow/core/core.h>
+#include <cartocrow/datastructures/indexed_priority_queue.h>
 
 #include "point_quad_tree.h"
 #include "segment_quad_tree.h"
 #include "straight_graph.h"
-#include "indexed_priority_queue.h"
 #include "modifiable_graph.h"
 #include "historic_graph.h"
 #include "common.h"
@@ -72,7 +72,7 @@ namespace cartocrow::simplification {
 		MG& graph;
 		SegmentQuadTree<Edge, Kernel>& sqt;
 		PointQuadTree<Vertex, Kernel>& pqt;
-		IndexedPriorityQueue<GraphQueueTraits<Edge, Kernel>> queue;
+		cartocrow::datastructures::IndexedPriorityQueue<GraphQueueTraits<Edge, Kernel>> queue;
 
 		void update(Edge* e);
 		bool blocks(Edge& edge, Edge* collapse);
