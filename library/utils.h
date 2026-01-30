@@ -63,6 +63,39 @@ namespace cartocrow::simplification::utils {
 		return box;
 	}
 
+	template<typename K>
+	Rectangle<K> boxOf(std::initializer_list<Point<K>> pts) {
+
+		Number<K> left = 0, right = 0, bottom = 0, top = 0;
+
+		bool first = true;
+		for (Point<K> pt : pts) {
+			if (first) {
+				left = right = pt.x();
+				top = bottom = pt.y();
+				first = false;
+			}
+			else {
+				if (pt.x() < left) {
+					left = pt.x();
+				}
+				else if (pt.x() > right) {
+					right = pt.x();
+				}
+
+				if (pt.y() < bottom) {
+					bottom = pt.y();
+				}
+				else if (pt.y() > top) {
+					top = pt.y();
+				}
+			}
+		}
+
+		Rectangle<K> box(left, bottom, right, top);
+		return box;
+	}
+
 	template<class P, typename K>
 	Rectangle<K> boxOf(std::vector<P*> elements) {
 

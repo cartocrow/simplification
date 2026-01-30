@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cartocrow/core/core.h>
+#include "quad_tree.h"
 
 namespace cartocrow::simplification {
 
@@ -11,39 +11,23 @@ namespace cartocrow::simplification {
 		} -> std::convertible_to<Segment<K>>;
 	};
 
-	namespace detail {
-		template <typename P, typename K> requires SegmentConvertable<P, K> class SQTNode;
-	}
+	template<typename P, typename K> requires SegmentConvertable<P, K>
+	struct SegmentQuadTreeTraits {
+		using Element = P;
+		using Kernel = K;
 
-	template <typename P, typename K> requires SegmentConvertable<P, K> class SegmentQuadTree {
-	private:
-		using Node = detail::SQTNode<P, K>;
+		static Rectangle<Kernel> get_bounding_box(Element& elt) {
+			Segment<Kernel> seg = elt.getSegment();
+			return utils::boxOf({ seg.start(), seg.end() });
+		}
 
-		Node* root;
-		int maxdepth;
-		Number<K> fuzziness;
-
-		// Does the rectangle enclose the (possibly infinite) node?
-		bool encloses(Rectangle<K>& rect, Node* node);
-
-		// Is the (possibly infinite) node disjoint from the rectangle
-		bool disjoint(Node* node, Rectangle<K>& rect);
-
-		void findOverlappedRecursive(Node* n, Rectangle<K>& query, std::function<void(P&)> act);
-
-		template <bool extend> Node* find(P& elt);
-
-	public:
-		SegmentQuadTree(Rectangle<K>& box, int depth, Number<K> fuzz);
-		~SegmentQuadTree();
-
-		void clear();
-		void insert(P& elt);
-		bool remove(P& elt);
-
-		void findOverlapped(Rectangle<K>& query, std::function<void(P&)> act);
+		static bool element_overlaps_rectangle(Element& elt, Rectangle<Kernel>& rect) {
+			Segment<Kernel> seg = elt.getSegment();
+			return utils::overlaps(rect, seg);
+		}
 	};
 
-} // namespace cartocrow::simplification
-
-#include "segment_quad_tree.hpp"
+	template<typename P, typename K>
+		requires SegmentConvertable<P, K>
+	using SegmentQuadTree = QuadTree<SegmentQuadTreeTraits<P, K>>;
+}

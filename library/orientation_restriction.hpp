@@ -3,8 +3,6 @@
 // Do not include this file, but the .h file instead
 // -----------------------------------------------------------------------------
 
-#include <CGAL/Boolean_set_operations_2.h>
-
 namespace cartocrow::simplification {
 
 	namespace detail {
@@ -525,7 +523,6 @@ namespace cartocrow::simplification {
 						auto sidestep = step_dist * dir_1;
 						auto lengthstep = step_len * dir_2;
 
-						// TODO better var names
 						auto a = v_pt + sidestep;
 						auto b = a + lengthstep;
 						auto c = b - 2 * sidestep;
@@ -1231,19 +1228,17 @@ namespace cartocrow::simplification {
 						auto v_pt = to_inexact(v->getPoint());
 						auto o_pt = to_inexact(e->other(v)->getPoint());
 
-						// TODO actual step distance...
 						auto len = std::sqrt(CGAL::squared_distance(v_pt, o_pt));
 
 						Vec dir_1 = directions[edata.assigned];
-						Vec dir_2 = directions[edata.other_direction()];
+						Vec dir_2 = directions[edata.associated.first];
 
-						auto step_dist = len * eps;
-						auto step_len = (1 - eps) * len / 2.0; // NB: this uses eps still, not step dist
+						auto step_dist = edata.stepdist;
+						auto step_len = (1 - eps) * len / 2.0; // NB: this needs to use eps, not stepdist
 
 						auto sidestep = to_kernel(step_dist * dir_1);
 						auto lengthstep = to_kernel(step_len * dir_2);
 
-						// TODO better var names
 						auto a = v->getPoint() + sidestep;
 						auto b = a + lengthstep;
 						auto c = b - 2 * sidestep;

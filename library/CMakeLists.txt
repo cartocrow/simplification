@@ -13,8 +13,9 @@ set(HEADERS
 	orientation_restriction.hpp
 	point_quad_tree.h
 	point_quad_tree.hpp
+	quad_tree.h
+	quad_tree.hpp
 	segment_quad_tree.h
-	segment_quad_tree.hpp
 	straight_graph.h
 	straight_graph.hpp
 	utils.h

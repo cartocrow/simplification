@@ -8,7 +8,6 @@
 #include "indexed_priority_queue.h"
 #include "modifiable_graph.h"
 #include "historic_graph.h"
-
 #include "common.h"
 
 namespace cartocrow::simplification {
