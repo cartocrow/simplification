@@ -13,6 +13,7 @@
 
 #include "region_set.h"
 #include "simplification_algorithm.h"
+#include "persistent_settings.h"
 
 using namespace cartocrow;
 using namespace cartocrow::renderer;
@@ -29,6 +30,8 @@ private:
 	InputGraph* input = nullptr;
 	InputGraph* preprocessed = nullptr;
 	std::vector<SimplificationAlgorithm*> algorithms;
+
+	PersistentSettings m_settings = PersistentSettings("settings");
 
 	QTabWidget* tabs;
 	// IO

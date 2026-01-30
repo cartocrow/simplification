@@ -59,6 +59,8 @@ void SimplificationGUI::addIOTab() {
 	auto* layout = new QVBoxLayout(tab);
 	layout->setAlignment(Qt::AlignTop);
 
+	curr_dir = QString::fromStdString(m_settings.getString("dir", "."));
+
 	layout->addWidget(new QLabel("<h3>Input</h3>"));
 
 	auto* loadFileButton = new QPushButton("Load file");
@@ -76,6 +78,7 @@ void SimplificationGUI::addIOTab() {
 		std::filesystem::path filePath = QFileDialog::getOpenFileName(this, tr("Select map"), curr_dir, tr("Accepted formats (*.shp *.geojson *.ipe);;Shapefiles (*.shp);;Geojson (*.geojson);;IPE files(*.ipe)")).toStdString();
 		if (filePath == "") return;
 		curr_dir = QString::fromStdU16String(filePath.parent_path().u16string());
+		m_settings.setString("dir", curr_dir.toStdString());
 
 		QProgressDialog progress("Loading file", nullptr, 0, 2, this);
 		progress.setWindowModality(Qt::WindowModal);
@@ -134,7 +137,7 @@ void SimplificationGUI::addIOTab() {
 		std::filesystem::path filePath = QFileDialog::getSaveFileName(this, tr("Select Shapefile"), curr_dir, tr("Shapefile (*.shp)")).toStdString();
 		if (filePath == "") return;
 		curr_dir = QString::fromStdU16String(filePath.parent_path().u16string());
-
+		m_settings.setString("dir", curr_dir.toStdString());
 
 		QProgressDialog progress("Exporting", nullptr, 0, 2, this);
 		progress.setWindowModality(Qt::WindowModal);
