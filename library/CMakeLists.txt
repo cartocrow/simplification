@@ -10,8 +10,6 @@ set(HEADERS
 	modifiable_graph.h
 	orientation_restriction.h
 	orientation_restriction.hpp
-	point_quad_tree.h
-	point_quad_tree.hpp
 	straight_graph.h
 	straight_graph.hpp
 	utils.h

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "point_quad_tree.h"
+#include <cartocrow/datastructures/point_quad_tree.h>
 
 namespace cartocrow::simplification {
 
@@ -16,5 +16,5 @@ namespace cartocrow::simplification {
 	};
 
 	template<class Graph>
-	using VertexQuadTree = PointQuadTree<VertexQuadTreeTraits<Graph>>;
+	using VertexQuadTree = cartocrow::datastructures::PointQuadTree<VertexQuadTreeTraits<Graph>>;
 }
