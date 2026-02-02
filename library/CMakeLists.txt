@@ -4,6 +4,7 @@ set(HEADERS
 	edge_collapse.hpp
 	edge_moves.h
 	edge_moves.hpp
+	edge_quad_tree.h
 	historic_graph.h
 	historic_graph.hpp	
 	modifiable_graph.h
@@ -11,10 +12,10 @@ set(HEADERS
 	orientation_restriction.hpp
 	point_quad_tree.h
 	point_quad_tree.hpp
-	segment_quad_tree.h
 	straight_graph.h
 	straight_graph.hpp
 	utils.h
+	vertex_quad_tree.h
 	vertex_removal.h	
 	vertex_removal.hpp	
 )

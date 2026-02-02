@@ -7,7 +7,7 @@
 using namespace cartocrow::simplification;
 
 using VWGraph = HistoricVertexRemovalGraph<Inexact>;
-using VWPQT = PointQuadTree<VWGraph::Vertex, Inexact>;
+using VWPQT = VertexQuadTree<VWGraph>;
 using VW = VisvalingamWhyatt<VWGraph>;
 
 static VWInexactSimplifier* instance = nullptr;

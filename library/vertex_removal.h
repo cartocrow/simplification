@@ -3,7 +3,7 @@
 #include <cartocrow/core/core.h>
 #include <cartocrow/datastructures/indexed_priority_queue.h>
 
-#include "point_quad_tree.h"
+#include "vertex_quad_tree.h"
 #include "straight_graph.h"
 #include "modifiable_graph.h"
 #include "historic_graph.h"
@@ -75,10 +75,11 @@ namespace cartocrow::simplification {
 		public:
 			using Vertex = MG::Vertex;
 			using Kernel = MG::Kernel;
+			using VertexTree = VertexQuadTree<MG>;
 
 		private:
 			MG& graph;
-			PointQuadTree<Vertex, Kernel>& pqt;
+			VertexTree& pqt;
 			cartocrow::datastructures::IndexedPriorityQueue<GraphQueueTraits<Vertex, Kernel>> queue;
 
 			void update(Vertex* v);
@@ -86,8 +87,8 @@ namespace cartocrow::simplification {
 			Vertex* findNextStep();
 			void performStep(Vertex* v);
 		public:
-			VertexRemoval(MG& g, PointQuadTree<Vertex, Kernel>& qt) : graph(g), pqt(qt) {}
-			~VertexRemoval() {}
+			VertexRemoval(MG& g, VertexTree& qt);
+			~VertexRemoval();
 
 			void initialize(bool initQuadTree);
 			bool run(std::optional<std::function<bool(int, Number<Kernel>)>> stop = std::nullopt);

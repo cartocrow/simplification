@@ -157,7 +157,7 @@ namespace cartocrow::simplification {
 	}
 
 	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
-	EdgeCollapse<MG, ECT>::EdgeCollapse(MG& g, SegmentQuadTree<Edge, Kernel>& sqt, PointQuadTree<Vertex, Kernel>& pqt)
+	EdgeCollapse<MG, ECT>::EdgeCollapse(MG& g, EdgeTree& sqt, VertexTree& pqt)
 		: graph(g), sqt(sqt), pqt(pqt) {
 
 	}

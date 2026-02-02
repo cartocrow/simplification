@@ -4,39 +4,55 @@
 
 namespace cartocrow::simplification {
 
-	template <typename P, typename K> concept PointConvertable = requires(P p) {
+	template <typename PQT>
+	concept PointQuadTreeTraits = requires(typename PQT::Element& elt) {
+
+		typename PQT::Element;
+		typename PQT::Kernel;
 
 		{
-			p.getPoint()
-		} -> std::convertible_to<Point<K>&>;
+			PQT::get_point(elt)
+		} -> std::convertible_to<Point<typename PQT::Kernel>&>;
+
 	};
 
 	namespace detail {
-		template <typename P, typename K> requires PointConvertable<P, K> struct PQTNode;
+		template <PointQuadTreeTraits PQT> struct PQTNode;
 	}
 
-	template <typename P, typename K> requires PointConvertable<P, K> class PointQuadTree {
+	template <PointQuadTreeTraits PQT> class PointQuadTree {
+	public:
+		using Kernel = PQT::Kernel;
+		using Element = PQT::Element;
+		using ElementCallback = std::function<void(Element&)>;
 
+		PointQuadTree(Rectangle<Kernel>& box, int depth);
+		~PointQuadTree();
+
+		void clear();
+		void insert(Element& elt);
+		bool remove(Element& elt);
+
+		void findContained(Rectangle<Kernel>& query, ElementCallback act);
+		Element* findElement(const Point<Kernel>& query, const Number<Kernel> prec = 0);
 	private:
-		using Node = detail::PQTNode<P, K>;
+		using Node = detail::PQTNode<PQT>;
 
 		Node* root;
 		int maxdepth;
 
-		P* findElementRecursive(Node* n, const  Point<K>& query, const Number<K> prec);
-		void findContainedRecursive(Node* n, Rectangle<K>& query, std::function<void(P&)> act);
-		template <bool extend>Node* find(P& elt);
+		Element* findElementRecursive(Node* n, const  Point<Kernel>& query, const Number<Kernel> prec);
+		void findContainedRecursive(Node* n, Rectangle<Kernel>& query, ElementCallback act);
+		template <bool extend>Node* find(Element& elt);
 
-	public:
-		PointQuadTree(Rectangle<K>& box, int depth);
-		~PointQuadTree();
-
-		void clear();
-		void insert(P& elt);
-		bool remove(P& elt);
-
-		void findContained(Rectangle<K>& query, std::function<void(P&)> act);
-		P* findElement(const Point<K>& query, const Number<K> prec = 0);
+		// Does the larger rectangle enclose the smaller?
+		static bool encloses(const Rectangle<Kernel>& larger, const Rectangle<Kernel>& smaller);
+		// Are these rectangles disjoint?
+		static bool disjoint(const Rectangle<Kernel>& a, const Rectangle<Kernel>& b);
+		// Does the rectangle contain the point?
+		static bool contains(const Rectangle<Kernel>& rect, const Point<Kernel>& point, const Number<Kernel> prec);
+		// Are these points the same, up to the given precision?
+		static bool same_point(const Point<Kernel>& a, const Point<Kernel>& b, const Number<Kernel> prec);
 	};
 
 } // namespace cartocrow::simplification

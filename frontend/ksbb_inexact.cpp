@@ -7,8 +7,8 @@
 using namespace cartocrow::simplification;
 
 using KSBBGraph = HistoricEdgeCollapseGraph<Inexact>;
-using KSBBPQT = PointQuadTree<KSBBGraph::Vertex, Inexact>;
-using KSBBSQT = SegmentQuadTree<KSBBGraph::Edge, Inexact>;
+using KSBBPQT = VertexQuadTree<KSBBGraph>;
+using KSBBSQT = EdgeQuadTree<KSBBGraph>;
 using KSBB = KronenfeldEtAl<KSBBGraph>;
 
 static KSBBInexactSimplifier* instance = nullptr;

@@ -3,8 +3,8 @@
 #include <cartocrow/core/core.h>
 #include <cartocrow/datastructures/indexed_priority_queue.h>
 
-#include "point_quad_tree.h"
-#include "segment_quad_tree.h"
+#include "vertex_quad_tree.h"
+#include "edge_quad_tree.h"
 #include "straight_graph.h"
 #include "modifiable_graph.h"
 #include "historic_graph.h"
@@ -68,10 +68,13 @@ namespace cartocrow::simplification {
 		using Vertex = MG::Vertex;
 		using Edge = MG::Edge;
 		using Kernel = MG::Kernel;
+		using VertexTree = VertexQuadTree<MG>;
+		using EdgeTree = EdgeQuadTree<MG>;
+
 	private:
 		MG& graph;
-		SegmentQuadTree<Edge, Kernel>& sqt;
-		PointQuadTree<Vertex, Kernel>& pqt;
+		EdgeTree& sqt;
+		VertexTree& pqt;
 		cartocrow::datastructures::IndexedPriorityQueue<GraphQueueTraits<Edge, Kernel>> queue;
 
 		void update(Edge* e);
@@ -81,7 +84,7 @@ namespace cartocrow::simplification {
 		Edge* findNextStep();
 		void performStep(Edge* e);
 	public:
-		EdgeCollapse(MG& g, SegmentQuadTree<Edge, Kernel>& sqt, PointQuadTree<Vertex, Kernel>& pqt);
+		EdgeCollapse(MG& g, EdgeTree& sqt, VertexTree& pqt);
 		~EdgeCollapse();
 
 		void initialize(bool initSQT, bool initPQT);

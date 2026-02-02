@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cartocrow/core/core.h>
-#include "library/point_quad_tree.h"
+#include "library/vertex_quad_tree.h"
 #include "simplification_algorithm.h"
 
 namespace cartocrow {

@@ -48,7 +48,7 @@ namespace cartocrow {
 		Rectangle<Exact> box = utils::boxOf<Exact>(points);
 
 		// construct the graph
-		PointQuadTree<InputGraph::Vertex, Exact> pqt(box, depth);
+		VertexQuadTree<InputGraph> pqt(box, depth);
 
 		auto findVtx = [&pqt, &graph](Point<Exact> pt) {
 			InputGraph::Vertex* v = pqt.findElement(pt, 0.00001);

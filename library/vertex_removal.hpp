@@ -29,6 +29,14 @@ namespace cartocrow::simplification {
 	}
 
 	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
+	VertexRemoval<MG,VRT>::VertexRemoval(MG& g, VertexTree& qt) : graph(g), pqt(qt) {
+	}
+
+	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
+	VertexRemoval<MG, VRT>::~VertexRemoval() {
+	}
+
+	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
 	void VertexRemoval<MG, VRT>::initialize(bool initQuadTree) {
 
 		if (initQuadTree) {

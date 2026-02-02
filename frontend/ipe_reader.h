@@ -3,7 +3,7 @@
 #include <ipepath.h>
 #include <cartocrow/reader/ipe_reader.h>
 
-#include "library/point_quad_tree.h"
+#include "library/vertex_quad_tree.h"
 #include "library/utils.h"
 
 template<class Graph>
@@ -54,7 +54,7 @@ Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
 	Rectangle<Kernel> box = utils::boxOf<Kernel>(points);
 
 	// construct the graph
-	PointQuadTree<Vertex, Kernel> pqt(box, depth);
+	VertexQuadTree<Graph> pqt(box, depth);
 
 	for (int i = 0; i < page->count(); i++) {
 		auto object = page->object(i);
