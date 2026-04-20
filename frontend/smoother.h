@@ -5,7 +5,7 @@
 using namespace cartocrow;
 using namespace cartocrow::simplification;
 
-extern template StraightGraph<std::monostate, std::monostate, Inexact>;
+extern template class StraightGraph<std::monostate, std::monostate, Inexact>;
 
 using SmoothGraph = StraightGraph<std::monostate, std::monostate, Inexact>;
 

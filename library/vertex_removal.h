@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cartocrow/core/core.h>
-#include <cartocrow/datastructures/indexed_priority_queue.h>
+#include <cartocrow/data_structures/indexed_priority_queue.h>
 
 #include "vertex_quad_tree.h"
 #include "straight_graph.h"
@@ -80,7 +80,7 @@ namespace cartocrow::simplification {
 		private:
 			MG& graph;
 			VertexTree& pqt;
-			cartocrow::datastructures::IndexedPriorityQueue<GraphQueueTraits<Vertex, Kernel>> queue;
+			cartocrow::data_structures::IndexedPriorityQueue<GraphQueueTraits<Vertex, Kernel>> queue;
 
 			void update(Vertex* v);
 

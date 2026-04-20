@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cartocrow/core/core.h>
-#include <cartocrow/datastructures/indexed_priority_queue.h>
+#include <cartocrow/data_structures/indexed_priority_queue.h>
 
 #include "vertex_quad_tree.h"
 #include "edge_quad_tree.h"
@@ -75,10 +75,10 @@ namespace cartocrow::simplification {
 		MG& graph;
 		EdgeTree& sqt;
 		VertexTree& pqt;
-		cartocrow::datastructures::IndexedPriorityQueue<GraphQueueTraits<Edge, Kernel>> queue;
+		cartocrow::data_structures::IndexedPriorityQueue<GraphQueueTraits<Edge, Kernel>> queue;
 
 		void update(Edge* e);
-		bool blocks(Edge& edge, Edge* collapse);
+		bool blocks(Edge* edge, Edge* collapse);
 		bool validateState();
 
 		Edge* findNextStep();

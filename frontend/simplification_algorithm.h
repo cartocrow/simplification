@@ -8,9 +8,9 @@ using namespace cartocrow;
 using namespace cartocrow::renderer;
 using namespace cartocrow::simplification;
 
-extern template StraightGraph<std::monostate, std::monostate, Exact>;
+extern template class StraightGraph<std::monostate, std::monostate, Exact>;
 using InputGraph = StraightGraph<std::monostate, std::monostate, Exact>;
-extern template GraphPainting<InputGraph>;
+extern template class GraphPainting<InputGraph>;
 
 class SimplificationAlgorithm {
 public:

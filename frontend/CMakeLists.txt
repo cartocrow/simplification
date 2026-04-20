@@ -17,7 +17,7 @@ target_link_libraries(
     simplification
     PRIVATE
     cartocrow::core
-    cartocrow::datastructures
+    cartocrow::data_structures
     cartocrow::reader
     cartocrow::renderer
     CGAL::CGAL

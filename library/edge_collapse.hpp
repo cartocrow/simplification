@@ -63,11 +63,11 @@ namespace cartocrow::simplification {
 	}
 
 	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
-	bool EdgeCollapse<MG, ECT>::blocks(Edge& edge, Edge* collapse) {
+	bool EdgeCollapse<MG, ECT>::blocks(Edge* edge, Edge* collapse) {
 		Edge* prev = collapse->sourceWalk();
 		Edge* next = collapse->targetWalk();
 
-		if (&edge == collapse || &edge == prev || &edge == next) {
+		if (edge == collapse || edge == prev || edge == next) {
 			// involved in collapse
 			return false;
 		}
@@ -75,8 +75,8 @@ namespace cartocrow::simplification {
 		Vertex* prev_v = collapse->previous()->getSource();
 		Vertex* next_v = collapse->next()->getTarget();;
 
-		bool source_shared = edge.getSource() == prev_v || edge.getSource() == next_v;
-		bool target_shared = edge.getTarget() == prev_v || edge.getTarget() == next_v;
+		bool source_shared = edge->getSource() == prev_v || edge->getSource() == next_v;
+		bool target_shared = edge->getTarget() == prev_v || edge->getTarget() == next_v;
 
 		auto test_is = [&](std::optional<std::variant<Point<Kernel>, Segment<Kernel>>> is) {
 			if (!is.has_value()) {
@@ -97,10 +97,10 @@ namespace cartocrow::simplification {
 				if (Point<Kernel>* pt = std::get_if<Point<Kernel>>(&*is)) {
 
 					// make sure it's not the common point
-					if (source_shared && close(*pt, edge.getSource()->getPoint())) {
+					if (source_shared && close(*pt, edge->getSource()->getPoint())) {
 						return false;
 					}
-					if (target_shared && close(*pt, edge.getTarget()->getPoint())) {
+					if (target_shared && close(*pt, edge->getTarget()->getPoint())) {
 						return false;
 					}
 				}
@@ -110,14 +110,14 @@ namespace cartocrow::simplification {
 					Segment<Kernel>* ls = std::get_if<Segment<Kernel>>(&*is);
 
 					if (source_shared 
-						&& close(ls->source(), edge.getSource()->getPoint()) 
-						&& close(ls->target(), edge.getSource()->getPoint())) {
+						&& close(ls->source(), edge->getSource()->getPoint())
+						&& close(ls->target(), edge->getSource()->getPoint())) {
 						return false;
 					}
 
 					if (target_shared
-						&& close(ls->source(), edge.getTarget()->getPoint())
-						&& close(ls->target(), edge.getTarget()->getPoint())) {
+						&& close(ls->source(), edge->getTarget()->getPoint())
+						&& close(ls->target(), edge->getTarget()->getPoint())) {
 						return false;
 					}
 				}
@@ -132,10 +132,10 @@ namespace cartocrow::simplification {
 
 				if (Point<Kernel>* pt = std::get_if<Point<Kernel>>(&*is)) {
 					// make sure it's not the common point
-					if (source_shared && *pt == edge.getSource()->getPoint()) {
+					if (source_shared && *pt == edge->getSource()->getPoint()) {
 						return false;
 					}
-					if (target_shared && *pt == edge.getTarget()->getPoint()) {
+					if (target_shared && *pt == edge->getTarget()->getPoint()) {
 						return false;
 					}
 				}
@@ -145,11 +145,11 @@ namespace cartocrow::simplification {
 			}
 			};
 
-		if (test_is(CGAL::intersection(collapse->data().T1, edge.getSegment()))) {
+		if (test_is(CGAL::intersection(collapse->data().T1, edge->getSegment()))) {
 			return true;
 		}
 
-		if (test_is(CGAL::intersection(collapse->data().T2, edge.getSegment()))) {
+		if (test_is(CGAL::intersection(collapse->data().T2, edge->getSegment()))) {
 			return true;
 		}
 
@@ -171,7 +171,7 @@ namespace cartocrow::simplification {
 		if (initSQT) {
 			sqt.clear();
 			for (Edge* e : graph.getEdges()) {
-				sqt.insert(*e);
+				sqt.insert(e);
 			}
 		}
 
@@ -281,11 +281,11 @@ namespace cartocrow::simplification {
 
 				if (!edata.blocked_by_degzero) {
 
-					sqt.findOverlapped(rect, [this, &e](Edge& b) {
+					sqt.findOverlapped(rect, [this, &e](Edge* b) {
 
 						if (blocks(b, e)) {
-							b.data().blocking.push_back(e);
-							e->data().blocked_by.push_back(&b);
+							b->data().blocking.push_back(e);
+							e->data().blocked_by.push_back(b);
 						}
 						});
 				}
@@ -321,9 +321,9 @@ namespace cartocrow::simplification {
 		// remove from blocking lists and search structure
 		Edge* prev = e->previous();
 		Edge* next = e->next();
-		sqt.remove(*e);
-		sqt.remove(*prev);
-		sqt.remove(*next);
+		sqt.remove(e);
+		sqt.remove(prev);
+		sqt.remove(next);
 
 		queue.remove(prev);
 		queue.remove(next);
@@ -368,7 +368,7 @@ namespace cartocrow::simplification {
 			Edge* ne = graph.mergeVertex(tar);
 
 			// insert the one new edge
-			sqt.insert(*ne);
+			sqt.insert(ne);
 
 			// update it and its neighbors, if applicable
 			update(ne);
@@ -389,8 +389,8 @@ namespace cartocrow::simplification {
 			graph.shiftVertex(tar, pt);
 
 			// insert the two new edges
-			sqt.insert(*tar->incoming());
-			sqt.insert(*tar->outgoing());
+			sqt.insert(tar->incoming());
+			sqt.insert(tar->outgoing());
 
 			// update them and their neighbors, if applicable
 			update(tar->incoming());

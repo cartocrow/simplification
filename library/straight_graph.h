@@ -10,9 +10,9 @@ namespace cartocrow::simplification {
 
 	template <class VD, class ED, typename K> class StraightGraph {
 
-		template <class VD, class ED, typename K> friend class StraightVertex;
-		template <class VD, class ED, typename K> friend class StraightEdge;
-		template <class VD, class ED, typename K> friend class StraightBoundary;
+		template <class VD_, class ED_, typename K_> friend class StraightVertex;
+		template <class VD_, class ED_, typename K_> friend class StraightEdge;
+		template <class VD_, class ED_, typename K_> friend class StraightBoundary;
 		template <class InputGraph, class OutputGraph> friend OutputGraph* copy(InputGraph* input);
 
 	public:
@@ -70,9 +70,9 @@ namespace cartocrow::simplification {
 
 	template <class VD, class ED, typename K> class StraightVertex {
 
-		template <class VD, class ED, typename K> friend class StraightGraph;
-		template <class VD, class ED, typename K> friend class StraightEdge;
-		template <class VD, class ED, typename K> friend class StraightBoundary;
+		template <class VD_, class ED_, typename K_> friend class StraightGraph;
+		template <class VD_, class ED_, typename K_> friend class StraightEdge;
+		template <class VD_, class ED_, typename K_> friend class StraightBoundary;
 		template <class InputGraph, class OutputGraph> friend OutputGraph* copy(InputGraph* input);
 
 	public:
