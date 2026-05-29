@@ -1,16 +1,16 @@
 #pragma once
 
 #include <cartocrow/renderer/geometry_painting.h>
-#include "library/straight_graph.h"
+#include <cartocrow/data_structures/straight_graph_2.h>
+
 #include "graph_painter.h"
 
 using namespace cartocrow;
 using namespace cartocrow::renderer;
-using namespace cartocrow::simplification;
 
-extern template StraightGraph<std::monostate, std::monostate, Exact>;
-using InputGraph = StraightGraph<std::monostate, std::monostate, Exact>;
-extern template OldGraphPainting<InputGraph>;
+//extern template Straight_graph_2<std::monostate, std::monostate, Exact, SimpleGraph>;
+using InputGraph = Straight_graph_2<std::monostate, std::monostate, Exact, SimpleGraph>;
+extern template GraphPainting<InputGraph>;
 
 class SimplificationAlgorithm {
 public:

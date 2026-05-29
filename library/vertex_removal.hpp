@@ -80,9 +80,9 @@ namespace cartocrow::simplification {
 			Vertex_handle w = v->next();
 
 			// test whether the operation is blocked
-			Point<Kernel>& up = u->point();
-			Point<Kernel>& vp = v->point();
-			Point<Kernel>& wp = w->point();
+			const Point<Kernel>& up = u->point();
+			const Point<Kernel>& vp = v->point();
+			const Point<Kernel>& wp = w->point();
 			Triangle<Kernel> T(up, vp, wp);
 
 			Rectangle<Kernel> rect = utils::boxOf(up, vp, wp);

@@ -1,5 +1,7 @@
 #include "vw_inexact.h"
 
+#include <cartocrow/data_structures/graph_map_2.h>
+
 #include "library/vertex_removal.h"
 #include "graph_painter.h"
 #include "smoother.h"
@@ -35,15 +37,15 @@ void VWInexactSimplifier::initialize(InputGraph* graph, const int depth) {
 
 	m_graph = new VWGraph();
 
-	std::vector<typename VWGraph::Vertex_handle> map;
+	Graph_static_vertex_map<InputGraph, typename VWGraph::Vertex_handle> map(*graph, nullptr);
 
-	for (typename InputGraph::Vertex* v : graph->getVertices()) {
-		map.push_back(m_graph->add_vertex(approximate(v->getPoint())));
+	for (typename InputGraph::Vertex_handle v : graph->vertices()) {
+		map[v] = m_graph->add_vertex(approximate(v->point()));
 	}
 
-	for (typename InputGraph::Edge* e : graph->getEdges()) {
-		typename VWGraph::Vertex_handle u = map[e->getSource()->graphIndex()];
-		typename VWGraph::Vertex_handle v = map[e->getTarget()->graphIndex()];
+	for (typename InputGraph::Edge_handle e : graph->edges()) {
+		auto u = map[e->source()];
+		auto v = map[e->target()];
 		m_graph->add_edge(u, v);
 	}
 

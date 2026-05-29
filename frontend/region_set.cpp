@@ -1,5 +1,10 @@
 #include "region_set.h"
 
+#include "library/utils.h"
+#include "library/vertex_quad_tree.h"
+
+using namespace cartocrow::simplification;
+
 namespace cartocrow {
 
 	bool ArcRegistration::validate(InputGraph* graph) {
@@ -7,24 +12,24 @@ namespace cartocrow {
 		using Vtx = InputGraph::Vertex;
 
 		// end of the last arc
-		Vtx* prev = back().reverse 
-			? graph->getBoundaries()[back().boundary]->getFirstEdge()->getSource()
-			: graph->getBoundaries()[back().boundary]->getLastEdge()->getTarget();
-		for (Arc a : *this) {
+		//Vtx* prev = back().reverse 
+		//	? graph->getBoundaries()[back().boundary]->getFirstEdge()->getSource()
+		//	: graph->getBoundaries()[back().boundary]->getLastEdge()->getTarget();
+		//for (Arc a : *this) {
 
-			Vtx* start = a.reverse
-				? graph->getBoundaries()[a.boundary]->getLastEdge()->getTarget()
-				: graph->getBoundaries()[a.boundary]->getFirstEdge()->getSource();
-			// start of this arc: does it match the end of the previous?
-			if (prev != start) {
-				return false;
-			}
+		//	Vtx* start = a.reverse
+		//		? graph->getBoundaries()[a.boundary]->getLastEdge()->getTarget()
+		//		: graph->getBoundaries()[a.boundary]->getFirstEdge()->getSource();
+		//	// start of this arc: does it match the end of the previous?
+		//	if (prev != start) {
+		//		return false;
+		//	}
 
-			// end of last ast
-			prev = a.reverse
-				? graph->getBoundaries()[a.boundary]->getFirstEdge()->getSource()
-				: graph->getBoundaries()[a.boundary]->getLastEdge()->getTarget();
-		}
+		//	// end of last ast
+		//	prev = a.reverse
+		//		? graph->getBoundaries()[a.boundary]->getFirstEdge()->getSource()
+		//		: graph->getBoundaries()[a.boundary]->getLastEdge()->getTarget();
+		//}
 
 		return true;
 	}
@@ -48,12 +53,12 @@ namespace cartocrow {
 		Rectangle<Exact> box = utils::boxOf<Exact>(points);
 
 		// construct the graph
-		OldVertexQuadTree<InputGraph> pqt(box, depth);
+		VertexQuadTree<InputGraph> pqt(box, depth);
 
 		auto findVtx = [&pqt, &graph](Point<Exact> pt) {
-			InputGraph::Vertex* v = pqt.findElement(pt, 0.00001);
+			InputGraph::Vertex_handle v = pqt.findElement(pt, 0.00001);
 			if (v == nullptr) {
-				v = graph->addVertex(pt);
+				v = graph->add_vertex(pt);
 				pqt.insert(v);
 			}
 			return v;
@@ -69,71 +74,72 @@ namespace cartocrow {
 					if (prev == nullptr) {
 						first = curr;
 					}
-					else if (prev != curr && !prev->isNeighborOf(curr)) {
-						graph->addEdge(prev, curr);
+					else if (prev != curr && !prev->is_neighbor_of(curr)) {
+						graph->add_edge(prev, curr);
 					}
 
 					prev = curr;
 				}
-				if (prev != first && !prev->isNeighborOf(first)) {
-					graph->addEdge(prev, first);
+				if (prev != first && !prev->is_neighbor_of(first)) {
+					graph->add_edge(prev, first);
 				}
 			}
 		}
 
 		// register boundaries
-		graph->orient();
+		
+		graph->initialize();
 
-		for (Region<Exact>& r : rs) {
+		//for (Region<Exact>& r : rs) {
 
-			for (Polygon<Exact> poly : r.rings) {
+		//	for (Polygon<Exact> poly : r.rings) {
 
-				ArcRegistration reg;
+		//		ArcRegistration reg;
 
-				InputGraph::Vertex* prev = nullptr;
-				InputGraph::Vertex* first = nullptr;
-				for (Point<Exact> p : poly.vertices()) {
-					InputGraph::Vertex* curr = findVtx(p);
+		//		InputGraph::Vertex* prev = nullptr;
+		//		InputGraph::Vertex* first = nullptr;
+		//		for (Point<Exact> p : poly.vertices()) {
+		//			InputGraph::Vertex* curr = findVtx(p);
 
-					if (prev == nullptr) {
-						first = curr;
-					}
-					else if (prev != curr) {
-						InputGraph::Edge* e = prev->edgeTo(curr);
+		//			if (prev == nullptr) {
+		//				first = curr;
+		//			}
+		//			else if (prev != curr) {
+		//				InputGraph::Edge* e = prev->edgeTo(curr);
 
-						int bi = e->getBoundary()->graphIndex();
-						bool brev = e->getSource() == curr;
+		//				int bi = e->getBoundary()->graphIndex();
+		//				bool brev = e->getSource() == curr;
 
-						if (reg.empty() || reg.back().boundary != bi || reg.back().reverse != brev) {
-							reg.push_back(Arc(bi, brev));
-						}
-					}
+		//				if (reg.empty() || reg.back().boundary != bi || reg.back().reverse != brev) {
+		//					reg.push_back(Arc(bi, brev));
+		//				}
+		//			}
 
-					prev = curr;
-				}
+		//			prev = curr;
+		//		}
 
-				if (prev != first) {
-					InputGraph::Edge* e = prev->edgeTo(first);
+		//		if (prev != first) {
+		//			InputGraph::Edge* e = prev->edgeTo(first);
 
-					int bi = e->getBoundary()->graphIndex();
-					bool brev = e->getSource() == first;
-					if (reg.empty() || reg.back().boundary != bi || reg.back().reverse != brev) {
-						reg.push_back(Arc(bi, brev));
-					}
-				}
+		//			int bi = e->getBoundary()->graphIndex();
+		//			bool brev = e->getSource() == first;
+		//			if (reg.empty() || reg.back().boundary != bi || reg.back().reverse != brev) {
+		//				reg.push_back(Arc(bi, brev));
+		//			}
+		//		}
 
-				// cleanup, in case we didnt start at a boundary start...
-				while (reg.size() > 1 
-					&& reg.back().boundary == reg.front().boundary 
-					&& reg.back().reverse == reg.front().reverse) {
-					reg.pop_back();
-				}
+		//		// cleanup, in case we didnt start at a boundary start...
+		//		while (reg.size() > 1 
+		//			&& reg.back().boundary == reg.front().boundary 
+		//			&& reg.back().reverse == reg.front().reverse) {
+		//			reg.pop_back();
+		//		}
 
-				r.arcs.push_back(reg);
+		//		r.arcs.push_back(reg);
 
-				assert(reg.validate(graph));
-			}
-		}
+		//		assert(reg.validate(graph));
+		//	}
+		//}
 
 		return graph;
 	}

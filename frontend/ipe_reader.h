@@ -6,6 +6,8 @@
 #include "library/vertex_quad_tree.h"
 #include "library/utils.h"
 
+using namespace cartocrow::simplification;
+
 template<class Graph>
 Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
 	using Vertex = Graph::Vertex;
@@ -54,7 +56,7 @@ Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
 	Rectangle<Kernel> box = utils::boxOf<Kernel>(points);
 
 	// construct the graph
-	OldVertexQuadTree<Graph> pqt(box, depth);
+	VertexQuadTree<Graph> pqt(box, depth);
 
 	for (int i = 0; i < page->count(); i++) {
 		auto object = page->object(i);
@@ -76,11 +78,11 @@ Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
 
 				Vertex* next = pqt.findElement(point, 0.00001);
 				if (next == nullptr) {
-					next = graph->addVertex(point);
+					next = graph->add_vertex(point);
 					pqt.insert(next);
 				}
-				if (prev != nullptr && !next->isNeighborOf(prev) && next != prev) {
-					graph->addEdge(prev, next);
+				if (prev != nullptr && !next->is_neighbor_of(prev) && next != prev) {
+					graph->add_edge(prev, next);
 				}
 				prev = next;
 			}
@@ -91,11 +93,11 @@ Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
 
 			Vertex* next = pqt.findElement(point, 0.00001);
 			if (next == nullptr) {
-				next = graph->addVertex(point);
+				next = graph->add_vertex(point);
 				pqt.insert(next);
 			}
-			if (prev != nullptr && !next->isNeighborOf(prev) && next != prev) {
-				graph->addEdge(prev, next);
+			if (prev != nullptr && !next->is_neighbor_of(prev) && next != prev) {
+				graph->add_edge(prev, next);
 			}
 			prev = next;
 		}

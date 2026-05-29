@@ -19,6 +19,9 @@
 #include "read_graph_gdal.h"
 //#include "restrictor.h"
 
+using namespace cartocrow;
+using namespace cartocrow::simplification;
+
 void launchGUI(int argc, char* argv[]) {
 	QApplication app(argc, argv);
 	SimplificationGUI gui;
@@ -593,11 +596,10 @@ void SimplificationGUI::loadInput(InputGraph* graph, const bool keepregions) {
 	updatePaintings();
 
 	if (input != nullptr) {
-		input->orient();
-		input->sortIncidentEdges();
-		desiredComplexity->setMaximum(input->getEdgeCount());
-		complexitySlider->setMaximum(input->getEdgeCount());
-		m_renderer->fitInView(utils::boxOf<InputGraph::Vertex*, Exact>(input->getVertices()).bbox());
+		input->initialize();
+		desiredComplexity->setMaximum(input->number_of_edges());
+		complexitySlider->setMaximum(input->number_of_edges());
+		m_renderer->fitInView(input->bbox());
 	}
 }
 

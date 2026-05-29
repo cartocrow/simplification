@@ -4,7 +4,6 @@
 
 using namespace cartocrow;
 using namespace cartocrow::renderer;
-using namespace cartocrow::simplification;
 
 enum VertexMode {
 	DEG0_ONLY = 0,

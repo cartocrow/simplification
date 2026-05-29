@@ -24,7 +24,7 @@ namespace cartocrow::simplification {
 		using Element = Graph::Vertex_handle;
 		using Kernel = Graph::Kernel;
 
-		static Point<Kernel>& get_point(Element elt) {
+		static const Point<Kernel>& get_point(Element elt) {
 			return elt->point();
 		}
 	};	

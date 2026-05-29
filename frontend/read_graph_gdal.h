@@ -84,7 +84,7 @@ void exportRegionSetUsingGDAL(const std::filesystem::path& path, Graph* graph, c
         OGRLinearRing* ring = new OGRLinearRing();
 
         auto addVertexToRing = [&ring](typename Graph::Vertex* v) {
-            ring->addPoint(CGAL::to_double(v->getPoint().x()), CGAL::to_double(v->getPoint().y()));
+            ring->addPoint(CGAL::to_double(v->point().x()), CGAL::to_double(v->point().y()));
             };
 
         bool first = true;

@@ -5,7 +5,7 @@
 namespace cartocrow::simplification::utils {
 
 	template <typename K>
-	Rectangle<K> boxOf(Point<K>& a, Point<K>& b, Point<K>& c) {
+	Rectangle<K> boxOf(const Point<K>& a, const Point<K>& b, const Point<K>& c) {
 		Number<K> left = CGAL::min(a.x(), CGAL::min(b.x(), c.x()));
 		Number<K> right = CGAL::max(a.x(), CGAL::max(b.x(), c.x()));
 		Number<K> bottom = CGAL::min(a.y(), CGAL::min(b.y(), c.y()));
@@ -15,7 +15,7 @@ namespace cartocrow::simplification::utils {
 	}
 
 	template<typename K>
-	Rectangle<K> boxOf(Triangle<K>& T1, Triangle<K>& T2) {
+	Rectangle<K> boxOf(const Triangle<K>& T1, const Triangle<K>& T2) {
 
 		Number<K> left = CGAL::min(CGAL::min(T1[0].x(), CGAL::min(T1[1].x(), T1[2].x())),
 			CGAL::min(T2[0].x(), CGAL::min(T2[1].x(), T2[2].x())));
@@ -31,7 +31,7 @@ namespace cartocrow::simplification::utils {
 	}
 
 	template<typename K>
-	Rectangle<K> boxOf(std::vector<Point<K>>& pts) {
+	Rectangle<K> boxOf(const std::vector<Point<K>>& pts) {
 
 		Number<K> left = 0, right = 0, bottom = 0, top = 0;
 
@@ -64,7 +64,7 @@ namespace cartocrow::simplification::utils {
 	}
 
 	template<typename K>
-	Rectangle<K> boxOf(std::initializer_list<Point<K>> pts) {
+	Rectangle<K> boxOf(const std::initializer_list<Point<K>> pts) {
 
 		Number<K> left = 0, right = 0, bottom = 0, top = 0;
 
@@ -97,13 +97,13 @@ namespace cartocrow::simplification::utils {
 	}
 
 	template<class P, typename K>
-	Rectangle<K> boxOf(std::vector<P>& elements) {
+	Rectangle<K> boxOfWithGetPoint(const std::vector<P>& elements) {
 
 		Number<K> left = 0, right = 0, bottom = 0, top = 0;
 
 		bool first = true;
 		for (P elt : elements) {
-			Point<K> pt = elt->getPoint();
+			Point<K>& pt = elt->getPoint();
 			if (first) {
 				left = right = pt.x();
 				top = bottom = pt.y();
@@ -131,7 +131,7 @@ namespace cartocrow::simplification::utils {
 	}
 
 	template<typename K>
-	bool encloses(Rectangle<K>& larger, Rectangle<K>& smaller) {
+	bool encloses(const Rectangle<K>& larger, const Rectangle<K>& smaller) {
 		return larger.xmin() <= smaller.xmin() && larger.ymin() <= smaller.ymin() &&
 			larger.xmax() >= smaller.xmax() && larger.ymax() >= smaller.ymax();
 	}
@@ -154,7 +154,7 @@ namespace cartocrow::simplification::utils {
 	}
 
 	template<typename K>
-	bool overlaps(Rectangle<K>& a, Segment<K>& seg) {
+	bool overlaps(const Rectangle<K>& a, const Segment<K>& seg) {
 		if (CGAL::intersection(a, seg)) {
 			return true;
 		}
