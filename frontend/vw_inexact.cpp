@@ -6,17 +6,15 @@
 
 using namespace cartocrow::simplification;
 
-using VWGraph = HistoricVertexRemovalGraph<Inexact>;
+using VWGraph = VertexRemovalGraph<Inexact, true>;
 using VWPQT = VertexQuadTree<VWGraph>;
 using VW = VisvalingamWhyatt<VWGraph>;
 
 static VWInexactSimplifier* instance = nullptr;
-static VWGraph::BaseGraph* m_base = nullptr;
 static VWGraph* m_graph = nullptr;
 static VWPQT* m_pqt = nullptr;
 static VW* m_alg = nullptr;
 static SmoothGraph* m_smooth = nullptr;
-static bool m_reinit = false;
 static int m_init_complexity = -1;
 
 static Color m_color{ 80, 220, 220 };
@@ -35,18 +33,29 @@ void VWInexactSimplifier::initialize(InputGraph* graph, const int depth) {
 		clear();
 	}
 
-	copy(graph, m_base);
+	m_graph = new VWGraph();
 
-	Rectangle<Inexact> box = utils::boxOf<VWGraph::Vertex, Inexact>(m_base->getVertices());
+	std::vector<typename VWGraph::Vertex_handle> map;
+
+	for (typename InputGraph::Vertex* v : graph->getVertices()) {
+		map.push_back(m_graph->add_vertex(approximate(v->getPoint())));
+	}
+
+	for (typename InputGraph::Edge* e : graph->getEdges()) {
+		typename VWGraph::Vertex_handle u = map[e->getSource()->graphIndex()];
+		typename VWGraph::Vertex_handle v = map[e->getTarget()->graphIndex()];
+		m_graph->add_edge(u, v);
+	}
+
+	m_graph->initialize();	
+
+	Rectangle<Inexact> box = m_graph->bounding_rectangle();
 	m_pqt = new VWPQT(box, depth);
-
-	m_graph = new VWGraph(*m_base);
 
 	m_alg = new VW(*m_graph, *m_pqt);
 	m_alg->initialize(true);
-	m_reinit = false;
 
-	m_init_complexity = getComplexity();
+	m_init_complexity = m_graph->number_of_edges();
 }
 
 void VWInexactSimplifier::runToComplexity(const int k, std::optional<std::function<void(int)>> progress,
@@ -54,26 +63,20 @@ void VWInexactSimplifier::runToComplexity(const int k, std::optional<std::functi
 	if (hasResult()) {
 		clearSmoothResult();
 
-		if (k > m_graph->getEdgeCount()) {
+		auto& hist = m_graph->history();
+
+		if (k > m_graph->number_of_edges()) {
 			// revert
-			m_graph->recallComplexity(k);
-			m_reinit = true;
+			while (hist.can_undo() && m_graph->number_of_edges() < k) {
+				hist.undo();
+			}
 		}
-		else if (k < m_graph->getEdgeCount()) {
-			if (!m_graph->atPresent()) {
-				// first redo known operations
-				m_graph->recallComplexity(k);
-				m_reinit = true;
+		else if (k < m_graph->number_of_edges()) {
+			while (hist.can_redo() && m_graph->number_of_edges() > k) {
+				hist.redo();
 			}
 
-			if (m_graph->atPresent() && k < m_graph->getEdgeCount()) {
-				// see if there's more to perform
-				if (m_reinit) {
-					// recallComplexity was invoked, reinitialize algorithm
-					m_alg->initialize(true);
-					m_reinit = false;
-				}
-
+			if (!hist.can_redo() && k < m_graph->number_of_edges()) {
 				// already at present, run algorithm further
 				m_alg->run([&](int complexity, Number<Exact> cost) {
 					if (progress.has_value()) {
@@ -96,7 +99,7 @@ bool VWInexactSimplifier::hasResult() {
 
 int VWInexactSimplifier::getComplexity() {
 	if (hasResult()) {
-		return m_graph->getEdgeCount();
+		return m_graph->number_of_edges();
 	}
 	else {
 		return -1;
@@ -117,10 +120,7 @@ std::shared_ptr<GeometryPainting> VWInexactSimplifier::getPainting(const VertexM
 }
 
 void VWInexactSimplifier::clear() {
-	if (hasResult()) {
-		delete m_base;
-		m_base = nullptr;
-
+	if (hasResult()) {		
 		delete m_graph;
 		m_graph = nullptr;
 
@@ -137,7 +137,7 @@ void VWInexactSimplifier::clear() {
 void VWInexactSimplifier::smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
 	clearSmoothResult();
 
-	m_smooth = smoothGraph<VWGraph::BaseGraph>(&(m_graph->getBaseGraph()), radius, edges_on_semicircle, progress);
+	//m_smooth = smoothGraph<VWGraph::BaseGraph>(&(m_graph->getBaseGraph()), radius, edges_on_semicircle, progress);
 }
 
 bool VWInexactSimplifier::hasSmoothResult() {
@@ -145,7 +145,7 @@ bool VWInexactSimplifier::hasSmoothResult() {
 }
 
 std::shared_ptr<GeometryPainting> VWInexactSimplifier::getSmoothPainting() {
-	return std::make_shared<GraphPainting<SmoothGraph>>(*m_smooth, m_smooth_color, 2, VertexMode::DEG0_ONLY);
+	return std::make_shared<OldGraphPainting<SmoothGraph>>(*m_smooth, m_smooth_color, 2, VertexMode::DEG0_ONLY);
 }
 
 void VWInexactSimplifier::clearSmoothResult() {
@@ -156,7 +156,8 @@ void VWInexactSimplifier::clearSmoothResult() {
 }
 
 InputGraph* VWInexactSimplifier::resultToGraph() {
-	if (m_graph == nullptr) {
+	return nullptr;
+	/*if (m_graph == nullptr) {
 		return nullptr;
 	}
 	else if (m_smooth == nullptr) {
@@ -168,5 +169,5 @@ InputGraph* VWInexactSimplifier::resultToGraph() {
 		InputGraph* res;
 		copy(m_smooth, res);
 		return res;
-	}
+	}*/
 }

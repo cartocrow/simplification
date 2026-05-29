@@ -10,7 +10,7 @@ using namespace cartocrow::simplification;
 
 extern template StraightGraph<std::monostate, std::monostate, Exact>;
 using InputGraph = StraightGraph<std::monostate, std::monostate, Exact>;
-extern template GraphPainting<InputGraph>;
+extern template OldGraphPainting<InputGraph>;
 
 class SimplificationAlgorithm {
 public:

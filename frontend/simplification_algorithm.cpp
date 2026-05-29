@@ -2,4 +2,4 @@
 
 template class StraightGraph<std::monostate, std::monostate, Exact>;
 
-template class GraphPainting<InputGraph>;
+template class OldGraphPainting<InputGraph>;

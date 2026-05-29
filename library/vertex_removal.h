@@ -1,7 +1,8 @@
 #pragma once
 
 #include <cartocrow/core/core.h>
-#include <cartocrow/datastructures/indexed_priority_queue.h>
+#include <cartocrow/data_structures/indexed_priority_queue.h>
+#include <cartocrow/data_structures/straight_graph_2.h>
 
 #include "vertex_quad_tree.h"
 #include "straight_graph.h"
@@ -13,86 +14,58 @@ namespace cartocrow::simplification {
 
 	namespace detail {
 
-		template <class MG, class VRT>
-		concept VRSetup = requires(MG::Vertex * v) {
-			requires ModifiableGraph<MG>;
+		template<bool H>
+		struct VRGraphTraits;
 
-			requires std::same_as<typename MG::Kernel, typename VRT::Kernel>;
+		template<typename K, bool H>
+		struct VRData;
 
-		    {
-		    	v->data().cost
-		    } -> std::same_as<Number<typename MG::Kernel>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
-		    
-		    {
-		    	v->data().blocked_by
-		    } -> std::same_as<std::vector<typename MG::Vertex*>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
-		    
-		    {
-		    	v->data().blocking
-		    } -> std::same_as<std::vector<typename MG::Vertex*>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
-		    
-		    {
-		    	v->data().qid
-		    } -> std::same_as<int&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
-		    
-		    {
-		    	VRT::getCost(v)
-		    } -> std::same_as<Number<typename VRT::Kernel>>;
+		template<class G>
+		struct VRTraitsBase;
+
+		template<class VRT>
+		concept VRTraits = requires(typename VRT::Graph::Vertex_handle v) {
+
+			typename VRT::Graph;
+
+			{ VRT::data(v) } -> std::same_as<VRData<typename VRT::Graph::Kernel, VRT::Graph::Graph_traits::historic>&>;
+			{ VRT::compute_cost(v) } -> std::same_as<Number<typename VRT::Graph::Kernel>>;
 		};
-
-		template <typename K> struct VRData;
-
-		template <typename K> struct HVRData;
-
-		template <typename K> struct HVREdge;
-
-		template<typename K>
-		using HVRGraph = StraightGraph<HVRData<K>, HVREdge<K>, K>;
 	}
 
-	/// <summary>
-	/// Graph type that can be used with the VertexRemoval implementation. This variant is oblivious: changes made to the graph are not recoverable.
-	/// </summary>
-	/// <typeparam name="K">Desired CGAL kernel</typeparam>
-	template<typename K>
-	using VertexRemovalGraph = StraightGraph<detail::VRData<K>, std::monostate, K>;
-
-	/// <summary>
-	/// Graph type that can be used with the VertexRemoval implementation. This variant is historic: changes made to the graph can be undone and redone to retrieve intermediate steps.
-	/// </summary>
-	/// <typeparam name="K">Desired CGAL kernel</typeparam>
-	template<typename K>
-	using HistoricVertexRemovalGraph = HistoricGraph<detail::HVRGraph<K>>;
+	template<typename K, bool H>
+	using VertexRemovalGraph = Straight_graph_2<detail::VRData<K, H>, std::monostate, K, detail::VRGraphTraits<H>>;
 
 	/// <summary>
 	/// The Vertex Removal algorithm. It is topologically safe, ensuring that vertices are only erased if they have degree 2 and the triangle spanned with its neighbors is empty. Can be configured with custom cost function, via the VertexRemovalTraits.
 	/// </summary>
 	/// <typeparam name="MG">Modifiable Graph type to be used; typically, will be one of VertexRemovalGraph or HistoricVertexRemovalGraph</typeparam>
 	/// <typeparam name="VRT">VertexRemovalTraits, specifying the desired cost function</typeparam>
-	template <class MG, class VRT>
-		requires detail::VRSetup<MG, VRT> class VertexRemoval {
+	template <detail::VRTraits VRT> class VertexRemoval {
 
-		public:
-			using Vertex = MG::Vertex;
-			using Kernel = MG::Kernel;
-			using VertexTree = VertexQuadTree<MG>;
+	public:
+		using Graph = VRT::Graph;
+		using Vertex_handle = Graph::Vertex_handle;
+		using Kernel = Graph::Kernel;
+		using VertexTree = VertexQuadTree<Graph>;
 
-		private:
-			MG& graph;
-			VertexTree& pqt;
-			cartocrow::datastructures::IndexedPriorityQueue<GraphQueueTraits<Vertex, Kernel>> queue;
+	private:
+		using Queue = cartocrow::data_structures::IndexedPriorityQueue<GraphQueueTraits<Vertex_handle, Kernel>>;
 
-			void update(Vertex* v);
+		Graph& graph;
+		VertexTree& pqt;
+		Queue queue;
 
-			Vertex* findNextStep();
-			void performStep(Vertex* v);
-		public:
-			VertexRemoval(MG& g, VertexTree& qt);
-			~VertexRemoval();
+		void update(Vertex_handle v);
 
-			void initialize(bool initQuadTree);
-			bool run(std::optional<std::function<bool(int, Number<Kernel>)>> stop = std::nullopt);
-			bool step();
+		Vertex_handle findNextStep();
+		void performStep(Vertex_handle v);
+	public:
+		VertexRemoval(Graph& g, VertexTree& qt);
+
+		void initialize(bool initQuadTree);
+		bool run(std::optional<std::function<bool(int, Number<Kernel>)>> stop = std::nullopt);
+		bool step();
 	};
 
 
@@ -100,18 +73,22 @@ namespace cartocrow::simplification {
 	/// Traits for running VisvalingamWhyatt vertex-removal algorithms. The cost is equal to the area of the spanned triangle.
 	/// </summary>
 	/// <typeparam name="G">The graph type for the algorithm</typeparam>
-	template <typename G> struct VisvalingamWhyattTraits {
+	template <class G>
+	struct VisvalingamWhyattTraits : detail::VRTraitsBase<G> {
 		using Kernel = G::Kernel;
 
-		static Number<Kernel> getCost(typename G::Vertex* v);
+		static Number<Kernel> compute_cost(typename G::Vertex_handle v) {
+			return CGAL::abs(
+				CGAL::area(v->point(), v->prev()->point(), v->next()->point()));
+		}
 	};
 
 	/// <summary>
 	/// Shorthand for the VisvalingamWhyatt vertex-removal algorithm.
 	/// </summary>
 	/// <typeparam name="G">The graph type for the algorithm</typeparam>
-	template <typename G>
-	using VisvalingamWhyatt = VertexRemoval<G, VisvalingamWhyattTraits<G>>;
+	template <class G>
+	using VisvalingamWhyatt = VertexRemoval<VisvalingamWhyattTraits<G>>;
 
 } // namespace cartocrow::simplification
 

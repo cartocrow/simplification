@@ -10,14 +10,14 @@
 
 #include "library/utils.h"
 
-#include "vw.h"
+//#include "vw.h"
 #include "vw_inexact.h"
-#include "ksbb.h"
-#include "ksbb_inexact.h"
+//#include "ksbb.h"
+//#include "ksbb_inexact.h"
 #include "graph_painter.h"
 #include "ipe_reader.h"
 #include "read_graph_gdal.h"
-#include "restrictor.h"
+//#include "restrictor.h"
 
 void launchGUI(int argc, char* argv[]) {
 	QApplication app(argc, argv);
@@ -32,12 +32,12 @@ void SimplificationGUI::updatePaintings() {
 	VertexMode vmode = static_cast<VertexMode>(vertexMode->currentIndex());
 
 	if (input != nullptr) {
-		auto paint = std::make_shared<GraphPainting<InputGraph>>(*input, m_input_color, 1, vmode);
+		auto paint = std::make_shared<OldGraphPainting<InputGraph>>(*input, m_input_color, 1, vmode);
 		m_renderer->addPainting(paint, "Input");
 	}
 
 	if (preprocessed != nullptr) {
-		auto paint = std::make_shared<GraphPainting<InputGraph>>(*preprocessed, m_preprocessed_color, 2, vmode);
+		auto paint = std::make_shared<OldGraphPainting<InputGraph>>(*preprocessed, m_preprocessed_color, 2, vmode);
 		m_renderer->addPainting(paint, "Preprocessed");
 	}
 
@@ -199,7 +199,7 @@ void SimplificationGUI::addPreprocessTab() {
 			preprocessed = nullptr;
 		}
 		copy(input, preprocessed);
-		restrict(preprocessed, 2, 0);
+		//restrict(preprocessed, 2, 0);
 		updatePaintings();
 		});
 
@@ -212,7 +212,7 @@ void SimplificationGUI::addPreprocessTab() {
 			preprocessed = nullptr;
 		}
 		copy(input, preprocessed);
-		restrict(preprocessed, 3, 0);
+		//restrict(preprocessed, 3, 0);
 		updatePaintings();
 		});
 
@@ -225,7 +225,7 @@ void SimplificationGUI::addPreprocessTab() {
 			preprocessed = nullptr;
 		}
 		copy(input, preprocessed);
-		restrict(preprocessed, 3, std::numbers::pi / 6.0);
+		//restrict(preprocessed, 3, std::numbers::pi / 6.0);
 		updatePaintings();
 		});
 
@@ -238,7 +238,7 @@ void SimplificationGUI::addPreprocessTab() {
 			preprocessed = nullptr;
 		}
 		copy(input, preprocessed);
-		restrict(preprocessed, 4, 0);
+		//restrict(preprocessed, 4, 0);
 		updatePaintings();
 		});
 
@@ -522,10 +522,10 @@ void SimplificationGUI::addSettingsTab() {
 SimplificationGUI::SimplificationGUI() {
 	setWindowTitle("Simplification");
 
-	algorithms.push_back(&VWSimplifier::getInstance());
+	//algorithms.push_back(&VWSimplifier::getInstance());
 	algorithms.push_back(&VWInexactSimplifier::getInstance());
-	algorithms.push_back(&KSBBSimplifier::getInstance());
-	algorithms.push_back(&KSBBInexactSimplifier::getInstance());
+	//algorithms.push_back(&KSBBSimplifier::getInstance());
+	//algorithms.push_back(&KSBBInexactSimplifier::getInstance());
 
 	auto* dockWidget = new QDockWidget();
 	addDockWidget(Qt::LeftDockWidgetArea, dockWidget);
@@ -597,7 +597,7 @@ void SimplificationGUI::loadInput(InputGraph* graph, const bool keepregions) {
 		input->sortIncidentEdges();
 		desiredComplexity->setMaximum(input->getEdgeCount());
 		complexitySlider->setMaximum(input->getEdgeCount());
-		m_renderer->fitInView(utils::boxOf<InputGraph::Vertex, Exact>(input->getVertices()).bbox());
+		m_renderer->fitInView(utils::boxOf<InputGraph::Vertex*, Exact>(input->getVertices()).bbox());
 	}
 }
 

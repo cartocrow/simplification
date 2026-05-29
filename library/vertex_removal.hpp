@@ -8,58 +8,61 @@
 namespace cartocrow::simplification {
 
 	namespace detail {
-		template <class V, typename K>
-		struct VRBase {
+
+		template<bool H>
+		struct VRGraphTraits {
+			static constexpr bool historic = H;
+			static constexpr bool oriented = true;
+			static constexpr bool sorted = false;
+		};
+
+		template<typename K, bool H>
+		struct VRData {
 			Number<K> cost;
-			std::vector<V*> blocked_by;
-			std::vector<V*> blocking;
-			int qid;
+			std::vector<typename VertexRemovalGraph<K, H>::Vertex_handle> blocked_by;
+			std::vector<typename VertexRemovalGraph<K, H>::Vertex_handle> blocking;
+			int queue_index;
 		};
 
-		template <typename K> struct VRData : VRBase<typename VertexRemovalGraph<K>::Vertex, K> {
-		};
+		template<class G>
+		struct VRTraitsBase {
 
+			using Graph = G;
 
-		template <typename K> struct HVRData : VRBase<typename HVRGraph<K>::Vertex, K> {
-		};
-
-		template <typename K> struct HVREdge {
-			Operation<HVRGraph<K>>* hist = nullptr;
+			static VRData<typename G::Kernel, G::Graph_traits::historic>& data(typename G::Vertex_handle v) {
+				return v->data();
+			}
 		};
 	}
 
-	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
-	VertexRemoval<MG,VRT>::VertexRemoval(MG& g, VertexTree& qt) : graph(g), pqt(qt) {
+	template <detail::VRTraits VRT>
+	VertexRemoval<VRT>::VertexRemoval(Graph& g, VertexTree& qt) : graph(g), pqt(qt) {
 	}
 
-	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
-	VertexRemoval<MG, VRT>::~VertexRemoval() {
-	}
-
-	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
-	void VertexRemoval<MG, VRT>::initialize(bool initQuadTree) {
+	template <detail::VRTraits VRT>
+	void VertexRemoval<VRT>::initialize(bool initQuadTree) {
 
 		if (initQuadTree) {
 			pqt.clear();
-			for (Vertex* v : graph.getVertices()) {
-				pqt.insert(*v);
+			for (Vertex_handle v : graph.vertices()) {
+				pqt.insert(v);
 			}
 		}
 
-		for (Vertex* v : graph.getVertices()) {
+		for (Vertex_handle v : graph.vertices()) {
 			update(v);
 		}
 	}
 
-	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
-	bool VertexRemoval<MG, VRT>::run(std::optional<std::function<bool(int, Number<Kernel>)>> stop) {
+	template <detail::VRTraits VRT>
+	bool VertexRemoval<VRT>::run(std::optional<std::function<bool(int, Number<Kernel>)>> stop) {
 		while (true) {
-			Vertex* next = findNextStep();
+			Vertex_handle next = findNextStep();
 			if (next == nullptr) {
 				return false;
 			}
 
-			if (!stop.has_value() || (*stop)(graph.getEdgeCount(), next->data().cost)) {
+			if (!stop.has_value() || (*stop)(graph.number_of_edges(), VRT::data(next).cost)) {
 				return true;
 			}
 
@@ -67,36 +70,36 @@ namespace cartocrow::simplification {
 		}
 	}
 
-	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
-	MG::Vertex* VertexRemoval<MG, VRT>::findNextStep() {
+	template <detail::VRTraits VRT>
+	VRT::Graph::Vertex_handle VertexRemoval<VRT>::findNextStep() {
 
 		while (!queue.empty()) {
-			Vertex* v = queue.peek();
+			Vertex_handle v = queue.peek();
 
-			Vertex* u = v->previous();
-			Vertex* w = v->next();
+			Vertex_handle u = v->prev();
+			Vertex_handle w = v->next();
 
 			// test whether the operation is blocked
-			Point<Kernel>& up = u->getPoint();
-			Point<Kernel>& vp = v->getPoint();
-			Point<Kernel>& wp = w->getPoint();
+			Point<Kernel>& up = u->point();
+			Point<Kernel>& vp = v->point();
+			Point<Kernel>& wp = w->point();
 			Triangle<Kernel> T(up, vp, wp);
 
 			Rectangle<Kernel> rect = utils::boxOf(up, vp, wp);
 
-			pqt.findContained(rect, [&T, &u, &v, &w](Vertex& b) {
-				if (&b != u && &b != v && &b != w && !T.has_on_unbounded_side(b.getPoint())) {
+			pqt.findContained(rect, [&T, &u, &v, &w](Vertex_handle b) {
+				if (b != u && b != v && b != w && !T.has_on_unbounded_side(b->point())) {
 					// blocked, record the pair
-					b.data().blocking.push_back(v);
-					v->data().blocked_by.push_back(&b);
+					VRT::data(b).blocking.push_back(v);
+					VRT::data(v).blocked_by.push_back(b);
 				}
 				});
 
-			if (v->data().blocked_by.empty()) {
+			if (VRT::data(v).blocked_by.empty()) {
 				// not blocked, this is the next step
 				return v;
 			}
-			else { 
+			else {
 				// remove the element from the queue as it's not valid and continue searching
 				queue.pop();
 			}
@@ -106,37 +109,29 @@ namespace cartocrow::simplification {
 		return nullptr;
 	}
 
-	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
-	void VertexRemoval<MG, VRT>::performStep(Vertex* v) {
+	template <detail::VRTraits VRT>
+	void VertexRemoval<VRT>::performStep(Vertex_handle v) {
 
 		assert(queue.peek() == v);
 
 		queue.pop();
 
 		// remove from blocking lists and search structure
-		pqt.remove(*v);
-		for (Vertex* b : v->data().blocking) {
+		pqt.remove(v);
+		for (Vertex_handle b : VRT::data(v).blocking) {
 
-			if (utils::listRemove(v, b->data().blocked_by)) {
-				if (b->data().blocked_by.empty()) {
+			if (utils::listRemove(v, VRT::data(b).blocked_by)) {
+				if (VRT::data(b).blocked_by.empty()) {
 					queue.push(b);
 				}
 			}
 		}
 
 		// perform the removal
-		Vertex* u = v->previous();
-		Vertex* w = v->next();
+		Vertex_handle u = v->prev();
+		Vertex_handle w = v->next();
 
-		if constexpr (ModifiableGraphWithHistory<MG>) {
-			graph.startBatch(v->data().cost);
-		}
-
-		graph.mergeVertex(v);
-
-		if constexpr (ModifiableGraphWithHistory<MG>) {
-			graph.endBatch();
-		}
+		graph.merge_edge_with_prev(v->outgoing());
 
 		// update the neighbors
 		update(u);
@@ -144,20 +139,17 @@ namespace cartocrow::simplification {
 
 		// and their common neighbors (to avoid issues with triangles collapsing)
 		for (int i = 0; i < u->degree(); i++) {
-			Vertex* nbr = u->neighbor(i);
-			if (nbr->isNeighborOf(w)) {
+			Vertex_handle nbr = u->neighbor(i);
+			if (nbr->is_neighbor_of(w)) {
 				update(nbr);
 			}
 		}
 	}
 
-	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
-	bool VertexRemoval<MG, VRT>::step() {
-		if constexpr (ModifiableGraphWithHistory<MG>) {
-			assert(graph.atPresent());
-		}
+	template <detail::VRTraits VRT>
+	bool VertexRemoval<VRT>::step() {
 
-		Vertex* v = findNextStep();
+		Vertex_handle v = findNextStep();
 		if (v == nullptr) {
 			return false;
 		}
@@ -166,27 +158,27 @@ namespace cartocrow::simplification {
 		return true;
 	}
 
-	template <class MG, class VRT> requires detail::VRSetup<MG, VRT>
-	void VertexRemoval<MG, VRT>::update(Vertex* v) {
+	template <detail::VRTraits VRT>
+	void VertexRemoval<VRT>::update(Vertex_handle v) {
 		if (v->degree() != 2) {
 			return;
 		}
 
 		// clear topology
-		for (Vertex* b : v->data().blocked_by) {
-			utils::listRemove(v, b->data().blocking);
+		for (Vertex_handle b : VRT::data(v).blocked_by) {
+			utils::listRemove(v, VRT::data(b).blocking);
 		}
-		v->data().blocked_by.clear();
+		VRT::data(v).blocked_by.clear();
 
-		Vertex* u = v->previous();
-		Vertex* w = v->next();
+		Vertex_handle u = v->prev();
+		Vertex_handle w = v->next();
 
-		if (u->isNeighborOf(w)) {
+		if (u->is_neighbor_of(w)) {
 			queue.remove(v);
 			return;
 		}
 
-		v->data().cost = VRT::getCost(v);
+		VRT::data(v).cost = VRT::compute_cost(v);
 
 		if (queue.contains(v)) {
 			queue.update(v);
@@ -194,11 +186,5 @@ namespace cartocrow::simplification {
 		else {
 			queue.push(v);
 		}
-	}
-
-	template <typename G>
-	Number<typename G::Kernel> VisvalingamWhyattTraits<G>::getCost(typename G::Vertex* v) {
-		return CGAL::abs(
-			CGAL::area(v->getPoint(), v->previous()->getPoint(), v->next()->getPoint()));
 	}
 }

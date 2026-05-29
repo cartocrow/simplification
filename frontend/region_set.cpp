@@ -48,13 +48,13 @@ namespace cartocrow {
 		Rectangle<Exact> box = utils::boxOf<Exact>(points);
 
 		// construct the graph
-		VertexQuadTree<InputGraph> pqt(box, depth);
+		OldVertexQuadTree<InputGraph> pqt(box, depth);
 
 		auto findVtx = [&pqt, &graph](Point<Exact> pt) {
 			InputGraph::Vertex* v = pqt.findElement(pt, 0.00001);
 			if (v == nullptr) {
 				v = graph->addVertex(pt);
-				pqt.insert(*v);
+				pqt.insert(v);
 			}
 			return v;
 			};

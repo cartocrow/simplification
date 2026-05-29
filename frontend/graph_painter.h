@@ -13,9 +13,9 @@ enum VertexMode {
 };
 
 template<class Graph>
-class GraphPainting : public GeometryPainting {
+class OldGraphPainting : public GeometryPainting {
 public:
-	GraphPainting(Graph& graph, const Color color, const double linewidth, const VertexMode vmode)
+	OldGraphPainting(Graph& graph, const Color color, const double linewidth, const VertexMode vmode)
 		: m_graph(graph), m_color(color), m_linewidth(linewidth), m_vmode(vmode) {
 	}
 
@@ -45,6 +45,50 @@ protected:
 
 			if (render) {
 				renderer.draw(v->getPoint());
+			}
+		}
+	}
+
+private:
+	Graph& m_graph;
+	const Color m_color;
+	const double m_linewidth;
+	const VertexMode m_vmode;
+};
+
+template<class Graph>
+class GraphPainting : public GeometryPainting {
+public:
+	GraphPainting(Graph& graph, const Color color, const double linewidth, const VertexMode vmode)
+		: m_graph(graph), m_color(color), m_linewidth(linewidth), m_vmode(vmode) {
+	}
+
+protected:
+	void paint(GeometryRenderer& renderer) const override {
+		renderer.setMode(GeometryRenderer::stroke);
+
+		renderer.setStroke(m_color, m_linewidth);
+
+		for (typename Graph::Edge_const_handle e : m_graph.edges()) {
+			renderer.draw(e->curve());
+		}
+
+		for (typename Graph::Vertex_const_handle v : m_graph.vertices()) {
+			bool render = false;
+			switch (m_vmode) {
+			case DEG0_ONLY:
+				render = v->degree() == 0;
+				break;
+			case NO_DEG2:
+				render = v->degree() != 2;
+				break;
+			case ALL:
+				render = true;
+				break;
+			}
+
+			if (render) {
+				renderer.draw(v->point());
 			}
 		}
 	}

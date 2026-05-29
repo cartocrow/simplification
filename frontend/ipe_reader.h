@@ -54,7 +54,7 @@ Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
 	Rectangle<Kernel> box = utils::boxOf<Kernel>(points);
 
 	// construct the graph
-	VertexQuadTree<Graph> pqt(box, depth);
+	OldVertexQuadTree<Graph> pqt(box, depth);
 
 	for (int i = 0; i < page->count(); i++) {
 		auto object = page->object(i);
@@ -77,7 +77,7 @@ Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
 				Vertex* next = pqt.findElement(point, 0.00001);
 				if (next == nullptr) {
 					next = graph->addVertex(point);
-					pqt.insert(*next);
+					pqt.insert(next);
 				}
 				if (prev != nullptr && !next->isNeighborOf(prev) && next != prev) {
 					graph->addEdge(prev, next);
@@ -92,7 +92,7 @@ Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
 			Vertex* next = pqt.findElement(point, 0.00001);
 			if (next == nullptr) {
 				next = graph->addVertex(point);
-				pqt.insert(*next);
+				pqt.insert(next);
 			}
 			if (prev != nullptr && !next->isNeighborOf(prev) && next != prev) {
 				graph->addEdge(prev, next);

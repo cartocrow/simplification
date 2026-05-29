@@ -6,7 +6,7 @@
 
 using namespace cartocrow::simplification;
 
-using VWGraph = HistoricVertexRemovalGraph<Exact>;
+using VWGraph = VertexRemovalGraph<Exact, true>;
 using VWPQT = VertexQuadTree<VWGraph>;
 using VW = VisvalingamWhyatt<VWGraph>;
 

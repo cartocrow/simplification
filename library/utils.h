@@ -31,7 +31,7 @@ namespace cartocrow::simplification::utils {
 	}
 
 	template<typename K>
-	Rectangle<K> boxOf(std::vector<Point<K>> pts) {
+	Rectangle<K> boxOf(std::vector<Point<K>>& pts) {
 
 		Number<K> left = 0, right = 0, bottom = 0, top = 0;
 
@@ -97,12 +97,12 @@ namespace cartocrow::simplification::utils {
 	}
 
 	template<class P, typename K>
-	Rectangle<K> boxOf(std::vector<P*> elements) {
+	Rectangle<K> boxOf(std::vector<P>& elements) {
 
 		Number<K> left = 0, right = 0, bottom = 0, top = 0;
 
 		bool first = true;
-		for (P* elt : elements) {
+		for (P elt : elements) {
 			Point<K> pt = elt->getPoint();
 			if (first) {
 				left = right = pt.x();
