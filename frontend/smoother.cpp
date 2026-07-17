@@ -1,35 +1,33 @@
 #include "smoother.h"
 
-template class StraightGraph<std::monostate, std::monostate, Inexact>;
-
 void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
 
-	using Vertex = SmoothGraph::Vertex;
-	using Edge = SmoothGraph::Edge;
+	using Vertex = SmoothGraph::Vertex_handle;
+	using Edge = SmoothGraph::Edge_handle;
 	using Pt = Point<SmoothGraph::Kernel>;
 	using Vec = Vector<SmoothGraph::Kernel>;
 	using Num = Number<SmoothGraph::Kernel>;
 
-	int vtx_cnt = graph->getVertexCount();
+	size_t vtx_cnt = graph->number_of_vertices();
 
 	std::vector<Num> rads(vtx_cnt, 0);
 
 	// determine smoothing radii
 	Num max_rad = 0;
-	for (int i = 0; i < vtx_cnt; i++) {
+	for (size_t i = 0; i < vtx_cnt; ++i) {
 		if (progress.has_value()) {
 			(*progress)("Determining radii", i, vtx_cnt);
 		}
 
-		Vertex* v = graph->getVertices()[i];
+		Vertex v = graph->vertex(i);
 
 		if (v->degree() != 2) continue;
 
-		Edge* inc = v->incoming();
-		Edge* out = v->outgoing();
+		Edge inc = v->incoming();
+		Edge out = v->outgoing();
 
-		Num in_len = std::sqrt(inc->getSegment().squared_length());
-		Num out_len = std::sqrt(out->getSegment().squared_length());
+		Num in_len = std::sqrt(inc->curve().squared_length());
+		Num out_len = std::sqrt(out->curve().squared_length());
 
 		Num v_rad = std::min(in_len, out_len) / 2.0;
 		if (v_rad > max_rad) max_rad = v_rad;
@@ -46,24 +44,24 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 			(*progress)("Applying smoothing", i, vtx_cnt);
 		}
 
-		Vertex* v = graph->getVertices()[i];
+		Vertex v = graph->vertex(i);
 		if (v->degree() != 2) continue;
 
 		Num v_rad = std::min(rads[i], max_rad);
 
-		Edge* inc = v->incoming();
-		Edge* out = v->outgoing();
+		Edge inc = v->incoming();
+		Edge out = v->outgoing();
 
-		Num in_len = std::sqrt(inc->getSegment().squared_length());
-		Num out_len = std::sqrt(out->getSegment().squared_length());
+		Num in_len = std::sqrt(inc->curve().squared_length());
+		Num out_len = std::sqrt(out->curve().squared_length());
 
-		Pt pt_v = v->getPoint();
+		Pt pt_v = v->point();
 
-		Vec inc_vec = v->previous()->getPoint() - pt_v;
+		Vec inc_vec = v->prev()->point() - pt_v;
 		inc_vec /= in_len;
 		Pt start = pt_v + v_rad * inc_vec;
 
-		Vec out_vec = v->next()->getPoint() - pt_v;
+		Vec out_vec = v->next()->point() - pt_v;
 		out_vec /= out_len;
 		Pt end = pt_v + v_rad * out_vec;
 
@@ -78,13 +76,13 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 			continue;
 		}
 
-		bool ccw = CGAL::right_turn(v->previous()->getPoint(), pt_v, v->next()->getPoint());
+		bool ccw = CGAL::right_turn(v->prev()->point(), pt_v, v->next()->point());
 
 		// move to start of arc
-		graph->shiftVertex(v, start);
+		graph->move_vertex(v, start);
 
 		// create end of arc
-		Edge* edge = graph->splitEdge(out, end)->incoming();
+		Edge edge = graph->subdivide_edge(out, end)->incoming();
 
 		// introduce intermediate samples
 
@@ -110,19 +108,19 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 		while (samples > 1) {
 			arm = arm.transform(rot);
 			Pt pt = *ctr + arm;
-			edge = graph->splitEdge(edge, pt)->outgoing();
+			edge = graph->subdivide_edge(edge, pt)->outgoing();
 			samples--;
 		}
 	}
 
 	// erase zero-length edges (if two adjacent vertices are both constrained by their shared edge
 	{
-		int init_edge_count = graph->getEdgeCount();
+		int init_edge_count = graph->number_of_edges();
 		int i = 0;
 		int ii = 0;
 		// invariant: all edges with index < i have sufficient length, except for indices in "revisit"
 		std::vector<int> revisit;
-		while (i < graph->getEdgeCount()) {
+		while (i < graph->number_of_edges()) {
 			if (progress.has_value()) {
 				(*progress)("Cleaning up geometry", ii, init_edge_count);
 				// number of edges processed
@@ -138,20 +136,20 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 				revisit.pop_back();
 			}
 
-			Edge* e = graph->getEdges()[next_i];
+			Edge e = graph->edge(next_i);
 
-			if (e->getSegment().squared_length() <= 0.00001) {
+			if (e->curve().squared_length() <= 0.00001) {
 				// remove unless between degree-3 vertices
-				if (e->getSource()->degree() == 2) {
-					graph->mergeVertex(e->getSource());
+				if (e->source()->degree() == 2) {
+					graph->merge_vertex(e->source());
 					// this removes e itself
 				}
-				else if (e->getSource()->degree() == 2) {
-					Edge* nxt = e->next();
-					if (nxt->graphIndex() < i) {
-						revisit.push_back(nxt->graphIndex());
+				else if (e->target()->degree() == 2) {
+					Edge nxt = e->next();
+					if (nxt->graph_index() < i) {
+						revisit.push_back(nxt->graph_index());
 					}
-					graph->mergeVertex(e->getTarget());
+					graph->merge_vertex(e->target());
 					// this removes the next edge					
 					if (next_i == i)
 						i++;

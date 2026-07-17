@@ -91,30 +91,30 @@ void exportRegionSetUsingGDAL(const std::filesystem::path& path, Graph* graph, c
 
         for (Arc& a : reg) {
 
-            typename Graph::Boundary* bd = graph->getBoundaries()[a.boundary];
+            typename Graph::Path_handle bd = graph->path(a.boundary);
 
             if (a.reverse) {
-                typename Graph::Edge* e = bd->getLastEdge();
+                typename Graph::Edge_handle e = bd->end();
                 if (first) {
-                    addVertexToRing(e->getTarget());
+                    addVertexToRing(e->target());
                     first = false;
                 }
-                addVertexToRing(e->getSource());
-                while (e != bd->getFirstEdge()) {
-                    e = e->previous();
-                    addVertexToRing(e->getSource());
+                addVertexToRing(e->source());
+                while (e != bd->start()) {
+                    e = e->prev();
+                    addVertexToRing(e->source());
                 }
             }
             else {
-                typename Graph::Edge* e = bd->getFirstEdge();
+                typename Graph::Edge_handle e = bd->start();
                 if (first) {
-                    addVertexToRing(e->getSource());
+                    addVertexToRing(e->source());
                     first = false;
                 }
-                addVertexToRing(e->getTarget());
-                while (e != bd->getLastEdge()) {
+                addVertexToRing(e->target());
+                while (e != bd->end()) {
                     e = e->next();
-                    addVertexToRing(e->getTarget());
+                    addVertexToRing(e->target());
                 }
             }
         }

@@ -9,13 +9,6 @@ namespace cartocrow::simplification {
 
 	namespace detail {
 
-		template<bool H>
-		struct VRGraphTraits {
-			static constexpr bool historic = H;
-			static constexpr bool oriented = true;
-			static constexpr bool sorted = false;
-		};
-
 		template<typename K, bool H>
 		struct VRData {
 			Number<K> cost;
@@ -131,7 +124,7 @@ namespace cartocrow::simplification {
 		Vertex_handle u = v->prev();
 		Vertex_handle w = v->next();
 
-		graph.merge_edge_with_prev(v->outgoing());
+		graph.merge_vertex(v);
 
 		// update the neighbors
 		update(u);

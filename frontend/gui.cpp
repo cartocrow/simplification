@@ -35,12 +35,12 @@ void SimplificationGUI::updatePaintings() {
 	VertexMode vmode = static_cast<VertexMode>(vertexMode->currentIndex());
 
 	if (input != nullptr) {
-		auto paint = std::make_shared<OldGraphPainting<InputGraph>>(*input, m_input_color, 1, vmode);
+		auto paint = std::make_shared<GraphPainting<InputGraph>>(*input, m_input_color, 1, vmode);
 		m_renderer->addPainting(paint, "Input");
 	}
 
 	if (preprocessed != nullptr) {
-		auto paint = std::make_shared<OldGraphPainting<InputGraph>>(*preprocessed, m_preprocessed_color, 2, vmode);
+		auto paint = std::make_shared<GraphPainting<InputGraph>>(*preprocessed, m_preprocessed_color, 2, vmode);
 		m_renderer->addPainting(paint, "Preprocessed");
 	}
 
@@ -201,7 +201,7 @@ void SimplificationGUI::addPreprocessTab() {
 			delete preprocessed;
 			preprocessed = nullptr;
 		}
-		copy(input, preprocessed);
+		graph_2_copy(*input, *preprocessed);
 		//restrict(preprocessed, 2, 0);
 		updatePaintings();
 		});
@@ -214,7 +214,7 @@ void SimplificationGUI::addPreprocessTab() {
 			delete preprocessed;
 			preprocessed = nullptr;
 		}
-		copy(input, preprocessed);
+		graph_2_copy(*input, *preprocessed);
 		//restrict(preprocessed, 3, 0);
 		updatePaintings();
 		});
@@ -227,7 +227,7 @@ void SimplificationGUI::addPreprocessTab() {
 			delete preprocessed;
 			preprocessed = nullptr;
 		}
-		copy(input, preprocessed);
+		graph_2_copy(*input, *preprocessed);
 		//restrict(preprocessed, 3, std::numbers::pi / 6.0);
 		updatePaintings();
 		});
@@ -240,7 +240,7 @@ void SimplificationGUI::addPreprocessTab() {
 			delete preprocessed;
 			preprocessed = nullptr;
 		}
-		copy(input, preprocessed);
+		graph_2_copy(*input, *preprocessed);
 		//restrict(preprocessed, 4, 0);
 		updatePaintings();
 		});

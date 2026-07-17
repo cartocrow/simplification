@@ -37,19 +37,7 @@ void VWInexactSimplifier::initialize(InputGraph* graph, const int depth) {
 
 	m_graph = new VWGraph();
 
-	Graph_static_vertex_map<InputGraph, typename VWGraph::Vertex_handle> map(*graph, nullptr);
-
-	for (typename InputGraph::Vertex_handle v : graph->vertices()) {
-		map[v] = m_graph->add_vertex(approximate(v->point()));
-	}
-
-	for (typename InputGraph::Edge_handle e : graph->edges()) {
-		auto u = map[e->source()];
-		auto v = map[e->target()];
-		m_graph->add_edge(u, v);
-	}
-
-	m_graph->initialize();	
+	graph_2_copy(*graph, *m_graph);
 
 	Rectangle<Inexact> box = m_graph->bounding_rectangle();
 	m_pqt = new VWPQT(box, depth);
@@ -139,7 +127,7 @@ void VWInexactSimplifier::clear() {
 void VWInexactSimplifier::smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
 	clearSmoothResult();
 
-	//m_smooth = smoothGraph<VWGraph::BaseGraph>(&(m_graph->getBaseGraph()), radius, edges_on_semicircle, progress);
+	m_smooth = smoothGraph<VWGraph>(m_graph, radius, edges_on_semicircle, progress);
 }
 
 bool VWInexactSimplifier::hasSmoothResult() {
@@ -147,7 +135,7 @@ bool VWInexactSimplifier::hasSmoothResult() {
 }
 
 std::shared_ptr<GeometryPainting> VWInexactSimplifier::getSmoothPainting() {
-	return std::make_shared<OldGraphPainting<SmoothGraph>>(*m_smooth, m_smooth_color, 2, VertexMode::DEG0_ONLY);
+	return std::make_shared<GraphPainting<SmoothGraph>>(*m_smooth, m_smooth_color, 2, VertexMode::DEG0_ONLY);
 }
 
 void VWInexactSimplifier::clearSmoothResult() {
@@ -158,18 +146,17 @@ void VWInexactSimplifier::clearSmoothResult() {
 }
 
 InputGraph* VWInexactSimplifier::resultToGraph() {
-	return nullptr;
-	/*if (m_graph == nullptr) {
+	if (m_graph == nullptr) {
 		return nullptr;
 	}
 	else if (m_smooth == nullptr) {
-		InputGraph* res;
-		copy(m_base, res);
+		InputGraph* res = new InputGraph();
+		graph_2_copy(*m_graph, *res);
 		return res;
 	}
 	else {
-		InputGraph* res;
-		copy(m_smooth, res);
+		InputGraph* res = new InputGraph();
+		graph_2_copy(*m_smooth, *res);
 		return res;
-	}*/
+	}
 }
