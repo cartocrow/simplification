@@ -261,11 +261,11 @@ namespace cartocrow::simplification {
 						if (edata.associated.second < 0) {
 							if (best[i] == edata.associated.first) {
 								edata.type = EdgeType::ALIGN;
-								std::cout << gi << " -- align\n";
+								//std::cout << gi << " -- align\n";
 							}
 							else {
 								edata.type = EdgeType::DEV_ALIGN;
-								std::cout << gi << " -- dev align\n";
+								//std::cout << gi << " -- dev align\n";
 							}
 						}
 						else if (best[i] == edata.associated.first || best[i] == edata.associated.second) {
@@ -280,16 +280,16 @@ namespace cartocrow::simplification {
 
 							if (has_same) {
 								edata.type = EdgeType::EVADING;
-								std::cout << gi << " -- evading\n";
+								//std::cout << gi << " -- evading\n";
 							}
 							else {
 								edata.type = EdgeType::UNALIGN;
-								std::cout << gi << " -- unalign\n";
+								//std::cout << gi << " -- unalign\n";
 							}
 						}
 						else {
 							edata.type = EdgeType::DEV_UNALIGN;
-							std::cout << gi << " -- dev unalign\n";
+							//std::cout << gi << " -- dev unalign\n";
 						}
 					}
 

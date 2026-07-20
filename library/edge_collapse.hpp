@@ -91,8 +91,8 @@ namespace cartocrow::simplification {
 				// -- check segments originating from shared endpoints
 
 				auto close = [](const Point<Kernel>& a, const Point<Kernel>& b) {
-					return std::abs(a.x() - b.x()) < 0.000001 
-						&& std::abs(a.y() - b.y()) < 0.000001;
+					return std::abs(a.x() - b.x()) < M_EPSILON
+						&& std::abs(a.y() - b.y()) < M_EPSILON;
 					};
 
 				if (Point<Kernel>* pt = std::get_if<Point<Kernel>>(&*is)) {
@@ -431,8 +431,21 @@ namespace cartocrow::simplification {
 		Point<Kernel> c = e->target()->point();
 		Point<Kernel> d = e->next()->target()->point();
 
-		bool abc = CGAL::collinear(a, b, c);
-		bool bcd = CGAL::collinear(b, c, d);
+		bool abc;
+		if constexpr (std::is_same<Kernel, Inexact>::value) {
+			abc = CGAL::squared_distance(Line<Inexact>(a,c), b) < M_EPSILON;
+		}
+		else {
+			abc = CGAL::collinear(a, b, c);
+		}
+		bool bcd;
+		if constexpr (std::is_same<Kernel, Inexact>::value) {
+			bcd = CGAL::squared_distance(Line<Inexact>(b, d), c) < M_EPSILON;
+		}
+		else {
+			bcd = CGAL::collinear(b, c, d);
+		}
+
 		if (abc && bcd) {
 			edata.erase_both = true;
 			edata.creates_difference = false;
@@ -485,7 +498,7 @@ namespace cartocrow::simplification {
 
 		bool zero_area;
 		if constexpr (std::is_same<Kernel, Inexact>::value) {
-			zero_area = CGAL::squared_distance(ad, arealine.point()) < 0.00000001;
+			zero_area = CGAL::squared_distance(ad, arealine.point()) < M_EPSILON;
 		}
 		else {
 			zero_area = ad.has_on_boundary(arealine.point());
@@ -521,13 +534,19 @@ namespace cartocrow::simplification {
 					ad.has_on_positive_side(b) == ad.has_on_positive_side(arealine.point());
 			}
 
+			std::cout << "determine" << std::endl;
+			std::cout << "a" << a << std::endl;
+			std::cout << "b" << b << std::endl;
+			std::cout << "c" << c << std::endl;
+			std::cout << "d" << d << std::endl;
+
 			// configure type
 			if (ab_determines_shape) {
 
 				auto intersection = CGAL::intersection(arealine, ab);
 				edata.point = std::get<Point<Kernel>>(*intersection);
 
-				Segment<Kernel> ns = Segment<Kernel>(edata.point, d);
+				Line<Kernel> ns = Line<Kernel>(edata.point, d);
 				auto intersection2 = CGAL::intersection(bc, ns);
 				Point<Kernel> is = std::get<Point<Kernel>>(*intersection2);
 
@@ -539,7 +558,7 @@ namespace cartocrow::simplification {
 				auto intersection = CGAL::intersection(arealine, cd);
 				edata.point = std::get<Point<Kernel>>(*intersection);
 
-				Segment<Kernel> ns = Segment<Kernel>(edata.point, a);
+				Line<Kernel> ns = Line<Kernel>(edata.point, a);
 				auto intersection2 = CGAL::intersection(bc, ns);
 				Point<Kernel> is = std::get<Point<Kernel>>(*intersection2);
 
