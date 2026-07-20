@@ -10,69 +10,24 @@ namespace cartocrow::simplification {
 		template<class Graph>
 		struct AngleRestriction {
 
-			using Vertex = Graph::Vertex;
-			using Edge = Graph::Edge;
+			using Vertex_handle = Graph::Vertex_handle;
+			using Edge_handle = Graph::Edge_handle;
 			using Kernel = Graph::Kernel;
 			using Vec = Vector<Inexact>;
 			using Num = Number<Inexact>;
 
-			CGAL::Cartesian_converter<Kernel, Inexact> k_to_inex;
-			CGAL::Cartesian_converter<Inexact, Kernel> inex_to_k;
-
-			inline Num to_inexact(const Number<Kernel>& v) {
-				if constexpr (std::is_same<Kernel, Inexact>::value) {
-					return v;
-				}
-				else {
-					return k_to_inex(v);
-				}
+			inline Num approxSquaredLength(Edge_handle e) {
+				return approximate((e->source()->point() - e->target()->point()).squared_length());
 			}
-
-			inline Point<Inexact> to_inexact(const Point<Kernel>& v) {
-				if constexpr (std::is_same<Kernel, Inexact>::value) {
-					return v;
-				}
-				else {
-					return k_to_inex(v);
-				}
-			}
-
-			inline Vector<Inexact> to_inexact(const Vector<Kernel>& v) {
-				if constexpr (std::is_same<Kernel, Inexact>::value) {
-					return v;
-				}
-				else {
-					return k_to_inex(v);
-				}
-			}
-
-			inline Segment<Inexact> to_inexact(const Segment<Kernel>& v) {
-				if constexpr (std::is_same<Kernel, Inexact>::value) {
-					return v;
-				}
-				else {
-					return k_to_inex(v);
-				}
-			}
-
-			inline Vector<Kernel> to_kernel(const Vector<Inexact>& v) {
-				if constexpr (std::is_same<Kernel, Inexact>::value) {
-					return v;
-				}
-				else {
-					return inex_to_k(v);
-				}
-			}
-
-			inline Vec vector(Vertex* v, Edge* e) {
-				auto start = to_inexact(v->getPoint());
-				auto end = to_inexact(e->other(v)->getPoint());
+			inline Vec vector(Vertex_handle v, Edge_handle e) {
+				auto start = approximate(v->point());
+				auto end = approximate(e->other(v)->point());
 				return end - start;
 			}
 
-			inline Vec direction(Vertex* v, Edge* e) {
-				auto start = to_inexact(v->getPoint());
-				auto end = to_inexact(e->other(v)->getPoint());
+			inline Vec direction(Vertex_handle v, Edge_handle e) {
+				auto start = approximate(v->point());
+				auto end = approximate(e->other(v)->point());
 				return (end - start) / std::sqrt(CGAL::squared_distance(start, end));
 			}
 
@@ -87,7 +42,7 @@ namespace cartocrow::simplification {
 
 
 			struct EdgeData {
-				Vertex* significant = nullptr;
+				Vertex_handle significant = nullptr;
 				std::pair<int, int> associated = std::pair<int, int>(-1, -1);
 				int assigned = -1;
 				EdgeType type = EdgeType::UNDETERMINED;
@@ -100,8 +55,8 @@ namespace cartocrow::simplification {
 				}
 			};
 
-			inline Segment<Inexact> directed_segment(Edge* e, EdgeData& d) {
-				return Segment<Inexact>(to_inexact(d.significant->getPoint()), to_inexact(e->other(d.significant)->getPoint()));
+			inline Segment<Inexact> directed_segment(Edge_handle e, EdgeData& d) {
+				return Segment<Inexact>(approximate(d.significant->point()), approximate(e->other(d.significant)->point()));
 			}
 
 			Graph& graph;
@@ -118,7 +73,7 @@ namespace cartocrow::simplification {
 					&& std::abs(a.y() - b.y()) < eps;
 			}
 
-			std::pair<int, int> associated_directions(Vertex* v, Edge* e) {
+			std::pair<int, int> associated_directions(Vertex_handle v, Edge_handle e) {
 
 				Vec dir = direction(v, e);
 
@@ -154,22 +109,22 @@ namespace cartocrow::simplification {
 			void determine_significant_vertices() {
 
 				std::cout << "determine_significant_vertices\n";
-				significant_vertices = std::vector<bool>(graph.getVertexCount(), false);
+				significant_vertices = std::vector<bool>(graph.number_of_vertices(), false);
 
-				for (Vertex* v : graph.getVertices()) {
+				for (Vertex_handle v : graph.vertices()) {
 
-					int d = v->degree();
+					size_t d = v->degree();
 					if (d >= 2) {
-						std::pair<int, int> assoc_prev = associated_directions(v, v->edge(d - 1));
+						std::pair<int, int> assoc_prev = associated_directions(v, v->incident_edge(d - 1));
 
-						for (Edge* e : v->getEdges()) {
+						for (Edge_handle e : v->incident_edges()) {
 							std::pair<int, int> assoc = associated_directions(v, e);
 
 							if (assoc.first == assoc_prev.first
 								|| (assoc.second >= 0 && assoc.second == assoc_prev.second)
 								|| assoc.second == assoc_prev.first
 								|| assoc.first == assoc_prev.second) {
-								significant_vertices[v->graphIndex()] = true;
+								significant_vertices[v->graph_index()] = true;
 								break;
 							}
 
@@ -185,8 +140,8 @@ namespace cartocrow::simplification {
 				std::cout << "subdivide_edges\n";
 
 				Num max_sqr_len = 0;
-				for (Edge* e : graph.getEdges()) {
-					Num sqr_len = to_inexact(e->squared_length());
+				for (Edge_handle e : graph.edges()) {
+					Num sqr_len = approxSquaredLength(e);
 					if (max_sqr_len < sqr_len) {
 						max_sqr_len = sqr_len;
 					}
@@ -194,23 +149,23 @@ namespace cartocrow::simplification {
 
 				max_sqr_len *= lambda * lambda;
 
-				int cnt = graph.getEdgeCount();
-				for (int i = 0; i < cnt; i++) {
-					Edge* e = graph.getEdges()[i];
+				size_t cnt = graph.number_of_edges();
+				for (size_t i = 0; i < cnt; i++) {
+					Edge_handle e = graph.edge(i);
 
-					Num sqr_len = to_inexact(e->squared_length());
+					Num sqr_len = approxSquaredLength(e);
 
 					int steps = (int)std::ceil(std::sqrt(sqr_len / max_sqr_len));
 					if (steps < 2
-						&& significant_vertices[e->getSource()->graphIndex()]
-						&& significant_vertices[e->getTarget()->graphIndex()]) {
+						&& significant_vertices[e->source()->graph_index()]
+						&& significant_vertices[e->target()->graph_index()]) {
 						steps = 2;
 					}
 
-					Vector<Kernel> step = (e->getTarget()->getPoint() - e->getSource()->getPoint()) / steps;
-					Point<Kernel> pt = e->getSource()->getPoint() + step;
+					Vector<Kernel> step = (e->target()->point() - e->source()->point()) / steps;
+					Point<Kernel> pt = e->source()->point() + step;
 					while (steps > 1) {
-						e = graph.splitEdge(e, pt)->outgoing();
+						e = graph.subdivide_edge(e, pt)->outgoing();
 
 						pt = pt + step;
 						steps--;
@@ -250,7 +205,7 @@ namespace cartocrow::simplification {
 
 			}
 
-			bool same_sector(Vertex* v, Edge* e, std::pair<int, int> assoc) {
+			bool same_sector(Vertex_handle v, Edge_handle e, std::pair<int, int> assoc) {
 				if (assoc.second < 0)
 					return false;
 
@@ -268,23 +223,23 @@ namespace cartocrow::simplification {
 
 				std::cout << "assign_directions\n";
 
-				int e_cnt = graph.getEdgeCount();
+				size_t e_cnt = graph.number_of_edges();
 
 				edge_data.resize(e_cnt);
 
 				// NB: subdivide may have increased vertex count
 				// but the new vertices are insignificant by construction
-				int v_cnt = significant_vertices.size();
+				size_t v_cnt = significant_vertices.size();
 				for (int i = 0; i < v_cnt; i++) {
 
 					if (!significant_vertices[i]) continue;
 
-					Vertex* v = graph.getVertices()[i];
+					Vertex_handle v = graph.vertex(i);
 
-					int degree = v->degree();
+					size_t degree = v->degree();
 					std::vector<Vec> out;
 
-					for (Edge* e : v->getEdges()) {
+					for (Edge_handle e : v->incident_edges()) {
 						out.push_back(direction(v, e));
 					}
 
@@ -294,10 +249,10 @@ namespace cartocrow::simplification {
 					std::vector<int> build(degree);
 					find_best(out, build, 0, 0, &best, &best_cost);
 
-					for (int i = 0; i < degree; ++i) {
+					for (size_t i = 0; i < degree; ++i) {
 
-						Edge* e = v->edge(i);
-						int gi = e->graphIndex();
+						Edge_handle e = v->incident_edge(i);
+						size_t gi = e->graph_index();
 						EdgeData& edata = edge_data[gi];
 						edata.significant = v;
 						edata.associated = associated_directions(v, e);
@@ -316,8 +271,8 @@ namespace cartocrow::simplification {
 						else if (best[i] == edata.associated.first || best[i] == edata.associated.second) {
 
 							bool has_same = false;
-							for (int j = 0; j < degree; ++j) {
-								if (i != j && same_sector(v, v->getEdges()[j], edata.associated)) {
+							for (size_t j = 0; j < degree; ++j) {
+								if (i != j && same_sector(v, v->incident_edge(j), edata.associated)) {
 									has_same = true;
 									break;
 								}
@@ -346,25 +301,25 @@ namespace cartocrow::simplification {
 
 				std::cout << "assign_double_insignificant\n";
 
-				int e_cnt = graph.getEdgeCount();
+				size_t e_cnt = graph.number_of_edges();
 
-				for (int i = 0; i < e_cnt; i++) {
+				for (size_t i = 0; i < e_cnt; i++) {
 
 					EdgeData& edata = edge_data[i];
 					if (edata.type != EdgeType::UNDETERMINED) {
 						continue;
 					}
 
-					Edge* e = graph.getEdges()[i];
-					edata.significant = e->getSource();
-					edata.associated = associated_directions(e->getSource(), e);
+					Edge_handle e = graph.edge(i);
+					edata.significant = e->source();
+					edata.associated = associated_directions(e->source(), e);
 					if (edata.associated.second < 0) {
 						edata.type = EdgeType::ALIGN;
 						edata.assigned = edata.associated.first;
 					}
 					else {
 						edata.type = EdgeType::UNALIGN;
-						Vec dir = to_inexact(e->getTarget()->getPoint() - e->getSource()->getPoint());
+						Vec dir = approximate(e->target()->point() - e->source()->point());
 						Num det1 = CGAL::determinant(directions[edata.associated.first], dir);
 						Num det2 = CGAL::determinant(dir, directions[edata.associated.second]);
 						edata.assigned = det1 < det2 ? edata.associated.first : edata.associated.second;
@@ -424,11 +379,11 @@ namespace cartocrow::simplification {
 			}
 
 			void determine_interference_regions(Num eps) {
-				int e_cnt = graph.getEdgeCount();
+				size_t e_cnt = graph.number_of_edges();
 
-				for (int i = 0; i < e_cnt; i++) {
+				for (size_t i = 0; i < e_cnt; i++) {
 
-					Edge* e = graph.getEdges()[i];
+					Edge_handle e = graph.edge(i);
 					EdgeData& edata = edge_data[i];
 
 					switch (edata.type) {
@@ -437,8 +392,8 @@ namespace cartocrow::simplification {
 						break;
 					}
 					case EdgeType::ALIGN: {
-						edata.interference.push_back(to_inexact(edata.significant->getPoint()));
-						edata.interference.push_back(to_inexact(e->other(edata.significant)->getPoint()));
+						edata.interference.push_back(approximate(edata.significant->point()));
+						edata.interference.push_back(approximate(e->other(edata.significant)->point()));
 						break;
 					}
 					case EdgeType::UNALIGN:
@@ -449,8 +404,8 @@ namespace cartocrow::simplification {
 
 						std::pair<Num, Num> fg = solve_vector_addition(dir_1, dir_2, evec);
 
-						auto v_pt = to_inexact(edata.significant->getPoint());
-						auto o_pt = to_inexact(e->other(edata.significant)->getPoint());
+						auto v_pt = approximate(edata.significant->point());
+						auto o_pt = approximate(e->other(edata.significant)->point());
 						edata.interference.push_back(v_pt);
 						edata.interference.push_back(v_pt + dir_1 * fg.first);
 						edata.interference.push_back(o_pt);
@@ -484,8 +439,8 @@ namespace cartocrow::simplification {
 						Num len = halfcross / std::abs(CGAL::determinant(dir_close, directions[edata.assigned]));
 						Vec d = len * directions[edata.assigned];
 
-						auto v_pt = to_inexact(edata.significant->getPoint());
-						auto o_pt = to_inexact(e->other(edata.significant)->getPoint());
+						auto v_pt = approximate(edata.significant->point());
+						auto o_pt = approximate(e->other(edata.significant)->point());
 
 						auto far_pt = v_pt + d + dir_close;
 						auto is = CGAL::intersection(Line<Inexact>(o_pt, o_pt + dir_far), Line<Inexact>(far_pt, far_pt + dir_close));
@@ -509,8 +464,8 @@ namespace cartocrow::simplification {
 					}
 					case EdgeType::DEV_ALIGN: {
 
-						auto v_pt = to_inexact(edata.significant->getPoint());
-						auto o_pt = to_inexact(e->other(edata.significant)->getPoint());
+						auto v_pt = approximate(edata.significant->point());
+						auto o_pt = approximate(e->other(edata.significant)->point());
 
 						auto len = std::sqrt(CGAL::squared_distance(v_pt, o_pt));
 
@@ -549,7 +504,7 @@ namespace cartocrow::simplification {
 
 				std::cout << "assign_step_counts\n";
 
-				int e_cnt = graph.getEdgeCount();
+				size_t e_cnt = graph.number_of_edges();
 
 				auto even_rounding = [](Num v) {
 					int k = (int)std::ceil(v + 0.000001);
@@ -592,7 +547,7 @@ namespace cartocrow::simplification {
 					}
 					else {
 						// this only works if the interference polygons are not segments (i.e. for aligned edges...)
-						
+
 						if (!a.interference.has_on_unbounded_side(b.interference[0])) {
 							return true;
 						}
@@ -695,9 +650,9 @@ namespace cartocrow::simplification {
 					};
 
 				// first we do deviating edges
-				for (int i = 0; i < e_cnt; i++) {
+				for (size_t i = 0; i < e_cnt; i++) {
 
-					Edge* e = graph.getEdges()[i];
+					Edge_handle e = graph.edge(i);
 					EdgeData& edata = edge_data[i];
 
 					switch (edata.type) {
@@ -716,27 +671,27 @@ namespace cartocrow::simplification {
 						Segment<Inexact> seg_ignore = ignore(seg, 1.0 / 3.0);
 
 						// TODO: use quad tree to speed things up
-						for (Edge* other : graph.getEdges()) {
+						for (Edge_handle other : graph.edges()) {
 
 							if (other == e) {
 								continue;
 							}
 
-							Vertex* common = other->commonVertex(e);
+							Vertex_handle common = other->common_vertex(e);
 
 							if (common == nullptr) {
 								// no shared vertex, treat normally
 
-								if (!uncommon_interference(edata, edge_data[other->graphIndex()])) {
+								if (!uncommon_interference(edata, edge_data[other->graph_index()])) {
 									continue;
 								}
 
-								min_dist_sqr = std::min(min_dist_sqr, CGAL::squared_distance(seg, to_inexact(other->getSegment())));
+								min_dist_sqr = std::min(min_dist_sqr, CGAL::squared_distance(seg, approximate(other->curve())));
 							}
 							else if (common == edata.significant) {
 								// the other edge must be also evading or deviating
 
-								EdgeData& odata = edge_data[other->graphIndex()];
+								EdgeData& odata = edge_data[other->graph_index()];
 
 								if (!common_interference(edata, odata)) {
 									continue;
@@ -749,9 +704,9 @@ namespace cartocrow::simplification {
 
 						}
 
-						for (Vertex* vv : graph.getVertices()) {
+						for (Vertex_handle vv : graph.vertices()) {
 							if (vv->degree() == 0) {
-								min_dist_sqr = std::min(min_dist_sqr, CGAL::squared_distance(to_inexact(vv->getPoint()), seg));
+								min_dist_sqr = std::min(min_dist_sqr, CGAL::squared_distance(approximate(vv->point()), seg));
 							}
 						}
 
@@ -771,7 +726,7 @@ namespace cartocrow::simplification {
 								dir_far = directions[edata.associated.first];
 							}
 
-							Num elen = std::sqrt(to_inexact(e->squared_length()));
+							Num elen = std::sqrt(approxSquaredLength(e));
 
 							// set dir_close/far such that describe a step of unit length
 							Vec step = vector(edata.significant, e) / elen;
@@ -804,27 +759,27 @@ namespace cartocrow::simplification {
 						Segment<Inexact> seg_ignore = ignore(seg, (1 - eps) / 2.0);
 
 						// TODO: use quad tree to speed things up
-						for (Edge* other : graph.getEdges()) {
+						for (Edge_handle other : graph.edges()) {
 
 							if (other == e) {
 								continue;
 							}
 
-							Vertex* common = other->commonVertex(e);
+							Vertex_handle common = other->common_vertex(e);
 
 							if (common == nullptr) {
 								// no shared vertex, treat normally
 
-								if (!uncommon_interference(edata, edge_data[other->graphIndex()])) {
+								if (!uncommon_interference(edata, edge_data[other->graph_index()])) {
 									continue;
 								}
 
-								min_dist_sqr = std::min(min_dist_sqr, CGAL::squared_distance(seg, to_inexact(other->getSegment())));
+								min_dist_sqr = std::min(min_dist_sqr, CGAL::squared_distance(seg, approximate(other->curve())));
 							}
 							else if (common == edata.significant) {
 								// the other edge must be also evading or deviating
 
-								EdgeData& odata = edge_data[other->graphIndex()];
+								EdgeData& odata = edge_data[other->graph_index()];
 
 								if (!common_interference(edata, odata)) {
 									continue;
@@ -837,13 +792,13 @@ namespace cartocrow::simplification {
 
 						}
 
-						for (Vertex* vv : graph.getVertices()) {
+						for (Vertex_handle vv : graph.vertices()) {
 							if (vv->degree() == 0) {
-								min_dist_sqr = std::min(min_dist_sqr, CGAL::squared_distance(to_inexact(vv->getPoint()), seg));
+								min_dist_sqr = std::min(min_dist_sqr, CGAL::squared_distance(approximate(vv->point()), seg));
 							}
 						}
 
-						Num maxdist = eps * std::sqrt(to_inexact(e->squared_length()));
+						Num maxdist = eps * std::sqrt(approxSquaredLength(e));
 						if (!std::isfinite(min_dist_sqr)) {
 							edata.stepcount = maxdist;
 						}
@@ -858,9 +813,9 @@ namespace cartocrow::simplification {
 				} // loop
 
 				// then the remaining edges
-				for (int i = 0; i < e_cnt; i++) {
+				for (size_t i = 0; i < e_cnt; i++) {
 
-					Edge* e = graph.getEdges()[i];
+					Edge_handle e = graph.edge(i);
 					EdgeData& edata = edge_data[i];
 
 					switch (edata.type) {
@@ -874,32 +829,32 @@ namespace cartocrow::simplification {
 					}
 					case EdgeType::UNALIGN: {
 						Num min_dist_sqr = std::numeric_limits<Num>::infinity();
-						Segment<Inexact> seg = to_inexact(e->getSegment());
+						Segment<Inexact> seg = approximate(e->curve());
 
 						// TODO: use quad tree to speed things up
-						for (Edge* other : graph.getEdges()) {
+						for (Edge_handle other : graph.edges()) {
 
 							if (other == e) {
 								continue;
 							}
 
-							Vertex* common = other->commonVertex(e);
+							Vertex_handle common = other->common_vertex(e);
 
 							if (common == nullptr) {
 								// no shared vertex, treat normally
 
-								if (!uncommon_interference(edata, edge_data[other->graphIndex()])) {
+								if (!uncommon_interference(edata, edge_data[other->graph_index()])) {
 									continue;
 								}
 
-								Segment<Inexact> seg_other = to_inexact(other->getSegment());
+								Segment<Inexact> seg_other = approximate(other->curve());
 								Num dist_sqr = CGAL::squared_distance(seg, seg_other);
 								min_dist_sqr = std::min(min_dist_sqr, dist_sqr);
 							}
 							else if (common == edata.significant) {
 								// the other edge must be deviating, either aligned or unaligned
 
-								EdgeData& odata = edge_data[other->graphIndex()];
+								EdgeData& odata = edge_data[other->graph_index()];
 
 								if (!common_interference(edata, odata)) {
 									continue;
@@ -925,9 +880,9 @@ namespace cartocrow::simplification {
 							} // else: sharing an insignficant vertex, these staircases do not interact
 						}
 
-						for (Vertex* vv : graph.getVertices()) {
+						for (Vertex_handle vv : graph.vertices()) {
 							if (vv->degree() == 0) {
-								min_dist_sqr = std::min(min_dist_sqr, CGAL::squared_distance(to_inexact(vv->getPoint()), seg));
+								min_dist_sqr = std::min(min_dist_sqr, CGAL::squared_distance(approximate(vv->point()), seg));
 							}
 						}
 
@@ -938,7 +893,7 @@ namespace cartocrow::simplification {
 							Num min_dist = std::sqrt(min_dist_sqr);
 							Vec dir_1 = directions[edata.assigned];
 							Vec dir_2 = directions[edata.other_direction()];
-							Num elen = std::sqrt(to_inexact(e->squared_length()));
+							Num elen = std::sqrt(approxSquaredLength(e));
 							Vec edir = vector(edata.significant, e) / elen;
 							Num alpha_1 = std::abs(std::acos(edir * dir_1));
 							Num alpha_2 = std::abs(std::acos(edir * dir_2));
@@ -953,29 +908,29 @@ namespace cartocrow::simplification {
 						Segment<Inexact> seg_ev = ignore(seg, 0.5);
 
 						// TODO: use quad tree to speed things up
-						for (Edge* other : graph.getEdges()) {
+						for (Edge_handle other : graph.edges()) {
 
 							if (other == e) {
 								continue;
 							}
 
-							Vertex* common = other->commonVertex(e);
+							Vertex_handle common = other->common_vertex(e);
 
 							if (common == nullptr) {
 								// no shared vertex, treat normally
 
-								if (!uncommon_interference(edata, edge_data[other->graphIndex()])) {
+								if (!uncommon_interference(edata, edge_data[other->graph_index()])) {
 									continue;
 								}
 
-								Segment<Inexact> seg_other = to_inexact(other->getSegment());
+								Segment<Inexact> seg_other = approximate(other->curve());
 								Num dist_sqr = CGAL::squared_distance(seg, seg_other);
 								min_dist_sqr = std::min(min_dist_sqr, dist_sqr);
 							}
 							else if (common == edata.significant) {
 								// the other edge must be also evading or deviating
 
-								EdgeData& odata = edge_data[other->graphIndex()];
+								EdgeData& odata = edge_data[other->graph_index()];
 
 								if (!common_interference(edata, odata)) {
 									continue;
@@ -1006,9 +961,9 @@ namespace cartocrow::simplification {
 
 						}
 
-						for (Vertex* vv : graph.getVertices()) {
+						for (Vertex_handle vv : graph.vertices()) {
 							if (vv->degree() == 0) {
-								min_dist_sqr = std::min(min_dist_sqr, CGAL::squared_distance(to_inexact(vv->getPoint()), seg));
+								min_dist_sqr = std::min(min_dist_sqr, CGAL::squared_distance(approximate(vv->point()), seg));
 							}
 						}
 
@@ -1019,7 +974,7 @@ namespace cartocrow::simplification {
 							Num min_dist = std::sqrt(min_dist_sqr);
 							Vec dir_1 = directions[edata.assigned];
 							Vec dir_2 = directions[edata.other_direction()];
-							Num elen = std::sqrt(to_inexact(e->squared_length()));
+							Num elen = std::sqrt(approxSquaredLength(e));
 							Vec edir = vector(edata.significant, e) / elen;
 							Num alpha_1 = std::abs(std::acos(edir * dir_1));
 							Num alpha_2 = std::abs(std::acos(edir * dir_2));
@@ -1043,23 +998,23 @@ namespace cartocrow::simplification {
 
 				std::cout << "create_staircases\n";
 
-				int e_cnt = graph.getEdgeCount();
+				size_t e_cnt = graph.number_of_edges();
 
-				for (int i = 0; i < e_cnt; i++) {
+				for (size_t i = 0; i < e_cnt; i++) {
 
-					Edge* e = graph.getEdges()[i];
+					Edge_handle e = graph.edge(i);
 					EdgeData& edata = edge_data[i];
-					Vertex* v = edata.significant;
+					Vertex_handle v = edata.significant;
 
-					std::function<Edge* (Edge*, Point<Kernel>)> split;
-					if (v == e->getSource()) {
-						split = [this](Edge* edge, Point<Kernel> point) {
-							return graph.splitEdge(edge, point)->outgoing();
+					std::function<Edge_handle(Edge_handle, Point<Kernel>)> split;
+					if (v == e->source()) {
+						split = [this](Edge_handle edge, Point<Kernel> point) {
+							return graph.subdivide_edge(edge, point)->outgoing();
 							};
 					}
 					else {
-						split = [this](Edge* edge, Point<Kernel> point) {
-							return graph.splitEdge(edge, point)->incoming();
+						split = [this](Edge_handle edge, Point<Kernel> point) {
+							return graph.subdivide_edge(edge, point)->incoming();
 							};
 					}
 
@@ -1073,16 +1028,16 @@ namespace cartocrow::simplification {
 
 						assert(k > 1 && k % 2 == 0);
 
-						Vector<Kernel> d1 = to_kernel(directions[edata.assigned]);
-						Vector<Kernel> d2 = to_kernel(directions[edata.other_direction()]);
+						Vector<Kernel> d1 = convert_kernel<Kernel>(directions[edata.assigned]);
+						Vector<Kernel> d2 = convert_kernel<Kernel>(directions[edata.other_direction()]);
 
-						if (e->getSource() != v) {
+						if (e->source() != v) {
 							d1 *= -1;
 							d2 *= -1;
 						}
 
-						Point<Kernel>& s = e->getSource()->getPoint();
-						Point<Kernel>& t = e->getTarget()->getPoint();
+						const Point<Kernel>& s = e->source()->point();
+						const Point<Kernel>& t = e->target()->point();
 						Vector<Kernel> step = (t - s) / k;
 
 						std::pair<Number<Kernel>, Number<Kernel>> fg = solve_vector_addition(d1, d2, step);
@@ -1091,15 +1046,15 @@ namespace cartocrow::simplification {
 						d2 = fg.second * d2;
 
 						Point<Kernel> pt = s + d1;
-						e = graph.splitEdge(e, pt)->outgoing();
+						e = graph.subdivide_edge(e, pt)->outgoing();
 						pt += 2 * d2;
-						e = graph.splitEdge(e, pt)->outgoing();
+						e = graph.subdivide_edge(e, pt)->outgoing();
 						k -= 2;
 						while (k > 0) {
 							pt += 2 * d1;
-							e = graph.splitEdge(e, pt)->outgoing();
+							e = graph.subdivide_edge(e, pt)->outgoing();
 							pt += 2 * d2;
-							e = graph.splitEdge(e, pt)->outgoing();
+							e = graph.subdivide_edge(e, pt)->outgoing();
 							k -= 2;
 						}
 
@@ -1110,16 +1065,16 @@ namespace cartocrow::simplification {
 
 						assert(k > 1 && k % 2 == 0);
 
-						Vector<Kernel> d1 = to_kernel(directions[edata.assigned]);
-						Vector<Kernel> d2 = to_kernel(directions[edata.other_direction()]);
+						Vector<Kernel> d1 = convert_kernel<Kernel>(directions[edata.assigned]);
+						Vector<Kernel> d2 = convert_kernel<Kernel>(directions[edata.other_direction()]);
 
-						if (e->getSource() != v) {
+						if (e->source() != v) {
 							d1 *= -1;
 							d2 *= -1;
 						}
 
-						Point<Kernel>& s = e->getSource()->getPoint();
-						Point<Kernel>& t = e->getTarget()->getPoint();
+						const Point<Kernel>& s = e->source()->point();
+						const Point<Kernel>& t = e->target()->point();
 						Vector<Kernel> step = (t - s) / k;
 
 						std::pair<Number<Kernel>, Number<Kernel>> fg = solve_vector_addition(d1, d2, step);
@@ -1129,22 +1084,22 @@ namespace cartocrow::simplification {
 
 						// outward
 						Point<Kernel> pt_s = s + d1;
-						e = graph.splitEdge(e, pt_s)->outgoing();
+						e = graph.subdivide_edge(e, pt_s)->outgoing();
 						Point<Kernel> pt_t = t - d1;
-						e = graph.splitEdge(e, pt_t)->incoming();
+						e = graph.subdivide_edge(e, pt_t)->incoming();
 						k -= 2;
 						while (k > 0) {
 							// back to central line
 							pt_s += d2;
-							e = graph.splitEdge(e, pt_s)->outgoing();
+							e = graph.subdivide_edge(e, pt_s)->outgoing();
 							pt_t -= d2;
-							e = graph.splitEdge(e, pt_t)->incoming();
+							e = graph.subdivide_edge(e, pt_t)->incoming();
 
 							// step outward
 							pt_s += d1;
-							e = graph.splitEdge(e, pt_s)->outgoing();
+							e = graph.subdivide_edge(e, pt_s)->outgoing();
 							pt_t -= d1;
-							e = graph.splitEdge(e, pt_t)->incoming();
+							e = graph.subdivide_edge(e, pt_t)->incoming();
 							k -= 2;
 						}
 						break;
@@ -1181,14 +1136,14 @@ namespace cartocrow::simplification {
 						Vec dir_assigned = directions[edata.assigned];
 						Num f = 0.5 * std::abs(CGAL::determinant(dir_close, dir_far)) / std::abs(CGAL::determinant(dir_close, dir_assigned));
 
-						Vector<Kernel> side_step = to_kernel(f * dir_assigned);
-						Vector<Kernel> close_step = to_kernel(dir_close);
-						Vector<Kernel> far_step = to_kernel(dir_far);
+						Vector<Kernel> side_step = convert_kernel<Kernel>(f * dir_assigned);
+						Vector<Kernel> close_step = convert_kernel<Kernel>(dir_close);
+						Vector<Kernel> far_step = convert_kernel<Kernel>(dir_far);
 
 						int hk = k / 2;
 
 						// side step
-						auto pt = v->getPoint() + side_step;
+						auto pt = v->point() + side_step;
 						e = split(e, pt);
 						pt += close_step;
 						e = split(e, pt);
@@ -1225,8 +1180,8 @@ namespace cartocrow::simplification {
 					}
 					case EdgeType::DEV_ALIGN: {
 
-						auto v_pt = to_inexact(v->getPoint());
-						auto o_pt = to_inexact(e->other(v)->getPoint());
+						auto v_pt = approximate(v->point());
+						auto o_pt = approximate(e->other(v)->point());
 
 						auto len = std::sqrt(CGAL::squared_distance(v_pt, o_pt));
 
@@ -1236,10 +1191,10 @@ namespace cartocrow::simplification {
 						auto step_dist = edata.stepdist;
 						auto step_len = (1 - eps) * len / 2.0; // NB: this needs to use eps, not stepdist
 
-						auto sidestep = to_kernel(step_dist * dir_1);
-						auto lengthstep = to_kernel(step_len * dir_2);
+						auto sidestep = convert_kernel<Kernel>(step_dist * dir_1);
+						auto lengthstep = convert_kernel<Kernel>(step_len * dir_2);
 
-						auto a = v->getPoint() + sidestep;
+						auto a = v->point() + sidestep;
 						auto b = a + lengthstep;
 						auto c = b - 2 * sidestep;
 						auto d = c + lengthstep;
@@ -1261,11 +1216,10 @@ namespace cartocrow::simplification {
 			};
 		};
 
-		template<class Graph>
-		void restrict_directions(Graph& graph, std::vector<Vector<Inexact>> directions, Number<Inexact> lambda, Number<Inexact> eps) {
+		template<class Graph> requires Graph::Graph_traits::sorted&& Graph::Graph_traits::oriented
+			void restrict_directions(Graph& graph, std::vector<Vector<Inexact>> directions, Number<Inexact> lambda, Number<Inexact> eps) {
 
-			assert(graph.isSorted());
-			assert(graph.isOriented());
+			assert(graph.is_initialized());
 
 			// we assume directions are sorted by construction
 			// and we assume they are normalized
@@ -1283,11 +1237,8 @@ namespace cartocrow::simplification {
 
 	} // namespace detail
 
-	template<class Graph>
-	void restrict_orientations(Graph& graph, std::vector<Vector<Inexact>> orientations, Number<Inexact> lambda, Number<Inexact> eps) {
-
-		assert(graph.isSorted());
-		assert(graph.isOriented());
+	template<class Graph> requires Graph::Graph_traits::sorted&& Graph::Graph_traits::oriented
+		void restrict_orientations(Graph& graph, std::vector<Vector<Inexact>> orientations, Number<Inexact> lambda, Number<Inexact> eps) {
 
 		// convert orientations ("mod 180 degrees")
 		// to directions ("mod 360 degrees")
@@ -1304,8 +1255,9 @@ namespace cartocrow::simplification {
 		detail::restrict_directions(graph, dirs, lambda, eps);
 	}
 
-	template<class Graph>
-	void restrict_orientations(Graph& graph, int count, Number<Inexact> initial_angle, Number<Inexact> lambda, Number<Inexact> eps) {
+	template<class Graph> requires Graph::Graph_traits::sorted&& Graph::Graph_traits::oriented
+		void restrict_orientations(Graph& graph, int count, Number<Inexact> initial_angle, Number<Inexact> lambda, Number<Inexact> eps) {
+
 		using Vec = Vector<Inexact>;
 		using Transform = CGAL::Aff_transformation_2<Inexact>;
 
@@ -1331,8 +1283,9 @@ namespace cartocrow::simplification {
 		detail::restrict_directions(graph, dirs, lambda, eps);
 	}
 
-	template<class Graph>
-	void restrict_orientations(Graph& graph, std::initializer_list<Number<Inexact>> angles, Number<Inexact> lambda, Number<Inexact> eps) {
+	template<class Graph> requires Graph::Graph_traits::sorted&& Graph::Graph_traits::oriented
+		void restrict_orientations(Graph& graph, std::initializer_list<Number<Inexact>> angles, Number<Inexact> lambda, Number<Inexact> eps) {
+
 		using Vec = Vector<Inexact>;
 		using Transform = CGAL::Aff_transformation_2<Inexact>;
 

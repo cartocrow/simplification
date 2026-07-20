@@ -8,8 +8,7 @@
 using namespace cartocrow;
 using namespace cartocrow::renderer;
 
-//extern template Straight_graph_2<std::monostate, std::monostate, Exact, SimpleGraph>;
-using InputGraph = Straight_graph_2<std::monostate, std::monostate, Exact, DecomposedGraph<false,std::monostate>>;
+using InputGraph = Straight_graph_2<std::monostate, std::monostate, Exact, CustomGraphTraits<false,true, true, true, std::monostate>>;
 extern template GraphPainting<InputGraph>;
 
 class SimplificationAlgorithm {

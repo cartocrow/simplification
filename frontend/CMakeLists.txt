@@ -8,6 +8,7 @@ set(SOURCES
     smoother.cpp
     vw.cpp
     ksbb.cpp
+    restrictor.cpp
 )
 add_executable(simplification ${SOURCES})
 target_link_libraries(

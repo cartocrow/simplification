@@ -15,7 +15,7 @@
 #include "graph_painter.h"
 #include "ipe_reader.h"
 #include "read_graph_gdal.h"
-//#include "restrictor.h"
+#include "restrictor.h"
 
 using namespace cartocrow;
 using namespace cartocrow::simplification;
@@ -199,8 +199,9 @@ void SimplificationGUI::addPreprocessTab() {
 			delete preprocessed;
 			preprocessed = nullptr;
 		}
+		preprocessed = new InputGraph();
 		graph_2_copy(*input, *preprocessed);
-		//restrict(preprocessed, 2, 0);
+		restrict(preprocessed, 2, 0);
 		updatePaintings();
 		});
 
@@ -212,8 +213,9 @@ void SimplificationGUI::addPreprocessTab() {
 			delete preprocessed;
 			preprocessed = nullptr;
 		}
+		preprocessed = new InputGraph();
 		graph_2_copy(*input, *preprocessed);
-		//restrict(preprocessed, 3, 0);
+		restrict(preprocessed, 3, 0);
 		updatePaintings();
 		});
 
@@ -225,8 +227,9 @@ void SimplificationGUI::addPreprocessTab() {
 			delete preprocessed;
 			preprocessed = nullptr;
 		}
+		preprocessed = new InputGraph();
 		graph_2_copy(*input, *preprocessed);
-		//restrict(preprocessed, 3, std::numbers::pi / 6.0);
+		restrict(preprocessed, 3, std::numbers::pi / 6.0);
 		updatePaintings();
 		});
 
@@ -238,8 +241,9 @@ void SimplificationGUI::addPreprocessTab() {
 			delete preprocessed;
 			preprocessed = nullptr;
 		}
+		preprocessed = new InputGraph();
 		graph_2_copy(*input, *preprocessed);
-		//restrict(preprocessed, 4, 0);
+		restrict(preprocessed, 4, 0);
 		updatePaintings();
 		});
 
