@@ -5,13 +5,8 @@ set(HEADERS
 	edge_moves.h
 	edge_moves.hpp
 	edge_quad_tree.h
-	historic_graph.h
-	historic_graph.hpp	
-	modifiable_graph.h
 	orientation_restriction.h
 	orientation_restriction.hpp
-	straight_graph.h
-	straight_graph.hpp
 	utils.h
 	vertex_quad_tree.h
 	vertex_removal.h	
