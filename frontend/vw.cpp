@@ -154,7 +154,6 @@ struct VWBaseSimplifier {
 			return res;
 		}
 	}
-
 };
 
 

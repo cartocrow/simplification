@@ -11,8 +11,7 @@
 #include "library/utils.h"
 
 #include "vw.h"
-//#include "ksbb.h"
-//#include "ksbb_inexact.h"
+#include "ksbb.h"
 #include "graph_painter.h"
 #include "ipe_reader.h"
 #include "read_graph_gdal.h"
@@ -526,8 +525,9 @@ SimplificationGUI::SimplificationGUI() {
 
 	algorithms.push_back(&VWSimplifier::getInstance());
 	algorithms.push_back(&VWInexactSimplifier::getInstance());
-	//algorithms.push_back(&KSBBSimplifier::getInstance());
-	//algorithms.push_back(&KSBBInexactSimplifier::getInstance());
+	algorithms.push_back(&KSBBSimplifier::getInstance());
+	algorithms.push_back(&KSBBInexactSimplifier::getInstance());
+	algorithms.push_back(&KSBBSemiExactSimplifier::getInstance());
 
 	auto* dockWidget = new QDockWidget();
 	addDockWidget(Qt::LeftDockWidgetArea, dockWidget);

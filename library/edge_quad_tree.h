@@ -2,20 +2,22 @@
 
 #include <cartocrow/data_structures/quad_tree.h>
 
+#include "utils.h"
+
 namespace cartocrow::simplification {
 
 	template<class Graph>
 	struct EdgeQuadTreeTraits {
-		using Element = Graph::Edge*;
+		using Element = Graph::Edge_handle;
 		using Kernel = Graph::Kernel;
 
-		static Rectangle<Kernel> get_bounding_box(Element& elt) {
-			Segment<Kernel> seg = elt->getSegment();
+		static Rectangle<Kernel> get_bounding_box(Element elt) {
+			Segment<Kernel> seg = elt->curve();
 			return utils::boxOf({ seg.start(), seg.end() });
 		}
 
-		static bool element_overlaps_rectangle(Element& elt, Rectangle<Kernel>& rect) {
-			Segment<Kernel> seg = elt->getSegment();
+		static bool element_overlaps_rectangle(Element elt, Rectangle<Kernel>& rect) {
+			Segment<Kernel> seg = elt->curve();
 			return utils::overlaps(rect, seg);
 		}
 	};

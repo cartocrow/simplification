@@ -8,7 +8,7 @@
 namespace cartocrow::simplification {
 
 	namespace detail {
-		template <class E, typename K> struct ECBase {
+		template <typename K, bool H> struct ECData {
 
 			// collapse specification
 			bool erase_both; // special case: both endpoints are to be removed
@@ -19,40 +19,41 @@ namespace cartocrow::simplification {
 
 			// algorithm 
 			bool blocked_by_degzero;
-			std::vector<E*> blocked_by;
-			std::vector<E*> blocking;
-			int qid;
+			std::vector<typename EdgeCollapseGraph<K,H>::Edge_handle> blocked_by;
+			std::vector<typename EdgeCollapseGraph<K,H>::Edge_handle> blocking;
+			int queue_index;
 
 		};
 
-		template <typename K> struct ECData : ECBase<typename EdgeCollapseGraph<K>::Edge, K> {
+		template<class G>
+		struct ECTraitsBase {
+			using Graph = G;
 
-		};
-
-		template <typename K> struct HECData : ECBase<typename HECGraph<K>::Edge, K> {
-			Operation<HECGraph<K>>* hist = nullptr;
+			static ECData<typename G::Kernel, G::Graph_traits::historic>& data(typename G::Edge_handle e) {
+				return e->data();
+			}
 		};
 	}
 
-	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
-	void EdgeCollapse<MG, ECT>::update(Edge* e) {
+	template <detail::ECTraits ECT>
+	void EdgeCollapse<ECT>::update(Edge_handle e) {
 
-		auto& edata = e->data();
+		auto& edata = ECT::data(e);
 
 		// clear topology
-		for (Edge* b : edata.blocked_by) {
-			utils::listRemove(e, b->data().blocking);
+		for (Edge_handle b : edata.blocked_by) {
+			utils::listRemove(e, ECT::data(b).blocking);
 		}
 		edata.blocked_by.clear();
 
 		// last condition checks for a triangle
-		if (e->getSource()->degree() != 2 || e->getTarget()->degree() != 2 ||
-			e->sourceWalkNeighbor() == e->targetWalkNeighbor()) {
+		if (e->source()->degree() != 2 || e->target()->degree() != 2 ||
+			e->prev()->source() == e->next()->target()) {
 			queue.remove(e);
 			return;
 		}
 
-		ECT::determineCollapse(e);
+		ECT::determine_collapse(e);
 
 		if (queue.contains(e)) {
 			queue.update(e);
@@ -62,21 +63,21 @@ namespace cartocrow::simplification {
 		}
 	}
 
-	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
-	bool EdgeCollapse<MG, ECT>::blocks(Edge* edge, Edge* collapse) {
-		Edge* prev = collapse->sourceWalk();
-		Edge* next = collapse->targetWalk();
+	template <detail::ECTraits ECT>
+	bool EdgeCollapse<ECT>::blocks(Edge_handle edge, Edge_handle collapse) {
+		Edge_handle prev = collapse->prev();
+		Edge_handle next = collapse->next();
 
 		if (edge == collapse || edge == prev || edge == next) {
 			// involved in collapse
 			return false;
 		}
 
-		Vertex* prev_v = collapse->previous()->getSource();
-		Vertex* next_v = collapse->next()->getTarget();;
+		Vertex_handle prev_v = collapse->prev()->source();
+		Vertex_handle next_v = collapse->next()->target();;
 
-		bool source_shared = edge->getSource() == prev_v || edge->getSource() == next_v;
-		bool target_shared = edge->getTarget() == prev_v || edge->getTarget() == next_v;
+		bool source_shared = edge->source() == prev_v || edge->source() == next_v;
+		bool target_shared = edge->target() == prev_v || edge->target() == next_v;
 
 		auto test_is = [&](std::optional<std::variant<Point<Kernel>, Segment<Kernel>>> is) {
 			if (!is.has_value()) {
@@ -97,10 +98,10 @@ namespace cartocrow::simplification {
 				if (Point<Kernel>* pt = std::get_if<Point<Kernel>>(&*is)) {
 
 					// make sure it's not the common point
-					if (source_shared && close(*pt, edge->getSource()->getPoint())) {
+					if (source_shared && close(*pt, edge->source()->point())) {
 						return false;
 					}
-					if (target_shared && close(*pt, edge->getTarget()->getPoint())) {
+					if (target_shared && close(*pt, edge->target()->point())) {
 						return false;
 					}
 				}
@@ -110,14 +111,14 @@ namespace cartocrow::simplification {
 					Segment<Kernel>* ls = std::get_if<Segment<Kernel>>(&*is);
 
 					if (source_shared 
-						&& close(ls->source(), edge->getSource()->getPoint())
-						&& close(ls->target(), edge->getSource()->getPoint())) {
+						&& close(ls->source(), edge->source()->point())
+						&& close(ls->target(), edge->source()->point())) {
 						return false;
 					}
 
 					if (target_shared
-						&& close(ls->source(), edge->getTarget()->getPoint())
-						&& close(ls->target(), edge->getTarget()->getPoint())) {
+						&& close(ls->source(), edge->target()->point())
+						&& close(ls->target(), edge->target()->point())) {
 						return false;
 					}
 				}
@@ -132,10 +133,10 @@ namespace cartocrow::simplification {
 
 				if (Point<Kernel>* pt = std::get_if<Point<Kernel>>(&*is)) {
 					// make sure it's not the common point
-					if (source_shared && *pt == edge->getSource()->getPoint()) {
+					if (source_shared && *pt == edge->source()->point()) {
 						return false;
 					}
-					if (target_shared && *pt == edge->getTarget()->getPoint()) {
+					if (target_shared && *pt == edge->target()->point()) {
 						return false;
 					}
 				}
@@ -145,52 +146,50 @@ namespace cartocrow::simplification {
 			}
 			};
 
-		if (test_is(CGAL::intersection(collapse->data().T1, edge->getSegment()))) {
+		if (test_is(CGAL::intersection(ECT::data(collapse).T1, edge->curve()))) {
 			return true;
 		}
 
-		if (test_is(CGAL::intersection(collapse->data().T2, edge->getSegment()))) {
+		if (test_is(CGAL::intersection(ECT::data(collapse).T2, edge->curve()))) {
 			return true;
 		}
 
 		return false;
 	}
 
-	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
-	EdgeCollapse<MG, ECT>::EdgeCollapse(MG& g, EdgeTree& sqt, VertexTree& pqt)
+	template <detail::ECTraits ECT>
+	EdgeCollapse<ECT>::EdgeCollapse(Graph& g, EdgeTree& sqt, VertexTree& pqt)
 		: graph(g), sqt(sqt), pqt(pqt) {
 
 	}
 
-	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
-	EdgeCollapse<MG, ECT>::~EdgeCollapse() {}
-
-	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
-	void EdgeCollapse<MG, ECT>::initialize(bool initSQT, bool initPQT) {
+	template <detail::ECTraits ECT>
+	void EdgeCollapse<ECT>::initialize(bool initSQT, bool initPQT) {
 		
 		if (initSQT) {
 			sqt.clear();
-			for (Edge* e : graph.getEdges()) {
+			for (Edge_handle e : graph.edges()) {
 				sqt.insert(e);
 			}
 		}
 
 		if (initPQT) {
 			pqt.clear();
-			for (Vertex* v : graph.getVertices()) {
+			for (Vertex_handle v : graph.vertices()) {
 				if (v->degree() == 0) {
-					pqt.insert(*v);
+					pqt.insert(v);
 				}
 			}
 		}
 
 		queue.clear();
 
-		for (Edge* e : graph.getEdges()) {
-			e->data().qid = -1;
-			e->data().blocked_by.clear();
-			e->data().blocking.clear();
-			e->data().blocked_by_degzero = false;
+		for (Edge_handle e : graph.edges()) {
+			auto& edata = ECT::data(e);
+			edata.queue_index = -1;
+			edata.blocked_by.clear();
+			edata.blocking.clear();
+			edata.blocked_by_degzero = false;
 
 			update(e);
 		}
@@ -198,11 +197,11 @@ namespace cartocrow::simplification {
 		assert(validateState());
 	}
 
-	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
-	bool EdgeCollapse<MG, ECT>::validateState() {
+	template <detail::ECTraits ECT>
+	bool EdgeCollapse<ECT>::validateState() {
 		bool ok = true;
-		for (Edge* e : graph.getEdges()) {
-			if (e->data().qid >= 0) {
+		for (Edge_handle e : graph.edges()) {
+			if (ECT::data(e).queue_index >= 0) {
 				if (!queue.contains(e)) {
 					std::cout << e << " :: thinks it's in queue but isn't\n";
 					ok = false;
@@ -213,15 +212,15 @@ namespace cartocrow::simplification {
 				ok = false;
 			}
 
-			for (Edge* b : e->data().blocked_by) {
-				if (std::find(b->data().blocking.begin(), b->data().blocking.end(), e) == b->data().blocking.end()) {
+			for (Edge_handle b : ECT::data(e).blocked_by) {
+				if (std::find(ECT::data(b).blocking.begin(), ECT::data(b).blocking.end(), e) == ECT::data(b).blocking.end()) {
 					std::cout << e << " :: thinks it's blocked by " << b << ", but they don't agree\n";
 					ok = false;
 				}
 			}
 
-			for (Edge* b : e->data().blocking) {
-				if (std::find(b->data().blocked_by.begin(), b->data().blocked_by.end(), e) == b->data().blocked_by.end()) {
+			for (Edge_handle b : ECT::data(e).blocking) {
+				if (std::find(ECT::data(b).blocked_by.begin(), ECT::data(b).blocked_by.end(), e) == ECT::data(b).blocked_by.end()) {
 					std::cout << e << " :: thinks it's blocking " << b << ", but they don't agree\n";
 					ok = false;
 				}
@@ -230,17 +229,17 @@ namespace cartocrow::simplification {
 		return ok;
 	}
 
-	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
-	bool EdgeCollapse<MG, ECT>::run(std::optional<std::function<bool(int, Number<Kernel>)>> stop) {
+	template <detail::ECTraits ECT>
+	bool EdgeCollapse<ECT>::run(std::optional<std::function<bool(int, Number<Kernel>)>> stop) {
 		while (true) {
 			assert(validateState());
 
-			Edge* next = findNextStep();
+			Edge_handle next = findNextStep();
 			if (next == nullptr) {
 				return false;
 			}
 
-			if (!stop.has_value() || (*stop)(graph.getEdgeCount(), next->data().cost)) {
+			if (!stop.has_value() || (*stop)(graph.number_of_edges(), ECT::data(next).cost)) {
 				return true;
 			}
 
@@ -253,16 +252,17 @@ namespace cartocrow::simplification {
 		}
 	}
 
-	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
-	MG::Edge* EdgeCollapse<MG, ECT>::findNextStep() {
-		if constexpr (ModifiableGraphWithHistory<MG>) {
-			assert(graph.atPresent());
+	template <detail::ECTraits ECT>
+	ECT::Graph::Edge_handle EdgeCollapse<ECT>::findNextStep() {
+
+		if constexpr (Graph::Graph_traits::historic) {
+			assert(!graph.history().can_redo());
 		}
 
 		while (!queue.empty()) {
-			Edge* e = queue.peek();
+			Edge_handle e = queue.peek();
 
-			auto& edata = e->data();
+			auto& edata = ECT::data(e);
 
 			if (edata.creates_difference) {
 				// possibly blocked?
@@ -271,9 +271,9 @@ namespace cartocrow::simplification {
 
 				edata.blocked_by_degzero = false;
 
-				pqt.findContained(rect, [&edata](Vertex& b) {
-					if (!edata.T1.has_on_unbounded_side(b.getPoint()) ||
-						!edata.T2.has_on_unbounded_side(b.getPoint())) {
+				pqt.findContained(rect, [&edata](Vertex_handle b) {
+					if (!edata.T1.has_on_unbounded_side(b->point()) ||
+						!edata.T2.has_on_unbounded_side(b->point())) {
 						// blocked, by an unmovable vertex
 						edata.blocked_by_degzero = true;
 					}
@@ -281,11 +281,11 @@ namespace cartocrow::simplification {
 
 				if (!edata.blocked_by_degzero) {
 
-					sqt.findOverlapped(rect, [this, &e](Edge* b) {
+					sqt.findOverlapped(rect, [this, &e](Edge_handle b) {
 
 						if (blocks(b, e)) {
-							b->data().blocking.push_back(e);
-							e->data().blocked_by.push_back(b);
+							ECT::data(b).blocking.push_back(e);
+							ECT::data(e).blocked_by.push_back(b);
 						}
 						});
 				}
@@ -306,21 +306,18 @@ namespace cartocrow::simplification {
 		return nullptr;
 	}
 
-	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
-	void EdgeCollapse<MG, ECT>::performStep(Edge* e) {
-		if constexpr (ModifiableGraphWithHistory<MG>) {
-			assert(graph.atPresent());
-		}
-
+	template <detail::ECTraits ECT>
+	void EdgeCollapse<ECT>::performStep(Edge_handle e) {
+		
 		assert(queue.peek() == e);
 
 		queue.pop();
 
-		auto& edata = e->data();
+		auto& edata = ECT::data(e);
 
 		// remove from blocking lists and search structure
-		Edge* prev = e->previous();
-		Edge* next = e->next();
+		Edge_handle prev = e->prev();
+		Edge_handle next = e->next();
 		sqt.remove(e);
 		sqt.remove(prev);
 		sqt.remove(next);
@@ -328,94 +325,95 @@ namespace cartocrow::simplification {
 		queue.remove(prev);
 		queue.remove(next);
 
-		for (Edge* b : edata.blocking) {
-			if (utils::listRemove(e, b->data().blocked_by)) {
-				if (b->data().blocked_by.empty() && !b->data().blocked_by_degzero) {
+		for (Edge_handle b : edata.blocking) {
+			auto& bdata = ECT::data(b);
+			if (utils::listRemove(e, bdata.blocked_by)) {
+				if (bdata.blocked_by.empty() && !bdata.blocked_by_degzero) {
 					queue.push(b);
 				}
 			}
 		}
 		edata.blocking.clear();
 
-		for (Edge* b : prev->data().blocking) {
-			if (utils::listRemove(prev, b->data().blocked_by)) {
-				if (b->data().blocked_by.empty() && !b->data().blocked_by_degzero) {
+		for (Edge_handle b : ECT::data(prev).blocking) {
+			auto& bdata = ECT::data(b);
+			if (utils::listRemove(prev, bdata.blocked_by)) {
+				if (bdata.blocked_by.empty() && !bdata.blocked_by_degzero) {
 					queue.push(b);
 				}
 			}
 		}
-		prev->data().blocking.clear();
+		ECT::data(prev).blocking.clear();
 
-		for (Edge* b : next->data().blocking) {
-			if (utils::listRemove(next, b->data().blocked_by)) {
-				if (b->data().blocked_by.empty() && !b->data().blocked_by_degzero) {
+		for (Edge_handle b : ECT::data(next).blocking) {
+			auto& bdata = ECT::data(b);
+			if (utils::listRemove(next, bdata.blocked_by)) {
+				if (bdata.blocked_by.empty() && !bdata.blocked_by_degzero) {
 					queue.push(b);
 				}
 			}
 		}
-		next->data().blocking.clear();
+		ECT::data(next).blocking.clear();
 
-		if constexpr (ModifiableGraphWithHistory<MG>) {
-			graph.startBatch(edata.cost);
-		}
+		
 
-		Vertex* src = e->getSource();
-		Vertex* tar = e->getTarget();
+		Vertex_handle src = e->source();
+		Vertex_handle tar = e->target();
 
 		if (edata.erase_both) {
 
-			graph.mergeVertex(src);
-			Edge* ne = graph.mergeVertex(tar);
+			if constexpr (Graph::Graph_traits::historic) {
+				graph.history().start_group();
+			}
+
+			graph.merge_vertex(src);
+			Edge_handle ne = graph.merge_vertex(tar);
+
+			if constexpr (Graph::Graph_traits::historic) {
+				graph.history().end_group();
+			}
 
 			// insert the one new edge
 			sqt.insert(ne);
 
 			// update it and its neighbors, if applicable
 			update(ne);
-			if (ne->getSource()->degree() == 2) {
-				update(ne->previous());
+			if (ne->source()->degree() == 2) {
+				update(ne->prev());
 			}
-			if (ne->getTarget()->degree() == 2) {
+			if (ne->target()->degree() == 2) {
 				update(ne->next());
 			}
 		}
 		else {
 
-			// NB: edata will be erased on removing vertex b, hence, we need a local copy
-			Point<Kernel> pt = edata.point;
-
 			// perform the collapse
-			graph.mergeVertex(src);
-			graph.shiftVertex(tar, pt);
+			Vertex_handle v = graph.collapse_edge(e, edata.point);
 
 			// insert the two new edges
-			sqt.insert(tar->incoming());
-			sqt.insert(tar->outgoing());
+			sqt.insert(v->incoming());
+			sqt.insert(v->outgoing());
 
 			// update them and their neighbors, if applicable
-			update(tar->incoming());
-			update(tar->outgoing());
+			update(v->incoming());
+			update(v->outgoing());
 
-			if (tar->previous()->degree() == 2) {
-				update(tar->previous()->incoming());
+			if (v->prev()->degree() == 2) {
+				update(v->prev()->incoming());
 			}
-			if (tar->next()->degree() == 2) {
-				update(tar->next()->outgoing());
+			if (v->next()->degree() == 2) {
+				update(v->next()->outgoing());
 			}
-		}
-
-		if constexpr (ModifiableGraphWithHistory<MG>) {
-			graph.endBatch();
 		}
 	}
 
-	template <class MG, class ECT> requires detail::ECSetup<MG, ECT>
-	bool EdgeCollapse<MG, ECT>::step() {
-		if constexpr (ModifiableGraphWithHistory<MG>) {
-			assert(graph.atPresent());
+	template <detail::ECTraits ECT>
+	bool EdgeCollapse<ECT>::step() {
+		if constexpr (Graph::Graph_traits::historic) {
+			assert(!graph.history().can_redo());
 		}
 
-		Edge* e = findNextStep();
+		Edge_handle e = findNextStep();
 		if (e == nullptr) {
 			return false;
 		}
@@ -424,14 +422,14 @@ namespace cartocrow::simplification {
 		return true;
 	}
 
-	template <typename G>
-	void KronenfeldEtAlTraits<G>::determineCollapse(typename G::Edge* e) {
+	template <typename G, bool A>
+	void KronenfeldEtAlTraits<G,A>::determine_collapse(typename G::Edge_handle e) {
 		auto& edata = e->data(); // NB: this needs to be the handle, otherwise it doesn't update... (which is fun, because data() already returns a handle...)
 
-		Point<Kernel> a = e->previous()->getSource()->getPoint();
-		Point<Kernel> b = e->getSource()->getPoint();
-		Point<Kernel> c = e->getTarget()->getPoint();
-		Point<Kernel> d = e->next()->getTarget()->getPoint();
+		Point<Kernel> a = e->prev()->source()->point();
+		Point<Kernel> b = e->source()->point();
+		Point<Kernel> c = e->target()->point();
+		Point<Kernel> d = e->next()->target()->point();
 
 		bool abc = CGAL::collinear(a, b, c);
 		bool bcd = CGAL::collinear(b, c, d);
@@ -507,7 +505,6 @@ namespace cartocrow::simplification {
 
 			edata.T1 = Triangle<Kernel>(a, b, pt);
 			edata.T2 = Triangle<Kernel>(c, d, pt);
-
 		}
 		else {
 			edata.erase_both = false;
@@ -548,6 +545,10 @@ namespace cartocrow::simplification {
 
 				edata.T1 = Triangle<Kernel>(a, b, is);
 				edata.T2 = Triangle<Kernel>(c, is, edata.point);
+			}
+			
+			if constexpr (A) {
+				edata.point = convert_kernel<Kernel>(approximate(edata.point));
 			}
 		}
 

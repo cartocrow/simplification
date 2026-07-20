@@ -13,79 +13,53 @@
 namespace cartocrow::simplification {
 
 	namespace detail {
-		template <class MG, class ECT>
-		concept ECSetup = requires(MG::Edge * e) {
-			requires ModifiableGraph<MG>;
 
-			requires std::same_as<typename MG::Kernel, typename ECT::Kernel>;
+		template<bool H>
+		using ECGraphTraits = DecomposedGraph<H, std::monostate>;
 
-		{
-			e->data().cost
-		} -> std::same_as<Number<typename MG::Kernel>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
+		template<typename K, bool H>
+		struct ECData;
 
-		{
-			e->data().blocked_by
-		} -> std::same_as<std::vector<typename MG::Edge*>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
+		template<class G>
+		struct ECTraitsBase;
 
-		{
-			e->data().blocking
-		} -> std::same_as<std::vector<typename MG::Edge*>&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
+		template <class ECT>
+		concept ECTraits = requires(typename ECT::Graph::Edge_handle e) {
 
-		{
-			e->data().qid
-		} -> std::same_as<int&>; // c++ shenanigans: the expression is still a handle, even if it's declared as a nonhandle.
+			{ ECT::data(e) } -> std::same_as<ECData<typename ECT::Graph::Kernel, ECT::Graph::Graph_traits::historic>&>;
+			{ ECT::determine_collapse(e) };
 
-
-		{
-			ECT::determineCollapse(e)
 		};
-		};
-
-		template <typename K> struct ECData;
-		template <typename K> struct HECData;
-
-		template<typename K>
-		using HECGraph = StraightGraph<std::monostate, HECData<K>, K>;
 	}
 
-	/// <summary>
-	/// Graph type that can be used with the EdgeCollapse implementation. This variant is oblivious: changes made to the graph are not recoverable.
-	/// </summary>
-	/// <typeparam name="K">Desired CGAL kernel</typeparam>
-	template<typename K>
-	using EdgeCollapseGraph = StraightGraph<std::monostate, detail::ECData<K>, K>;
+	template<typename K, bool H>
+	using EdgeCollapseGraph = Straight_graph_2<std::monostate, detail::ECData<K, H>, K, detail::ECGraphTraits<H>>;
 
-	/// <summary>
-	/// Graph type that can be used with the EdgeCollapse implementation. This variant is historic: changes made to the graph can be undone and redone to retrieve intermediate steps.
-	/// </summary>
-	/// <typeparam name="K">Desired CGAL kernel</typeparam>
-	template<typename K>
-	using HistoricEdgeCollapseGraph = HistoricGraph<detail::HECGraph<K>>;
-
-
-	template <class MG, class ECT> requires detail::ECSetup<MG, ECT> class EdgeCollapse {
+	template <detail::ECTraits ECT> class EdgeCollapse {
 	public:
-		using Vertex = MG::Vertex;
-		using Edge = MG::Edge;
-		using Kernel = MG::Kernel;
-		using VertexTree = VertexQuadTree<MG>;
-		using EdgeTree = EdgeQuadTree<MG>;
+		using Graph = ECT::Graph;
+		using Vertex_handle = Graph::Vertex_handle;
+		using Edge_handle = Graph::Edge_handle;
+		using Kernel = Graph::Kernel;
+		using VertexTree = VertexQuadTree<Graph>;
+		using EdgeTree = EdgeQuadTree<Graph>;
 
 	private:
-		MG& graph;
+		using Queue = cartocrow::data_structures::IndexedPriorityQueue<GraphQueueTraits<Edge_handle, Kernel>>;
+
+		Graph& graph;
 		EdgeTree& sqt;
 		VertexTree& pqt;
-		cartocrow::data_structures::IndexedPriorityQueue<GraphQueueTraits<Edge, Kernel>> queue;
+		Queue queue;
 
-		void update(Edge* e);
-		bool blocks(Edge* edge, Edge* collapse);
+		void update(Edge_handle e);
+		bool blocks(Edge_handle edge, Edge_handle collapse);
 		bool validateState();
 
-		Edge* findNextStep();
-		void performStep(Edge* e);
+		Edge_handle findNextStep();
+		void performStep(Edge_handle e);
 	public:
-		EdgeCollapse(MG& g, EdgeTree& sqt, VertexTree& pqt);
-		~EdgeCollapse();
+		EdgeCollapse(Graph& g, EdgeTree& sqt, VertexTree& pqt);
 
 		void initialize(bool initSQT, bool initPQT);
 		bool run(std::optional<std::function<bool(int,Number<Kernel>)>> stop = std::nullopt);
@@ -94,13 +68,13 @@ namespace cartocrow::simplification {
 	};
 
 
-	template <typename G> struct KronenfeldEtAlTraits {
+	template <typename G, bool A> struct KronenfeldEtAlTraits : detail::ECTraitsBase<G> {
 		using Kernel = G::Kernel;
 
-		static void determineCollapse(typename G::Edge* e);
+		static void determine_collapse(typename G::Edge_handle e);
 	};
 
-	template <typename G> using KronenfeldEtAl = EdgeCollapse<G, KronenfeldEtAlTraits<G>>;
+	template <typename G> using KronenfeldEtAl = EdgeCollapse<KronenfeldEtAlTraits<G, false>>;
 
 } // namespace cartocrow::simplification
 

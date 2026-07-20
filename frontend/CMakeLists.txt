@@ -7,6 +7,7 @@ set(SOURCES
     simplification_algorithm.cpp
     smoother.cpp
     vw.cpp
+    ksbb.cpp
 )
 add_executable(simplification ${SOURCES})
 target_link_libraries(
