@@ -30,22 +30,22 @@ namespace cartocrow::simplification {
 			DEG_THREE_ALIGNED
 		};
 
-		template<ModifiableGraph MG> struct BaseMove {
+		template<class G> struct BaseMove {
 
-			MG::Edge* edge;
+			G::Edge_handle edge;
 
-			Number<typename MG::Kernel> cost;
-			int qid;
+			Number<typename G::Kernel> cost;
+			int queue_index;
 
 			bool blocked_by_degzero;
-			std::vector<typename MG::Edge*> blocked_by;
+			std::vector<typename G::Edge_handle> blocked_by;
 		};
 
-		template<ModifiableGraph MG> struct SingleMove : public BaseMove<MG> {
+		template<class G> struct SingleMove : public BaseMove<G> {
 
 			using K = MG::Kernel;
-			using Vertex = MG::Vertex;
-			using Edge = MG::Edge;
+			using Vertex_handle = G::Vertex_handle;
+			using Edge_handle = G::Edge_handle;
 
 			bool left;
 			enum VertexType src_type, tar_type;
@@ -329,48 +329,40 @@ namespace cartocrow::simplification {
 			}
 		};
 
-		template<ModifiableGraph MG> struct ComboMove : public BaseMove<MG> {
+		template<class G> struct ComboMove : public BaseMove<G> {
 
-			using K = MG::Kernel;
-			using Vertex = MG::Vertex;
-			using Edge = MG::Edge;
+			using K = G::Kernel;
+			using Vertex_handle = G::Vertex_handle;
+			using Edge_handle = G::Edge_handle;
 
 			Polygon<K> swept_prev;
 			Polygon<K> swept_next;
 		};
 
 
-		template<ModifiableGraph MG> struct EMBase {
+		template<class G> struct EMData {
 
-			SingleMove<MG> left, right;
-			ComboMove<MG> combo;
-			std::vector<BaseMove<MG>*> blocking;
+			SingleMove<G> left, right;
+			ComboMove<G> combo;
+			std::vector<BaseMove<G>*> blocking;
 		};
 
-		template <typename K> struct EMData : public EMBase<typename EdgeMoveGraph<K>> {
-
-		};
-
-		template <typename K> struct HEMData : public EMBase<typename HEMGraph<K>> {
-			Operation<HEMGraph<K>>* hist = nullptr;
-		};
-
-		template<ModifiableGraph MG>
+		template<class G>
 		struct MoveQueueTraits {
 
-			using Element = BaseMove<MG>;
+			using Element = BaseMove<G>*;
 
-			static void setIndex(Element* m, int id) {
-				m->qid = id;
+			static void setIndex(Element m, int id) {
+				m->queue_index = id;
 			}
 
-			static int getIndex(Element* m) {
-				return m->qid;
+			static int getIndex(Element m) {
+				return m->queue_index;
 			}
 
 			static int compare(Element* a, Element* b) {
-				Number<MG::Kernel> ac = a->cost;
-				Number<MG::Kernel> bc = b->cost;
+				Number<G::Kernel> ac = a->cost;
+				Number<G::Kernel> bc = b->cost;
 				if (ac < bc) {
 					return -1;
 				}

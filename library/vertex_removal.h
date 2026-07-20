@@ -6,9 +6,6 @@
 #include <cartocrow/data_structures/graph_traits_2.h>
 
 #include "vertex_quad_tree.h"
-#include "straight_graph.h"
-#include "modifiable_graph.h"
-#include "historic_graph.h"
 #include "common.h"
 
 namespace cartocrow::simplification {

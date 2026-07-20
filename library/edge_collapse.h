@@ -5,9 +5,6 @@
 
 #include "vertex_quad_tree.h"
 #include "edge_quad_tree.h"
-#include "straight_graph.h"
-#include "modifiable_graph.h"
-#include "historic_graph.h"
 #include "common.h"
 
 namespace cartocrow::simplification {

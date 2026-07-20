@@ -2,7 +2,6 @@
 
 #include <filesystem>
 #include <cartocrow/core/cubic_bezier.h>
-#include "library/straight_graph.h"
 #include "region_set.h"
 #include "simplification_algorithm.h"
 

@@ -1,34 +1,31 @@
 #pragma once
 
+#include <cartocrow/data_structures/indexed_priority_queue>
+#include <cartocrow/data_structures/graph_2>
+#include <cartocrow/data_structures/graph_2_traits>
+
+#include "vertex_quad_tree.h"
+#include "edge_quad_tree.h"
+
 namespace cartocrow::simplification {
 
 	namespace detail {
 
-		template<ModifiableGraph MG> struct BaseMove;
-		template<ModifiableGraph MG> struct SingleMove;
-		template<ModifiableGraph MG> struct ComboMove;
+		template<bool H>
+		using EMGraphTraits = CustomGraphTraits<true, true, false, std::monostate>;
 
-		template <class MG, class EMT>
-		concept EMSetup = requires(MG::Edge * e, BaseMove<MG>&m, SingleMove<MG>&sm, ComboMove<MG>&cm) {
-			requires ModifiableGraph<MG>;
+		template<class G> struct BaseMove;
+		template<class G> struct SingleMove;
+		template<class G> struct ComboMove;
 
-			requires std::same_as<typename MG::Kernel, typename EMT::Kernel>;
+		template <class G> struct EMData;
 
+		template <class EMT>
+		concept EMTraits = requires(typename EMT::Graph::Edge_handle e, SingleMove<typename EMT::Graph>&sm, ComboMove<typename EMT::Graph>& cm) {
+	
 		{
-			e->data().left
-		} -> std::same_as<SingleMove<MG>&>;
-
-		{
-			e->data().right
-		} -> std::same_as<SingleMove<MG>&>;
-
-		{
-			e->data().combo
-		} -> std::same_as<ComboMove<MG>&>;
-
-		{
-			e->data().blocking
-		} -> std::same_as<std::vector<BaseMove<MG>*>&>;
+			EMT::data(e)
+		} -> std::same_as<EMData<EMT::Graph>>;
 
 		{
 			EMT::determineSingleCost(sm)
@@ -40,50 +37,38 @@ namespace cartocrow::simplification {
 
 		};
 
-		template <typename K> struct EMData;
-		template <typename K> struct HEMData;
-
-		template<typename K>
-		using HEMGraph = StraightGraph<std::monostate, HEMData<K>, K>;
-
-		template<ModifiableGraph MG>
+		template<class G>
 		struct MoveQueueTraits;
 	}
 
-	/// <summary>
-	/// Graph type that can be used with the EdgeCollapse implementation. This variant is oblivious: changes made to the graph are not recoverable.
-	/// </summary>
-	/// <typeparam name="K">Desired CGAL kernel</typeparam>
-	template<typename K>
-	using EdgeMoveGraph = StraightGraph<std::monostate, detail::EMData<K>, K>;
+	template<typename K, bool H>
+	using EdgeMoveGraph = straight_graph_2<std::monostate, detail::EMData<K>, K, EMGraphTraits<H>>;
 
-	/// <summary>
-	/// Graph type that can be used with the EdgeCollapse implementation. This variant is historic: changes made to the graph can be undone and redone to retrieve intermediate steps.
-	/// </summary>
-	/// <typeparam name="K">Desired CGAL kernel</typeparam>
-	template<typename K>
-	using HistoricEdgeMoveGraph = HistoricGraph<detail::HEMGraph<K>>;
-
-	template <class MG, class EMT> requires detail::EMSetup<MG, EMT> class EdgeMove {
+	template <EMTraits EMT> class EdgeMove {
 	public:
-		using Vertex = MG::Vertex;
-		using Edge = MG::Edge;
-		using Kernel = MG::Kernel;
+		using Graph = EMT::Graph;
+		using Vertex_handle = Graph::Vertex_handle;
+		using Edge_handle = Graph::Edge_handle;
+		using Kernel = Graph::Kernel;
+		using VertexTree = VertexQuadTree<Graph>;
+		using EdgeTree = EdgeQuadTree<Graph>;
+
 	private:
-		using Move = detail::BaseMove<MG>;
-		using Single = detail::SingleMove<MG>;
-		using Combo = detail::ComboMove<MG>;
+		using Move = detail::BaseMove<Graph>;
+		using Single = detail::SingleMove<Graph>;
+		using Combo = detail::ComboMove<Graph>;
+		using Queue = cartocrow::data_structures::IndexedPriorityQueue<detail::MoveQueueTraits<Graph>>;
 
-		MG& graph;
-		SegmentQuadTree<Edge, Kernel>& sqt;
-		PointQuadTree<Vertex, Kernel>& pqt;
-		IndexedPriorityQueue<detail::MoveQueueTraits<MG>> queue;
+		Graph& graph;
+		EdgeTree& sqt;
+		VertexTree& pqt;
+		Queue queue;
 
-		void update(Edge* e);
-		bool blocks(Edge& edge, Move& move);
+		void update(Edge_handle e);
+		bool blocks(Edge_handle edge, Move& move);
 
 	public:
-		EdgeMove(MG& g, SegmentQuadTree<Edge, Kernel>& sqt, PointQuadTree<Vertex, Kernel>& pqt);
+		EdgeMove(Graph& g, EdgeQuadTree& sqt, VertexQuadTree& pqt);
 		~EdgeMove();
 
 		void initialize(bool initSQT, bool initPQT);
