@@ -10,8 +10,7 @@
 
 #include "library/utils.h"
 
-//#include "vw.h"
-#include "vw_inexact.h"
+#include "vw.h"
 //#include "ksbb.h"
 //#include "ksbb_inexact.h"
 #include "graph_painter.h"
@@ -525,7 +524,7 @@ void SimplificationGUI::addSettingsTab() {
 SimplificationGUI::SimplificationGUI() {
 	setWindowTitle("Simplification");
 
-	//algorithms.push_back(&VWSimplifier::getInstance());
+	algorithms.push_back(&VWSimplifier::getInstance());
 	algorithms.push_back(&VWInexactSimplifier::getInstance());
 	//algorithms.push_back(&KSBBSimplifier::getInstance());
 	//algorithms.push_back(&KSBBInexactSimplifier::getInstance());

@@ -6,7 +6,7 @@
 using namespace cartocrow;
 
 // extern template?
-using SmoothGraph = Straight_graph_2<std::monostate, std::monostate, Inexact, DecomposedGraph<false, std::monostate>>;;
+using SmoothGraph = Straight_graph_2<std::monostate, std::monostate, Inexact, DecomposedGraph<false, std::monostate>>;
 
 void smooth(SmoothGraph* graph, const Number<Inexact> radius, const int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress);
 

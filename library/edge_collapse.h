@@ -78,7 +78,7 @@ namespace cartocrow::simplification {
 		cartocrow::data_structures::IndexedPriorityQueue<GraphQueueTraits<Edge, Kernel>> queue;
 
 		void update(Edge* e);
-		bool blocks(Edge& edge, Edge* collapse);
+		bool blocks(Edge* edge, Edge* collapse);
 		bool validateState();
 
 		Edge* findNextStep();
