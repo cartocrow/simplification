@@ -9,6 +9,7 @@ set(SOURCES
     vw.cpp
     ksbb.cpp
     restrictor.cpp
+    bmrs.cpp
 )
 add_executable(simplification ${SOURCES})
 target_link_libraries(

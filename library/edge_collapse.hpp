@@ -4,6 +4,7 @@
 // -----------------------------------------------------------------------------
 
 #include "utils.h"
+#include "precision_safe_tests.h"
 
 namespace cartocrow::simplification {
 
@@ -19,8 +20,8 @@ namespace cartocrow::simplification {
 
 			// algorithm 
 			bool blocked_by_degzero;
-			std::vector<typename EdgeCollapseGraph<K,H>::Edge_handle> blocked_by;
-			std::vector<typename EdgeCollapseGraph<K,H>::Edge_handle> blocking;
+			std::vector<typename EdgeCollapseGraph<K, H>::Edge_handle> blocked_by;
+			std::vector<typename EdgeCollapseGraph<K, H>::Edge_handle> blocking;
 			int queue_index;
 
 		};
@@ -84,43 +85,35 @@ namespace cartocrow::simplification {
 				// certainly no intersection
 				return false;
 			}
-			
-			if constexpr (std::is_same<Inexact, Kernel>::value) {
-				// running in inexact mode: 
-				// -- perform approximate point equality tests
-				// -- check segments originating from shared endpoints
 
-				auto close = [](const Point<Kernel>& a, const Point<Kernel>& b) {
-					return std::abs(a.x() - b.x()) < M_EPSILON
-						&& std::abs(a.y() - b.y()) < M_EPSILON;
-					};
 
-				if (Point<Kernel>* pt = std::get_if<Point<Kernel>>(&*is)) {
-
-					// make sure it's not the common point
-					if (source_shared && close(*pt, edge->source()->point())) {
-						return false;
-					}
-					if (target_shared && close(*pt, edge->target()->point())) {
-						return false;
-					}
+			if (Point<Kernel>* pt = std::get_if<Point<Kernel>>(&*is)) {
+				// make sure it's not the common point
+				if (source_shared && safe_test::same_point(*pt, edge->source()->point())) {
+					return false;
 				}
-				else {
-					// running in inexact mode: may need to account for the intersection being a tiny segment near the start vertex
+				if (target_shared && safe_test::same_point(*pt, edge->target()->point())) {
+					return false;
+				}
 
-					Segment<Kernel>* ls = std::get_if<Segment<Kernel>>(&*is);
+				return true;
+			}
+			else if constexpr (std::is_same<Inexact, Kernel>::value) {
 
-					if (source_shared 
-						&& close(ls->source(), edge->source()->point())
-						&& close(ls->target(), edge->source()->point())) {
-						return false;
-					}
+				// running in inexact mode: may need to account for the intersection being a tiny segment near the start vertex
 
-					if (target_shared
-						&& close(ls->source(), edge->target()->point())
-						&& close(ls->target(), edge->target()->point())) {
-						return false;
-					}
+				Segment<Kernel>* ls = std::get_if<Segment<Kernel>>(&*is);
+
+				if (source_shared
+					&& safe_test::same_point(ls->source(), edge->source()->point())
+					&& safe_test::same_point(ls->target(), edge->source()->point())) {
+					return false;
+				}
+
+				if (target_shared
+					&& safe_test::same_point(ls->source(), edge->target()->point())
+					&& safe_test::same_point(ls->target(), edge->target()->point())) {
+					return false;
 				}
 
 				// intersection doesnt reflect a shared endpoint
@@ -128,20 +121,7 @@ namespace cartocrow::simplification {
 			}
 			else {
 				// running in exact mode: 
-				// -- direct point equality tests 
-				// -- segments always intersect
-
-				if (Point<Kernel>* pt = std::get_if<Point<Kernel>>(&*is)) {
-					// make sure it's not the common point
-					if (source_shared && *pt == edge->source()->point()) {
-						return false;
-					}
-					if (target_shared && *pt == edge->target()->point()) {
-						return false;
-					}
-				}
-
-				// segment overlap, or the point is not a shared endpoint
+				// segments always intersect
 				return true;
 			}
 			};
@@ -165,7 +145,7 @@ namespace cartocrow::simplification {
 
 	template <detail::ECTraits ECT>
 	void EdgeCollapse<ECT>::initialize(bool initSQT, bool initPQT) {
-		
+
 		if (initSQT) {
 			sqt.clear();
 			for (Edge_handle e : graph.edges()) {
@@ -255,9 +235,7 @@ namespace cartocrow::simplification {
 	template <detail::ECTraits ECT>
 	ECT::Graph::Edge_handle EdgeCollapse<ECT>::findNextStep() {
 
-		if constexpr (Graph::Graph_traits::historic) {
-			assert(!graph.history().can_redo());
-		}
+		assert(graph.can_perform_operation());
 
 		while (!queue.empty()) {
 			Edge_handle e = queue.peek();
@@ -308,7 +286,9 @@ namespace cartocrow::simplification {
 
 	template <detail::ECTraits ECT>
 	void EdgeCollapse<ECT>::performStep(Edge_handle e) {
-		
+
+
+		assert(graph.can_perform_operation());
 		assert(queue.peek() == e);
 
 		queue.pop();
@@ -355,23 +335,19 @@ namespace cartocrow::simplification {
 		}
 		ECT::data(next).blocking.clear();
 
-		
+
 
 		Vertex_handle src = e->source();
 		Vertex_handle tar = e->target();
 
 		if (edata.erase_both) {
 
-			if constexpr (Graph::Graph_traits::historic) {
-				graph.history().start_group();
-			}
+			graph.start_operation_group();
 
 			graph.merge_vertex(src);
 			Edge_handle ne = graph.merge_vertex(tar);
 
-			if constexpr (Graph::Graph_traits::historic) {
-				graph.history().end_group();
-			}
+			graph.end_operation_group();
 
 			// insert the one new edge
 			sqt.insert(ne);
@@ -409,9 +385,8 @@ namespace cartocrow::simplification {
 
 	template <detail::ECTraits ECT>
 	bool EdgeCollapse<ECT>::step() {
-		if constexpr (Graph::Graph_traits::historic) {
-			assert(!graph.history().can_redo());
-		}
+
+		assert(graph.can_perform_operation());
 
 		Edge_handle e = findNextStep();
 		if (e == nullptr) {
@@ -423,7 +398,7 @@ namespace cartocrow::simplification {
 	}
 
 	template <typename G, bool A>
-	void KronenfeldEtAlTraits<G,A>::determine_collapse(typename G::Edge_handle e) {
+	void KronenfeldEtAlTraits<G, A>::determine_collapse(typename G::Edge_handle e) {
 		auto& edata = e->data(); // NB: this needs to be the handle, otherwise it doesn't update... (which is fun, because data() already returns a handle...)
 
 		Point<Kernel> a = e->prev()->source()->point();
@@ -431,20 +406,8 @@ namespace cartocrow::simplification {
 		Point<Kernel> c = e->target()->point();
 		Point<Kernel> d = e->next()->target()->point();
 
-		bool abc;
-		if constexpr (std::is_same<Kernel, Inexact>::value) {
-			abc = CGAL::squared_distance(Line<Inexact>(a,c), b) < M_EPSILON;
-		}
-		else {
-			abc = CGAL::collinear(a, b, c);
-		}
-		bool bcd;
-		if constexpr (std::is_same<Kernel, Inexact>::value) {
-			bcd = CGAL::squared_distance(Line<Inexact>(b, d), c) < M_EPSILON;
-		}
-		else {
-			bcd = CGAL::collinear(b, c, d);
-		}
+		bool abc = safe_test::collinear(a, b, c);
+		bool bcd = safe_test::collinear(a, b, c);
 
 		if (abc && bcd) {
 			edata.erase_both = true;
@@ -496,13 +459,7 @@ namespace cartocrow::simplification {
 		CGAL::Aff_transformation_2<Kernel> t(CGAL::TRANSLATION, perpv);
 		Line<Kernel> arealine = ad.transform(t);
 
-		bool zero_area;
-		if constexpr (std::is_same<Kernel, Inexact>::value) {
-			zero_area = CGAL::squared_distance(ad, arealine.point()) < M_EPSILON;
-		}
-		else {
-			zero_area = ad.has_on_boundary(arealine.point());
-		}
+		bool zero_area = safe_test::point_on_line(arealine.point(), ad);
 
 		if (zero_area) {
 
@@ -534,12 +491,6 @@ namespace cartocrow::simplification {
 					ad.has_on_positive_side(b) == ad.has_on_positive_side(arealine.point());
 			}
 
-			std::cout << "determine" << std::endl;
-			std::cout << "a" << a << std::endl;
-			std::cout << "b" << b << std::endl;
-			std::cout << "c" << c << std::endl;
-			std::cout << "d" << d << std::endl;
-
 			// configure type
 			if (ab_determines_shape) {
 
@@ -565,7 +516,7 @@ namespace cartocrow::simplification {
 				edata.T1 = Triangle<Kernel>(a, b, is);
 				edata.T2 = Triangle<Kernel>(c, is, edata.point);
 			}
-			
+
 			if constexpr (A) {
 				edata.point = convert_kernel<Kernel>(approximate(edata.point));
 			}

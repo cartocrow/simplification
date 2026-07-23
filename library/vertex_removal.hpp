@@ -66,6 +66,8 @@ namespace cartocrow::simplification {
 	template <detail::VRTraits VRT>
 	VRT::Graph::Vertex_handle VertexRemoval<VRT>::findNextStep() {
 
+		assert(graph.can_perform_operation());
+
 		while (!queue.empty()) {
 			Vertex_handle v = queue.peek();
 
@@ -105,6 +107,7 @@ namespace cartocrow::simplification {
 	template <detail::VRTraits VRT>
 	void VertexRemoval<VRT>::performStep(Vertex_handle v) {
 
+		assert(graph.can_perform_operation());
 		assert(queue.peek() == v);
 
 		queue.pop();
@@ -141,6 +144,8 @@ namespace cartocrow::simplification {
 
 	template <detail::VRTraits VRT>
 	bool VertexRemoval<VRT>::step() {
+
+		assert(graph.can_perform_operation());
 
 		Vertex_handle v = findNextStep();
 		if (v == nullptr) {

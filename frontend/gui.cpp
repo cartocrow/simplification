@@ -12,6 +12,7 @@
 
 #include "vw.h"
 #include "ksbb.h"
+#include "bmrs.h"
 #include "graph_painter.h"
 #include "ipe_reader.h"
 #include "read_graph_gdal.h"
@@ -265,7 +266,7 @@ void SimplificationGUI::addSimplifyTab() {
 
 	layout->addWidget(new QLabel("<h3>Simplify</h3>"));
 
-	int default_alg = 3; // inexact KSBB
+	int default_alg = m_settings.getInteger("selected_algorithm",0);
 	algorithmSelector = new QComboBox();
 	layout->addWidget(algorithmSelector);
 	for (SimplificationAlgorithm* alg : algorithms) {
@@ -398,6 +399,7 @@ void SimplificationGUI::addSimplifyTab() {
 	connect(algorithmSelector, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), [this](int value) {
 
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		m_settings.setInteger("selected_algorithm", algorithmSelector->currentIndex());
 		int mc, c;
 		if (alg->hasResult()) {
 			mc = alg->getMaximumComplexity();
@@ -532,6 +534,8 @@ SimplificationGUI::SimplificationGUI() {
 	algorithms.push_back(&KSBBSimplifier::getInstance());
 	algorithms.push_back(&KSBBInexactSimplifier::getInstance());
 	algorithms.push_back(&KSBBSemiExactSimplifier::getInstance());
+	algorithms.push_back(&BMRSSimplifier::getInstance());
+	algorithms.push_back(&BMRSInexactSimplifier::getInstance());
 
 	auto* dockWidget = new QDockWidget();
 	addDockWidget(Qt::LeftDockWidgetArea, dockWidget);

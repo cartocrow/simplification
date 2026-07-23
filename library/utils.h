@@ -1,8 +1,30 @@
 #pragma once
 
 #include <cartocrow/core/core.h>
+#include "precision_safe_tests.h"
 
 namespace cartocrow::simplification::utils {
+
+
+	template <typename K>
+	Rectangle<K> boxOf(const Polygon<K>& p) {
+		auto v = p.vertices_begin();
+		Number<K> left = v->x();
+		Number<K> right = v->x();
+		Number<K> bottom = v->y();
+		Number<K> top = v->y();
+
+		++v;
+		while (v != p.vertices_end()) {
+			left = CGAL::min(left, v->x());
+			right = CGAL::max(right, v->x());
+			bottom = CGAL::min(bottom, v->x());
+			top = CGAL::max(top, v->x());
+			++v;
+		}
+
+		return Rectangle<K>(left, bottom, right, top);
+	}
 
 	template <typename K>
 	Rectangle<K> boxOf(const Point<K>& a, const Point<K>& b, const Point<K>& c) {
@@ -199,6 +221,34 @@ namespace cartocrow::simplification::utils {
 
 		}
 		assert(false);
+	}
 
+	inline Number<Inexact> solveQuadraticEquationForSmallestPositive(Number<Inexact> a, Number<Inexact> b, Number<Inexact> c) {
+		if (safe_test::close(a, 0)) {
+			// b x + c = 0 --> x = -c/b
+			return -c / b;
+		}
+		else {
+			Number<Inexact> d = b * b - 4 * a * c;
+			if (d < -M_EPSILON) {
+				return -1;
+			}
+			else if (d < M_EPSILON) {
+				return -b / (2 * a);
+			}
+			else {
+				Number<Inexact> s1 = (-b + std::sqrt(d)) / (2 * a);
+				Number<Inexact> s2 = (-b - std::sqrt(d)) / (2 * a);
+				if (s1 <= 0) {
+					return s2;
+				}
+				else if (s2 <= 0) {
+					return s1;
+				}
+				else {
+					return CGAL::min(s1, s2);
+				}
+			}
+		}
 	}
 }

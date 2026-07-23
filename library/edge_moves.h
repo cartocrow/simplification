@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cartocrow/data_structures/indexed_priority_queue>
-#include <cartocrow/data_structures/graph_2>
-#include <cartocrow/data_structures/graph_2_traits>
+#include <cartocrow/data_structures/indexed_priority_queue.h>
+#include <cartocrow/data_structures/graph_2.h>
+#include <cartocrow/data_structures/graph_traits_2.h>
 
 #include "vertex_quad_tree.h"
 #include "edge_quad_tree.h"
@@ -11,30 +11,32 @@ namespace cartocrow::simplification {
 
 	namespace detail {
 
-		template<bool H>
-		using EMGraphTraits = CustomGraphTraits<true, true, false, std::monostate>;
 
 		template<class G> struct BaseMove;
 		template<class G> struct SingleMove;
 		template<class G> struct ComboMove;
 
-		template <class G> struct EMData;
+		template <class K, bool H> struct EMData;
+		template <class K, bool H> struct EMPathData;
+
+		template<class K, bool H>
+		using EMGraphTraits = CustomGraphTraits<H, true, true, false, EMPathData<K, H>>;
 
 		template <class EMT>
-		concept EMTraits = requires(typename EMT::Graph::Edge_handle e, SingleMove<typename EMT::Graph>&sm, ComboMove<typename EMT::Graph>& cm) {
-	
-		{
-			EMT::data(e)
-		} -> std::same_as<EMData<EMT::Graph>>;
+		concept EMTraits = requires(typename EMT::Graph::Edge_handle e, typename EMT::Graph::Path_handle p, SingleMove<typename EMT::Graph>&sm, ComboMove<typename EMT::Graph>&cm) {
 
-		{
-			EMT::determineSingleCost(sm)
-		};
+			typename EMT::Graph;
 
-		{
-			EMT::determineComboCost(cm)
-		};
+			{
+				EMT::data(e)
+			} -> std::same_as<EMData<typename EMT::Kernel, EMT::Graph::Graph_traits::historic>&>;
 
+			{
+				EMT::data(p)
+			} -> std::same_as<EMPathData<typename EMT::Kernel, EMT::Graph::Graph_traits::historic>&>;
+
+			{ EMT::determineSingleCost(sm) } -> std::same_as< Number<typename EMT::Kernel>>;
+			{ EMT::determineComboCost(cm) } -> std::same_as< Number<typename EMT::Kernel>>;
 		};
 
 		template<class G>
@@ -42,9 +44,9 @@ namespace cartocrow::simplification {
 	}
 
 	template<typename K, bool H>
-	using EdgeMoveGraph = straight_graph_2<std::monostate, detail::EMData<K>, K, EMGraphTraits<H>>;
+	using EdgeMovesGraph = Straight_graph_2<std::monostate, detail::EMData<K, H>, K, detail::EMGraphTraits<K, H>>;
 
-	template <EMTraits EMT> class EdgeMove {
+	template <detail::EMTraits EMT> class EdgeMoves {
 	public:
 		using Graph = EMT::Graph;
 		using Vertex_handle = Graph::Vertex_handle;
@@ -54,10 +56,14 @@ namespace cartocrow::simplification {
 		using EdgeTree = EdgeQuadTree<Graph>;
 
 	private:
+		using Data = detail::EMData<Kernel, Graph::Graph_traits::historic>;
 		using Move = detail::BaseMove<Graph>;
 		using Single = detail::SingleMove<Graph>;
 		using Combo = detail::ComboMove<Graph>;
 		using Queue = cartocrow::data_structures::IndexedPriorityQueue<detail::MoveQueueTraits<Graph>>;
+		
+		using PairedSingles = std::pair<Single*, Single*>;
+		using Operation = std::variant<Combo*, PairedSingles>;
 
 		Graph& graph;
 		EdgeTree& sqt;
@@ -67,25 +73,35 @@ namespace cartocrow::simplification {
 		void update(Edge_handle e);
 		bool blocks(Edge_handle edge, Move& move);
 
+		std::optional<Operation> findNextStep();
+		void performStep(Single& contract, Single& compensate);
+		void performStep(Combo& combo);
+
 	public:
-		EdgeMove(Graph& g, EdgeQuadTree& sqt, VertexQuadTree& pqt);
-		~EdgeMove();
+		EdgeMoves(Graph& g, EdgeTree& sqt, VertexTree& pqt);
 
 		void initialize(bool initSQT, bool initPQT);
-		bool runToComplexity(int k);
+		bool run(std::optional<std::function<bool(int, Number<Kernel>)>> stop = std::nullopt);
 		bool step();
 	};
 
 
 	template <typename G> struct BuchinEtAlTraits {
-		using Kernel = G::Kernel;
+		using Graph = G;
+		using Kernel = Graph::Kernel;
 
-		static void determineSingleCost(detail::SingleMove<G>& sm);
+		static detail::EMData<Kernel, Graph::Graph_traits::historic>& data(typename Graph::Edge_handle e) {
+			return e->data();
+		}
+		static detail::EMPathData<Kernel, Graph::Graph_traits::historic>& data(typename Graph::Path_handle p) {
+			return p->data();
+		}
 
-		static void determineComboCost(detail::ComboMove<G>& cm);
+		static Number<Kernel> determineSingleCost(detail::SingleMove<Graph>& sm);
+		static Number<Kernel> determineComboCost(detail::ComboMove<Graph>& cm);
 	};
 
-	template <typename G> using BuchinEtAl = EdgeMove<G, BuchinEtAlTraits<G>>;
+	template <typename G> using BuchinEtAl = EdgeMoves<BuchinEtAlTraits<G>>;
 
 } // namespace cartocrow::simplification
 
