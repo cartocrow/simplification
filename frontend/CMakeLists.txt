@@ -1,6 +1,8 @@
 set(SOURCES
     gui.cpp
     main.cpp
+    commandline.cpp
+    cmd_arguments.cpp
     persistent_settings.cpp
     read_graph_gdal.cpp
     region_set.cpp

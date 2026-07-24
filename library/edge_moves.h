@@ -20,7 +20,7 @@ namespace cartocrow::simplification {
 		template <class K, bool H> struct EMPathData;
 
 		template<class K, bool H>
-		using EMGraphTraits = CustomGraphTraits<H, true, true, false, EMPathData<K, H>>;
+		using EMGraphTraits = CustomGraphTraits<H, true, true, true, EMPathData<K, H>>;
 
 		template <class EMT>
 		concept EMTraits = requires(typename EMT::Graph::Edge_handle e, typename EMT::Graph::Path_handle p, SingleMove<typename EMT::Graph>&sm, ComboMove<typename EMT::Graph>&cm) {
@@ -71,7 +71,11 @@ namespace cartocrow::simplification {
 		Queue queue;
 
 		void update(Edge_handle e);
-		bool blocks(Edge_handle edge, Move& move);
+		bool blocks(Edge_handle edge, Single& single);
+		bool blocks(Edge_handle edge, Combo& single);
+		bool test_topology(Single& single);
+		bool test_topology(Combo& combo);
+		Single* find_compensate_move(Single& contract);
 
 		std::optional<Operation> findNextStep();
 		void performStep(Single& contract, Single& compensate);

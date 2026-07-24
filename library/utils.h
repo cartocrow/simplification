@@ -27,6 +27,36 @@ namespace cartocrow::simplification::utils {
 	}
 
 	template <typename K>
+	Rectangle<K> boxOf(const std::vector<Point<K>>& p) {
+		auto v = p.begin();
+		Number<K> left = v->x();
+		Number<K> right = v->x();
+		Number<K> bottom = v->y();
+		Number<K> top = v->y();
+
+		++v;
+		while (v != p.end()) {
+			left = CGAL::min(left, v->x());
+			right = CGAL::max(right, v->x());
+			bottom = CGAL::min(bottom, v->x());
+			top = CGAL::max(top, v->x());
+			++v;
+		}
+
+		return Rectangle<K>(left, bottom, right, top);
+	}
+
+	template <typename K>
+	Rectangle<K> boxOf(const Rectangle<K>& a, const Rectangle<K>& b) {
+		Number<K> left = CGAL::min(a.xmin(), b.xmin());
+		Number<K> right = CGAL::max(a.xmax(), b.xmax());
+		Number<K> bottom = CGAL::min(a.ymin(), b.ymin());
+		Number<K> top = CGAL::max(a.ymax(), b.ymax());
+
+		return Rectangle<K>(left, bottom, right, top);
+	}
+
+	template <typename K>
 	Rectangle<K> boxOf(const Point<K>& a, const Point<K>& b, const Point<K>& c) {
 		Number<K> left = CGAL::min(a.x(), CGAL::min(b.x(), c.x()));
 		Number<K> right = CGAL::max(a.x(), CGAL::max(b.x(), c.x()));
@@ -50,39 +80,6 @@ namespace cartocrow::simplification::utils {
 			CGAL::max(T2[0].y(), CGAL::max(T2[1].y(), T2[2].y())));
 
 		return Rectangle<K>(left, bottom, right, top);
-	}
-
-	template<typename K>
-	Rectangle<K> boxOf(const std::vector<Point<K>>& pts) {
-
-		Number<K> left = 0, right = 0, bottom = 0, top = 0;
-
-		bool first = true;
-		for (Point<K> pt : pts) {
-			if (first) {
-				left = right = pt.x();
-				top = bottom = pt.y();
-				first = false;
-			}
-			else {
-				if (pt.x() < left) {
-					left = pt.x();
-				}
-				else if (pt.x() > right) {
-					right = pt.x();
-				}
-
-				if (pt.y() < bottom) {
-					bottom = pt.y();
-				}
-				else if (pt.y() > top) {
-					top = pt.y();
-				}
-			}
-		}
-
-		Rectangle<K> box(left, bottom, right, top);
-		return box;
 	}
 
 	template<typename K>

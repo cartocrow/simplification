@@ -65,7 +65,46 @@ namespace cartocrow::simplification {
 			}
 
 			bool contractable() {
-				return movable() && !contract_merges_highdegrees;
+				return movable() && !contract_merges_highdegrees && decrease_on_contract() > 0;
+			}
+
+			int increase_on_move() {
+				int inc = 0;
+				switch (src_type) {
+				case DEG_THREE_NO_SUPPORT:
+				case DEG_THREE_SUPPORT:
+				case DEG_THREE_ALIGNED:
+					inc++;
+					break;
+				}
+				switch (tar_type) {
+				case DEG_THREE_NO_SUPPORT:
+				case DEG_THREE_SUPPORT:
+				case DEG_THREE_ALIGNED:
+					inc++;
+					break;
+				}
+				return inc;
+			}
+
+			int decrease_on_contract() {
+				int dec = 0;
+				if (remove_next) {
+					dec++;
+				}
+				if (remove_self) {
+					dec++;
+				}
+				if (remove_previous) {
+					dec++;
+				}
+				if (merge_next) {
+					dec++;
+				}
+				if (merge_previous) {
+					dec++;
+				}
+				return dec - increase_on_move();
 			}
 
 			void update() {
@@ -762,7 +801,13 @@ namespace cartocrow::simplification {
 	}
 
 	template <detail::EMTraits EMT>
-	bool EdgeMoves<EMT>::blocks(Edge_handle e, Move& move) {
+	bool EdgeMoves<EMT>::blocks(Edge_handle e, Single& move) {
+		// TODO
+		return false;
+	}
+
+	template <detail::EMTraits EMT>
+	bool EdgeMoves<EMT>::blocks(Edge_handle e, Combo& move) {
 		// TODO
 		return false;
 	}
@@ -817,46 +862,162 @@ namespace cartocrow::simplification {
 	}
 
 	template <detail::EMTraits EMT>
+	bool EdgeMoves<EMT>::test_topology(Single& single) {
+		// test if its blocked
+		Rectangle<Kernel> rect = utils::boxOf(single.swept);
+
+		single.blocked_by_degzero = false;
+		pqt.findContained(rect, [&single](Vertex_handle b) {
+			if (!single.swept.has_on_unbounded_side(b->point())) {
+				single.blocked_by_degzero = true;
+			}
+			});
+
+		if (single.blocked_by_degzero)
+			return false;
+
+		sqt.findOverlapped(rect, [this, &single](Edge_handle b) {
+			if (blocks(b, single)) {
+				EMT::data(b).blocking.push_back(&single);
+				single.blocked_by.push_back(b);
+			}
+			});
+
+		return single.blocked_by.empty();
+	}
+
+	template <detail::EMTraits EMT>
+	bool EdgeMoves<EMT>::test_topology(Combo& combo) {
+		// test if its blocked
+		// TODO
+		//Rectangle<Kernel> rect = utils::boxOf(combo.prev_swept) + utils::boxOf(combo.next_swept);
+
+		//combo.blocked_by_degzero = false;
+		//pqt.findContained(rect, [&combo](Vertex_handle b) {
+		//	if (!combo.prev_swept.has_on_unbounded_side(b->point())
+		//		|| !combo.next_swept.has_on_unbounded_side(b->point())) {
+		//		combo.blocked_by_degzero = true;
+		//	}
+		//	});
+
+		//if (combo.blocked_by_degzero)
+		//	return false;
+
+		//sqt.findOverlapped(rect, [this, &combo](Edge_handle b) {
+		//	if (blocks(b, combo)) {
+		//		EMT::data(b).blocking.push_back(&combo);
+		//		combo.blocked_by.push_back(b);
+		//	}
+		//	});
+
+		return combo.blocked_by.empty();
+	}
+
+	template <detail::EMTraits EMT>
+	detail::SingleMove<typename EMT::Graph>* EdgeMoves<EMT>::find_compensate_move(Single& contract) {
+		// find compensating move
+		//auto safe_previous = [](Edge_handle e) {
+		//	if (e->source()->degree() == 2) {
+		//		return e->prev();
+		//	}
+		//	else {
+		//		return nullptr;
+		//	}
+		//	};
+		//auto safe_next = [](Edge_handle e) {
+		//	if (e->target()->degree() == 2) {
+		//		return e->next();
+		//	}
+		//	else {
+		//		return nullptr;
+		//	}
+		//	};
+
+		return nullptr; // TODO
+
+		//Edge_handle walkBck = safe_previous(contract->edge);
+		//if (walkBck != nullptr) {
+		//	walkBck = safe_previous(walkBck);
+		//}
+		//Edge_handle walkFwd = safe_next(contract->edge);
+		//if (walkFwd != nullptr) {
+		//	walkFwd = safe_next(walkFwd);
+		//}
+
+		//int reduc = contract->decrease_on_contract();
+
+		//// TODO: partial blocked...
+		//while (walkBck != nullptr || walkFwd != nullptr) {
+		//	if (walkBck != nullptr) {
+		//		Single* candidate = contract->left ? walkBck.right : walkBck.left;
+		//		if (!isBlocked(candidate) && candidate.canCompensateFor(contract, reduc)) {
+
+		//			testTopology(candidate);
+		//			if (!isBlocked(candidate)) {
+		//				return candidate;
+		//			}
+		//			else {
+		//				queue.remove(candidate);
+		//			}
+		//		}
+		//		else {
+		//			return candidate;
+		//		}
+		//	}
+		//	walkBck = safe_previous(walkBck);
+
+		//	if (walkBck == walkFwd) {
+		//		break;
+		//	}
+		//}
+
+		//if (walkFwd != null) {
+		//	EdgeMove candidate = contract.left ? walkFwd.right : walkFwd.left;
+		//	if (!isBlocked(candidate) && candidate.canCompensateFor(contract, reduc)) {
+
+		//		testTopology(candidate);
+		//		if (!isBlocked(candidate)) {
+		//			return candidate;
+		//		}
+		//		else {
+		//			queue.remove(candidate);
+		//		}
+		//	}
+		//	walkFwd = walkFwd.safeWalkEnd();
+
+		//	if (walkBck == walkFwd) {
+		//		break;
+		//	}
+		//}
+	}
+
+	template <detail::EMTraits EMT>
 	std::optional<std::variant<detail::ComboMove<typename EMT::Graph>*, std::pair<detail::SingleMove<typename EMT::Graph>*, detail::SingleMove<typename EMT::Graph>*>>>
 		EdgeMoves<EMT>::findNextStep() {
 
 		assert(graph.can_perform_operation());
 		while (!queue.empty()) {
-			Move* m = queue.peek();
+			Move* m = queue.pop();
 
 			if (Single* sm = dynamic_cast<Single*>(m)) {
 
-				// test if its blocked
-				Rectangle<Kernel> rect = utils::boxOf(sm->swept);
+				if (test_topology(*sm)) {
 
-				sm->blocked_by_degzero = false;
-				pqt.findContained(rect, [&sm](Vertex_handle b) {
-					if (!sm->swept.has_on_unbounded_side(b->point())) {
-						sm->blocked_by_degzero = true;
+					Single* compensate = find_compensate_move(*sm);
+					if (compensate != nullptr) {
+						return Operation(PairedSingles(sm, compensate));
 					}
-					});
-
-				if (!sm->blocked_by_degzero) {
-
-					sqt.findOverlapped(rect, [this, &sm](Edge_handle b) {
-						if (blocks(b, *sm)) {
-							EMT::data(b).blocking.push_back(sm);
-							sm->blocked_by.push_back(b);
-						}
-						});
-
-					if (sm->blocked_by.empty()) {
-						// safe operation
-						return Operation(PairedSingles(sm, nullptr));
+					else {
+						EMT::data(sm->edge->path()).add_waiting(sm);
 					}
 				}
-
-				// remove element from queue, it's blocked
-				queue.pop();
 			}
 			else {
-				Combo* combo = dynamic_cast<Combo*>(m);
-				return Operation(combo);
+				Combo* combo = static_cast<Combo*>(m);
+
+				if (test_topology(*combo)) {
+					return Operation(combo);
+				}
 			}
 		}
 
