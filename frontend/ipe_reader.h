@@ -26,7 +26,6 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 	std::vector<std::vector<Point<Kernel>>> lines;
 	std::vector<bool> closed;
 
-	int vs = 0;
 	std::string line;
 	std::vector<Point<Kernel>>* building = nullptr;
 	while (std::getline(filestream, line))
@@ -61,12 +60,7 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 					std::cout << "Unexpected path command: " << line << std::endl;
 				}
 				else {
-					building->push_back(Point<Kernel>(x, y));
-					vs++;
-					if (vs % 250000 == 0) {
-						std::cout << "#vtcs " << vs << std::endl;
-					}
-				
+					building->push_back(Point<Kernel>(x, y));				
 				}
 
 			}
@@ -78,10 +72,6 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 				}
 				else {
 					building->push_back(Point<Kernel>(x, y));
-					vs++;
-					if (vs % 250000 == 0) {
-						std::cout << "#vtcs " << vs << std::endl;
-					}
 				}
 			}
 			else if (line.ends_with("h")) {
@@ -100,14 +90,12 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 		return nullptr;
 	}
 
-	std::cout << "Computing bbox" << std::endl;
 	Rectangle<Kernel> box = utils::boxOf<Kernel>(lines[0]);
 	for (int i = 1; i < lines.size(); ++i) {
 		box = utils::boxOf(box, utils::boxOf<Kernel>(lines[i]));
 	}
 
 	// construct the graph
-	std::cout << "Making graph" << std::endl;
 	VertexQuadTree<Graph>* pqt = new VertexQuadTree<Graph>(box, depth);
 
 	for (int i = 0; i < lines.size(); i++) {
@@ -116,11 +104,6 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 		Vertex* first = nullptr;
 		for (int k = 0; k < lines[i].size(); k++) {
 			Point<Kernel>& point = lines[i][k];
-
-			vs--;
-			if (vs % 250000 == 0) {
-				std::cout << "#vtcs " << vs << std::endl;
-			}
 
 			Vertex* next = pqt->findElement(point, prec);
 			if (next == nullptr) {
@@ -140,7 +123,6 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 			graph.add_edge(prev, first);
 		}
 	}
-	std::cout << "Done" << std::endl;
 	return pqt;
 }
 
