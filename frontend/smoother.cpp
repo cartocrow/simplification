@@ -1,16 +1,18 @@
 #include "smoother.h"
 
+#include <cartocrow/data_structures/graph_map_2.h>
+
 void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
 
-	using Vertex = SmoothGraph::Vertex_handle;
-	using Edge = SmoothGraph::Edge_handle;
+	using Vertex_handle = SmoothGraph::Vertex_handle;
+	using Edge_handle = SmoothGraph::Edge_handle;
 	using Pt = Point<SmoothGraph::Kernel>;
 	using Vec = Vector<SmoothGraph::Kernel>;
 	using Num = Number<SmoothGraph::Kernel>;
 
 	size_t vtx_cnt = graph->number_of_vertices();
 
-	std::vector<Num> rads(vtx_cnt, 0);
+	Graph_static_vertex_map<SmoothGraph, Num> rads(*graph, 0.0);
 
 	// determine smoothing radii
 	Num max_rad = 0;
@@ -19,12 +21,12 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 			(*progress)("Determining radii", i, vtx_cnt);
 		}
 
-		Vertex v = graph->vertex(i);
+		Vertex_handle v = graph->vertex(i);
 
 		if (v->degree() != 2) continue;
 
-		Edge inc = v->incoming();
-		Edge out = v->outgoing();
+		Edge_handle inc = v->incoming();
+		Edge_handle out = v->outgoing();
 
 		Num in_len = std::sqrt(inc->curve().squared_length());
 		Num out_len = std::sqrt(out->curve().squared_length());
@@ -32,7 +34,7 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 		Num v_rad = std::min(in_len, out_len) / 2.0;
 		if (v_rad > max_rad) max_rad = v_rad;
 
-		rads[i] = v_rad;
+		rads[v] = v_rad;
 	}
 
 	// impose max
@@ -44,13 +46,13 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 			(*progress)("Applying smoothing", i, vtx_cnt);
 		}
 
-		Vertex v = graph->vertex(i);
+		Vertex_handle v = graph->vertex(i);
 		if (v->degree() != 2) continue;
 
-		Num v_rad = std::min(rads[i], max_rad);
+		Num v_rad = std::min(rads[v], max_rad);
 
-		Edge inc = v->incoming();
-		Edge out = v->outgoing();
+		Edge_handle inc = v->incoming();
+		Edge_handle out = v->outgoing();
 
 		Num in_len = std::sqrt(inc->curve().squared_length());
 		Num out_len = std::sqrt(out->curve().squared_length());
@@ -82,7 +84,7 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 		graph->move_vertex(v, start);
 
 		// create end of arc
-		Edge edge = graph->subdivide_edge(out, end)->incoming();
+		Edge_handle edge = graph->subdivide_edge(out, end)->incoming();
 
 		// introduce intermediate samples
 
@@ -113,7 +115,7 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 		}
 	}
 
-	// erase zero-length edges (if two adjacent vertices are both constrained by their shared edge
+	// erase zero-length edges (if two adjacent vertices are both constrained by their shared edge)
 	{
 		int init_edge_count = graph->number_of_edges();
 		int i = 0;
@@ -136,7 +138,7 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 				revisit.pop_back();
 			}
 
-			Edge e = graph->edge(next_i);
+			Edge_handle e = graph->edge(next_i);
 
 			if (e->curve().squared_length() <= 0.00001) {
 				// remove unless between degree-3 vertices
@@ -145,7 +147,7 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 					// this removes e itself
 				}
 				else if (e->target()->degree() == 2) {
-					Edge nxt = e->next();
+					Edge_handle nxt = e->next();
 					if (nxt->graph_index() < i) {
 						revisit.push_back(nxt->graph_index());
 					}

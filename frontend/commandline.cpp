@@ -20,9 +20,9 @@ void runVW(const CommandLineArguments& cla) {
 	using PQT = VertexQuadTree<Graph>;
 	using Alg = VisvalingamWhyatt<Graph>;
 
-	filesystem::path input = cla.get_argument("-input");
-	int complexity = stoi(cla.get_argument("-target"));
-	filesystem::path output = cla.get_argument("-output");
+	filesystem::path input = cla.get_string("-input");
+	int complexity = cla.get_integer("-target");
+	filesystem::path output = cla.get_string("-output");
 
 	StopwatchPool pool("Timers");
 
@@ -33,7 +33,7 @@ void runVW(const CommandLineArguments& cla) {
 	Graph graph;
 	cout << "Loading " << input << endl;
 	load.start();
-	auto res = readIpeFile<Graph>(graph, input, 10, 0.00001);
+	auto res = readIpeFile<Graph>(graph, input, 10, 0.0000001);
 	if (!res) {
 		return;
 	}
@@ -52,7 +52,11 @@ void runVW(const CommandLineArguments& cla) {
 	alg.run([](int complexity, Number<Kernel> cost) {
 		return complexity <= 1; });
 	run.stop();
+	run.start();
 	cout << "Done, " << graph.number_of_edges() << " edges" << endl;
+	run.stop();
+
+	writeIpeFile(graph, output);
 
 	pool.printAll();
 }
@@ -65,11 +69,14 @@ void runKSBB(const CommandLineArguments& cla) {
 	using Kernel = std::conditional<ExactMode, Exact, Inexact>::type;
 	using Graph = EdgeCollapseGraph<Kernel, false>;
 	using PQT = VertexQuadTree<Graph>;
+	using SQT = EdgeQuadTree<Graph>;
 	using Alg = KronenfeldEtAl<Graph>;
 
-	filesystem::path input = cla.get_argument("-input");
-	int complexity = stoi(cla.get_argument("-target"));
-	filesystem::path output = cla.get_argument("-output");
+	filesystem::path input = cla.get_string("-input");
+	int complexity = cla.get_integer("-target", 1);
+	filesystem::path output = cla.get_string("-output");
+	int depth = 10;
+	Number<Kernel> fuzz = 0.05;
 
 	StopwatchPool pool("Timers");
 
@@ -80,7 +87,7 @@ void runKSBB(const CommandLineArguments& cla) {
 	Graph graph;
 	cout << "Loading " << input << endl;
 	load.start();
-	auto res = readIpeFile<Graph>(graph, input, 10, 0.00001);
+	auto res = readIpeFile<Graph>(graph, input, depth, 0.0000001);
 	if (!res) {
 		return;
 	}
@@ -89,10 +96,12 @@ void runKSBB(const CommandLineArguments& cla) {
 	load.stop();
 	cout << "  Done, " << graph.number_of_edges() << " edges" << endl;
 
-	Alg alg(graph, pqt);
+	Rectangle box = pqt.root_box();
+	SQT sqt(box, depth, fuzz);
+	Alg alg(graph, sqt, pqt);
 	cout << "Initializing" << endl;
 	init.start();
-	alg.initialize(false);
+	alg.initialize(false, true);
 	init.stop();
 	cout << "Running" << endl;
 	run.start();
@@ -100,6 +109,8 @@ void runKSBB(const CommandLineArguments& cla) {
 		return complexity <= 1; });
 	run.stop();
 	cout << "Done, " << graph.number_of_edges() << " edges" << endl;
+
+	writeIpeFile(graph, output);
 
 	pool.printAll();
 }
@@ -128,7 +139,7 @@ void runCommand(const CommandLineArguments& cla) {
 		return;
 	}
 
-	string alg = cla.get_argument("-alg");
+	string alg = cla.get_string("-alg", "VW");
 	bool exact = cla.has_argument("-exact");
 	if (alg == "VW") {
 		if (exact) {
@@ -140,10 +151,10 @@ void runCommand(const CommandLineArguments& cla) {
 	}
 	else if (alg == "KSBB") {
 		if (exact) {
-			runVW<true>(cla);
+			runKSBB<true>(cla);
 		}
 		else {
-			runVW<false>(cla);
+			runKSBB<false>(cla);
 		}
 	}
 	else {

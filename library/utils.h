@@ -18,8 +18,8 @@ namespace cartocrow::simplification::utils {
 		while (v != p.vertices_end()) {
 			left = CGAL::min(left, v->x());
 			right = CGAL::max(right, v->x());
-			bottom = CGAL::min(bottom, v->x());
-			top = CGAL::max(top, v->x());
+			bottom = CGAL::min(bottom, v->y());
+			top = CGAL::max(top, v->y());
 			++v;
 		}
 
@@ -38,8 +38,8 @@ namespace cartocrow::simplification::utils {
 		while (v != p.end()) {
 			left = CGAL::min(left, v->x());
 			right = CGAL::max(right, v->x());
-			bottom = CGAL::min(bottom, v->x());
-			top = CGAL::max(top, v->x());
+			bottom = CGAL::min(bottom, v->y());
+			top = CGAL::max(top, v->y());
 			++v;
 		}
 

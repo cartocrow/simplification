@@ -39,6 +39,8 @@ namespace cartocrow::simplification {
 	template <detail::ECTraits ECT>
 	void EdgeCollapse<ECT>::update(Edge_handle e) {
 
+		assert(graph.edge(e->graph_index()) == e);
+
 		auto& edata = ECT::data(e);
 
 		// clear topology
@@ -183,27 +185,33 @@ namespace cartocrow::simplification {
 		for (Edge_handle e : graph.edges()) {
 			if (ECT::data(e).queue_index >= 0) {
 				if (!queue.contains(e)) {
-					std::cout << e << " :: thinks it's in queue but isn't\n";
+					std::cout << *e << " :: thinks it's in queue but isn't\n";
 					ok = false;
 				}
 			}
 			else if (queue.contains(e)) {
-				std::cout << e << " :: thinks it's not in queue, but is\n";
+				std::cout << *e << " :: thinks it's not in queue, but is\n";
 				ok = false;
 			}
 
 			for (Edge_handle b : ECT::data(e).blocked_by) {
 				if (std::find(ECT::data(b).blocking.begin(), ECT::data(b).blocking.end(), e) == ECT::data(b).blocking.end()) {
-					std::cout << e << " :: thinks it's blocked by " << b << ", but they don't agree\n";
+					std::cout << *e << " :: thinks it's blocked by " << *b << ", but they don't agree\n";
 					ok = false;
 				}
 			}
 
 			for (Edge_handle b : ECT::data(e).blocking) {
 				if (std::find(ECT::data(b).blocked_by.begin(), ECT::data(b).blocked_by.end(), e) == ECT::data(b).blocked_by.end()) {
-					std::cout << e << " :: thinks it's blocking " << b << ", but they don't agree\n";
+					std::cout << *e << " :: thinks it's blocking " << *b << ", but they don't agree\n";
 					ok = false;
 				}
+			}
+		}
+		for (Edge_handle e : queue.content()) {
+			if (graph.edge(e->graph_index()) != e) {
+				std::cout << *e << " :: in queue but not in graph!?\n";
+				ok = false;
 			}
 		}
 		return ok;
@@ -287,7 +295,6 @@ namespace cartocrow::simplification {
 	template <detail::ECTraits ECT>
 	void EdgeCollapse<ECT>::performStep(Edge_handle e) {
 
-
 		assert(graph.can_perform_operation());
 		assert(queue.peek() == e);
 
@@ -305,6 +312,8 @@ namespace cartocrow::simplification {
 		queue.remove(prev);
 		queue.remove(next);
 
+		// clear blocking data from collapsing edge.
+		// NB: this edge will be removed in the collapse, so we dont need to consider blocked_by
 		for (Edge_handle b : edata.blocking) {
 			auto& bdata = ECT::data(b);
 			if (utils::listRemove(e, bdata.blocked_by)) {
@@ -315,27 +324,43 @@ namespace cartocrow::simplification {
 		}
 		edata.blocking.clear();
 
-		for (Edge_handle b : ECT::data(prev).blocking) {
-			auto& bdata = ECT::data(b);
-			if (utils::listRemove(prev, bdata.blocked_by)) {
-				if (bdata.blocked_by.empty() && !bdata.blocked_by_degzero) {
-					queue.push(b);
+		// clear blocking data from previous edge
+		{
+			auto& pdata = ECT::data(prev);
+			for (Edge_handle b : pdata.blocking) {
+				if (b == next) continue; // NB: next could be blocking prev, but will be reset or removed
+				auto& bdata = ECT::data(b);
+				if (utils::listRemove(prev, bdata.blocked_by)) {
+					if (bdata.blocked_by.empty() && !bdata.blocked_by_degzero) {
+						queue.push(b);
+					}
 				}
 			}
+			pdata.blocking.clear();
+			for (Edge_handle b : pdata.blocked_by) {
+				utils::listRemove(prev, ECT::data(b).blocking);
+			}
+			pdata.blocked_by.clear();
 		}
-		ECT::data(prev).blocking.clear();
 
-		for (Edge_handle b : ECT::data(next).blocking) {
-			auto& bdata = ECT::data(b);
-			if (utils::listRemove(next, bdata.blocked_by)) {
-				if (bdata.blocked_by.empty() && !bdata.blocked_by_degzero) {
-					queue.push(b);
+		// clear blocking data from next edge
+		{
+			auto& ndata = ECT::data(next);
+			for (Edge_handle b : ndata.blocking) {
+				if (b == prev) continue; // NB: prev could be blocking next, but will be reset or removed
+				auto& bdata = ECT::data(b);
+				if (utils::listRemove(next, bdata.blocked_by)) {
+					if (bdata.blocked_by.empty() && !bdata.blocked_by_degzero) {
+						queue.push(b);
+					}
 				}
 			}
+			ndata.blocking.clear();
+			for (Edge_handle b : ndata.blocked_by) {
+				utils::listRemove(next, ECT::data(b).blocking);
+			}
+			ndata.blocked_by.clear();
 		}
-		ECT::data(next).blocking.clear();
-
-
 
 		Vertex_handle src = e->source();
 		Vertex_handle tar = e->target();
@@ -407,7 +432,7 @@ namespace cartocrow::simplification {
 		Point<Kernel> d = e->next()->target()->point();
 
 		bool abc = safe_test::collinear(a, b, c);
-		bool bcd = safe_test::collinear(a, b, c);
+		bool bcd = safe_test::collinear(b, c, d);
 
 		if (abc && bcd) {
 			edata.erase_both = true;

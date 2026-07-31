@@ -1,11 +1,11 @@
 #pragma once
 
-//#include <ipepath.h>
-
 #include <sstream>
 #include <string>
 #include <fstream>
+
 #include <cartocrow/reader/ipe_reader.h>
+#include <cartocrow/data_structures/graph_map_2.h>
 
 #include "library/vertex_quad_tree.h"
 #include "library/utils.h"
@@ -15,7 +15,7 @@ using namespace cartocrow::simplification;
 
 template<class Graph>
 VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& file, const int depth, const Number<typename Graph::Kernel> prec) {
-	using Vertex = Graph::Vertex;
+	using Vertex_handle = Graph::Vertex_handle;
 	using Kernel = Graph::Kernel;
 
 	std::ifstream filestream(file);
@@ -100,12 +100,12 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 
 	for (int i = 0; i < lines.size(); i++) {
 
-		Vertex* prev = nullptr;
-		Vertex* first = nullptr;
+		Vertex_handle prev = nullptr;
+		Vertex_handle first = nullptr;
 		for (int k = 0; k < lines[i].size(); k++) {
 			Point<Kernel>& point = lines[i][k];
 
-			Vertex* next = pqt->findElement(point, prec);
+			Vertex_handle next = pqt->findElement(point, prec);
 			if (next == nullptr) {
 				next = graph.add_vertex(point);
 				pqt->insert(next);
@@ -126,113 +126,83 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 	return pqt;
 }
 
-//template<class Graph>
-//VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& file, const int depth, const Number<typename Graph::Kernel> prec) {
-//	using Vertex = Graph::Vertex;
-//	using Kernel = Graph::Kernel;
-//	std::cout << "Starting IPE doc" << std::endl;
-//	std::shared_ptr<ipe::Document> document = IpeReader::loadIpeFile(file);
-//
-//	if (document->countPages() == 0) {
-//		std::cout << "Warning: No pages found in IPE file\n";
-//		return nullptr;
-//	}
-//	else if (document->countPages() > 1) {
-//		std::cout << "Warning: Multiple pages found in IPE file; reading only the first\n";
-//	}
-//
-//	ipe::Page* page = document->page(0);
-//
-//	// compute a bounding box
-//	std::cout << "Making bbox" << std::endl;
-//	std::vector<Point<Kernel>> points;
-//
-//	for (int i = 0; i < page->count(); i++) {
-//		auto object = page->object(i);
-//		if (object->type() != ipe::Object::Type::EPath) continue;
-//		auto path = object->asPath();
-//		auto matrix = object->matrix();
-//		auto shape = path->shape();
-//		for (int j = 0; j < shape.countSubPaths(); j++) {
-//			auto subpath = shape.subPath(j);
-//			if (subpath->type() != ipe::SubPath::Type::ECurve) continue;
-//			auto curve = subpath->asCurve();
-//
-//			for (int k = 0; k < curve->countSegments(); k++) {
-//				auto segment = curve->segment(k);
-//				auto pt = matrix * segment.cp(0);
-//				Point<Kernel> point(pt.x, pt.y);
-//				points.push_back(point);
-//			}
-//
-//			auto pt = matrix * curve->segment(curve->countSegments() - 1).last();
-//			Point<Kernel> point(pt.x, pt.y);
-//			points.push_back(point);
-//		}
-//	}
-//
-//	Rectangle<Kernel> box = utils::boxOf<Kernel>(points);
-//
-//	// construct the graph
-//	std::cout << "Making graph" << std::endl;
-//	VertexQuadTree<Graph>* pqt = new VertexQuadTree<Graph>(box, depth);
-//
-//	for (int i = 0; i < page->count(); i++) {
-//		auto object = page->object(i);
-//		if (object->type() != ipe::Object::Type::EPath) continue;
-//		auto path = object->asPath();
-//		auto matrix = object->matrix();
-//		auto shape = path->shape();
-//		for (int j = 0; j < shape.countSubPaths(); j++) {
-//			auto subpath = shape.subPath(j);
-//			if (subpath->type() != ipe::SubPath::Type::ECurve) continue;
-//			auto curve = subpath->asCurve();
-//
-//			Vertex* prev = nullptr;
-//			for (int k = 0; k < curve->countSegmentsClosing(); k++) {
-//				auto segment = curve->segment(k);
-//				auto pt = matrix * segment.cp(0);
-//
-//				Point<Kernel> point(pt.x, pt.y);
-//
-//				Vertex* next = pqt->findElement(point, prec);
-//				if (next == nullptr) {
-//					next = graph.add_vertex(point);
-//					pqt->insert(next);
-//				}
-//				if (prev != nullptr && !next->is_neighbor_of(prev) && next != prev) {
-//					graph.add_edge(prev, next);
-//				}
-//				prev = next;
-//			}
-//
-//			auto pt = matrix * curve->segment(curve->countSegmentsClosing() - 1).last();
-//
-//			Point<Kernel> point(pt.x, pt.y);
-//
-//			Vertex* next = pqt->findElement(point, prec);
-//			if (next == nullptr) {
-//				next = graph.add_vertex(point);
-//				pqt->insert(next);
-//			}
-//			if (prev != nullptr && !next->is_neighbor_of(prev) && next != prev) {
-//				graph.add_edge(prev, next);
-//			}
-//			prev = next;
-//		}
-//	}
-//	std::cout << "Done" << std::endl;
-//	return pqt;
-//}
-
 template<class Graph>
-Graph* readIpeFile(const std::filesystem::path& file, const int depth) {
+Graph* readIpeFile(const std::filesystem::path& file, const int depth, const Number<typename Graph::Kernel> prec) {
 	Graph* graph = new Graph();
-	auto pqt = readIpeFile(*graph, file, depth, 0.00001);
+	auto pqt = readIpeFile(*graph, file, depth, prec);
 	if (pqt == nullptr) {
 		delete graph;
 		return nullptr;
 	}
 	delete pqt;
 	return graph;
+}
+
+template<class Graph>
+void writeIpeFile(Graph& graph, const std::filesystem::path& file) {
+	using Vertex_handle = Graph::Vertex_handle;
+	using Edge_handle = Graph::Edge_handle;
+	using Kernel = Graph::Kernel;
+
+	std::ofstream filestream(file);
+
+	filestream << "<?xml version=\"1.0\"?>" << std::endl;
+	filestream << "<!DOCTYPE ipe SYSTEM \"ipe.dtd\">" << std::endl;
+	filestream << "<ipe version=\"70010\" creator=\"Ipe 7.0.10\">" << std::endl;
+	filestream << "<info created=\"D:20100909134504\" modified=\"D:20100909150018\"/>" << std::endl;
+	filestream << "<ipestyle name=\"export\">" << std::endl;
+	filestream << "<layout paper=\"595 842\" origin=\"0 0\" frame=\"595 842\"/>" << std::endl;
+	filestream << "<color name=\"black\" value=\"0.0 0.0 0.0\"/>" << std::endl;
+	filestream << "<symbolsize name=\"normal\" value=\"3.0\"/>" << std::endl;
+	filestream << "<pen name=\"normal\" value=\"0.4\"/>" << std::endl;
+	filestream << "</ipestyle>" << std::endl;
+	filestream << "<page>" << std::endl;
+	filestream << "<layer name=\"default\"/>" << std::endl;
+	filestream << "<view layers=\"default\" active=\"default\"/>" << std::endl;
+
+	Graph_static_edge_map<Graph, Edge_handle> handled(graph, nullptr); // workaround because bool doesnt work yet
+
+	for (Edge_handle e : graph.edges()) {
+		if (handled[e] != nullptr) {
+			continue;
+		}
+
+		Edge_handle walk = e;
+		while (walk->source()->degree() == 2) {
+			walk = walk->prev();
+			if (walk == e) {
+				break;
+			}
+		}
+
+		filestream << "<path cap=\"1\" layer=\"default\" stroke=\"black\" pen=\"normal\">" << std::endl;
+		if (walk->source()->degree() == 2) {
+			// cycle
+			assert(walk == e);
+			filestream << walk->target()->point().x() << " " << walk->target()->point().y() << " m" << std::endl;
+			handled[walk] = e;
+			walk = walk->next();
+			while (walk != e) {
+				filestream << walk->target()->point().x() << " " << walk->target()->point().y() << " l" << std::endl;
+				handled[walk] = e;
+				walk = walk->next();
+			}
+			filestream << "h" << std::endl;
+		}
+		else {
+			// polyline
+			filestream << walk->source()->point().x() << " " << walk->source()->point().y() << " m" << std::endl;
+			filestream << walk->target()->point().x() << " " << walk->target()->point().y() << " l" << std::endl;
+			handled[walk] = e;
+			while (walk->target()->degree() == 2) {
+				walk = walk->next();
+				filestream << walk->target()->point().x() << " " << walk->target()->point().y() << " l" << std::endl;
+				handled[walk] = e;
+			}
+		}
+		filestream << "</path>" << std::endl;
+	}
+
+	filestream << "</page>" << std::endl;
+	filestream << "</ipe>" << std::endl;
 }

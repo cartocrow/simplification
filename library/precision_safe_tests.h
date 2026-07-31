@@ -4,8 +4,6 @@
 
 namespace cartocrow::safe_test {
 
-	constexpr const Number<Inexact> M_EPSILON_SQRD = M_EPSILON * M_EPSILON;
-
 	inline bool close(const Number<Exact> a, const Number<Exact> b) {
 		return a == b;
 	}
@@ -32,14 +30,14 @@ namespace cartocrow::safe_test {
 		return CGAL::collinear(a, b, c);
 	}
 	inline bool collinear(const Point<Inexact> a, const Point<Inexact> b, const Point<Inexact> c) {
-		return CGAL::squared_distance(Line<Inexact>(a, c), b) < M_EPSILON_SQRD;
+		return CGAL::squared_distance(Line<Inexact>(a, c), b) < M_EPSILON;
 	}
 
 	inline bool point_on_line(const Point<Exact> p, const Line<Exact> l) {
 		return l.has_on_boundary(p);
 	}
 	inline bool point_on_line(const Point<Inexact> p, const Line<Inexact> l) {
-		return CGAL::squared_distance(l, p) < M_EPSILON_SQRD;
+		return CGAL::squared_distance(l, p) < M_EPSILON;
 	}
 
 

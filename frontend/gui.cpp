@@ -277,12 +277,16 @@ void SimplificationGUI::addSimplifyTab() {
 	auto* initButton = new QPushButton("Initialize");
 	layout->addWidget(initButton);
 
+	auto* initAndRunButton = new QPushButton("Initialize and run fully");
+	layout->addWidget(initAndRunButton);
+
+	int default_step = m_settings.getInteger("step_size", 1);
 	auto* stepSpinLabel = new QLabel("Step size");
 	layout->addWidget(stepSpinLabel);
 	auto* stepSpin = new QSpinBox();
 	stepSpin->setMinimum(1);
 	stepSpin->setMaximum(1000);
-	stepSpin->setValue(50);
+	stepSpin->setValue(default_step);
 	layout->addWidget(stepSpin);
 
 	auto* reverseButton = new QPushButton("Step back");
@@ -352,6 +356,33 @@ void SimplificationGUI::addSimplifyTab() {
 				alg->initialize(preprocessed, depthSpin->value());
 			}
 
+			progress.setValue(2);
+
+			int c = alg->getComplexity();
+			desiredComplexity->setMaximum(c);
+			desiredComplexity->setValue(c);
+			complexitySlider->setMaximum(c);
+			complexitySlider->setValue(c);
+			updatePaintings();
+		}
+		});
+
+	connect(initAndRunButton, &QPushButton::clicked, [this, runAlg]() {
+		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		if (input != nullptr) {
+
+			QProgressDialog progress("Initializing", nullptr, 0, 2, this);
+			progress.setWindowModality(Qt::WindowModal);
+			progress.setMinimumDuration(1000);
+			progress.setValue(1);
+
+			if (preprocessed == nullptr) {
+				alg->initialize(input, depthSpin->value());
+			}
+			else {
+				alg->initialize(preprocessed, depthSpin->value());
+			}
+
 
 			progress.setValue(2);
 
@@ -360,6 +391,11 @@ void SimplificationGUI::addSimplifyTab() {
 			desiredComplexity->setValue(c);
 			complexitySlider->setMaximum(c);
 			complexitySlider->setValue(c);
+
+			if (alg->hasResult()) {
+				runAlg(alg, 1);
+			}
+
 			updatePaintings();
 		}
 		});
@@ -387,6 +423,7 @@ void SimplificationGUI::addSimplifyTab() {
 
 	connect(stepSpin, &QSpinBox::textChanged, [this, stepSpin]() {
 		complexitySlider->setSingleStep(stepSpin->value());
+		m_settings.setInteger("step_size", stepSpin->value());
 		});
 
 	connect(complexitySlider, &QSlider::valueChanged, [this, runAlg](int value) {
@@ -620,7 +657,7 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path, const int d
 
 	InputGraph* graph;
 	if (path.extension() == ".ipe") {
-		graph = readIpeFile<InputGraph>(path, depth);
+		graph = readIpeFile<InputGraph>(path, depth, M_EPSILON);
 		curr_file->setText(QString::fromStdString(path.filename().string()));
 		curr_srs->setText(QString::fromStdString("<i>No spatial reference</i>"));
 	}
