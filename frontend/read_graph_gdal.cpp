@@ -19,6 +19,9 @@ std::pair<RegionSet<Exact>*, std::optional<std::string>> readRegionSetUsingGDAL(
 
 	RegionSet<Exact>* regionSet = new RegionSet<Exact>();
 
+	std::set<std::string> type_err;
+	std::set<std::string> null_err;
+
 	for (auto& poFeature : *poLayer) {
 		OGRGeometry* poGeometry;
 
@@ -68,6 +71,10 @@ std::pair<RegionSet<Exact>*, std::optional<std::string>> readRegionSetUsingGDAL(
 		int i = 0;
 		for (auto&& oField : *poFeature) {
 			std::string name = poFeature->GetDefnRef()->GetFieldDefn(i)->GetNameRef();
+			if (oField.IsNull()) {
+				null_err.insert(name);
+				continue;
+			}
 			switch (oField.GetType()) {
 			case OFTInteger:
 				region.attributes[name] = static_cast<int>(oField.GetInteger());
@@ -82,13 +89,44 @@ std::pair<RegionSet<Exact>*, std::optional<std::string>> readRegionSetUsingGDAL(
 				region.attributes[name] = static_cast<std::string>(oField.GetString());
 				break;
 			default:
-				std::cout << "Did not handle this type of attribute: " << oField.GetType() << std::endl;
+				type_err.insert(name);
 				break;
 			}
 			++i;
 		}
 
 		regionSet->push_back(region);
+	}
+
+	if (!type_err.empty()) {
+		std::cout << "Warning: unexpected attribute types in the fields listed below. These will not be part of any output generated." << std::endl;
+		bool first = true;
+		for (std::string name : type_err) {			
+			if (first) {
+				first = false;
+				std::cout << "  ";
+			}
+			else {
+				std::cout << ", ";
+			}
+			std::cout << name;
+		}
+		std::cout << std::endl;
+	}
+	if (!null_err.empty()) {
+		std::cout << "Warning: null values found in the fields below. These will not be part of any output generated." << std::endl;
+		bool first = true;
+		for (std::string name : null_err) {
+			if (first) {
+				first = false;
+				std::cout << "  ";
+			}
+			else {
+				std::cout << ", ";
+			}
+			std::cout << name;
+		}
+		std::cout << std::endl;
 	}
 
 	std::optional<std::string> refstr;

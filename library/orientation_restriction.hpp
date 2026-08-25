@@ -3,6 +3,8 @@
 // Do not include this file, but the .h file instead
 // -----------------------------------------------------------------------------
 
+#include <cartocrow/data_structures/graph_map_2.h>
+
 namespace cartocrow::simplification {
 
 	namespace detail {
@@ -60,11 +62,11 @@ namespace cartocrow::simplification {
 			}
 
 			Graph& graph;
-			std::vector<Vector<Inexact>> directions;
-			std::vector<bool> significant_vertices;
-			std::vector<EdgeData> edge_data;
+			std::vector<Vec> directions;
+			Graph_static_vertex_map<Graph, bool> significant_vertices;			
+			Graph_static_edge_map<Graph, EdgeData> edge_data;
 
-			AngleRestriction(Graph& graph, std::vector<Vec> dirs) : graph(graph), directions(dirs) {
+			AngleRestriction(Graph& graph, std::vector<Vec> dirs) : graph(graph), directions(dirs), significant_vertices(graph, false), edge_data(graph) {
 			};
 
 			bool is_approximately(Vec a, Vec b) {
@@ -108,9 +110,6 @@ namespace cartocrow::simplification {
 
 			void determine_significant_vertices() {
 
-				std::cout << "determine_significant_vertices\n";
-				significant_vertices = std::vector<bool>(graph.number_of_vertices(), false);
-
 				for (Vertex_handle v : graph.vertices()) {
 
 					size_t d = v->degree();
@@ -124,7 +123,7 @@ namespace cartocrow::simplification {
 								|| (assoc.second >= 0 && assoc.second == assoc_prev.second)
 								|| assoc.second == assoc_prev.first
 								|| assoc.first == assoc_prev.second) {
-								significant_vertices[v->graph_index()] = true;
+								significant_vertices[v] = true;
 								break;
 							}
 
@@ -136,8 +135,6 @@ namespace cartocrow::simplification {
 			};
 
 			void subdivide_edges(Num lambda) {
-
-				std::cout << "subdivide_edges\n";
 
 				Num max_sqr_len = 0;
 				for (Edge_handle e : graph.edges()) {
@@ -157,8 +154,8 @@ namespace cartocrow::simplification {
 
 					int steps = (int)std::ceil(std::sqrt(sqr_len / max_sqr_len));
 					if (steps < 2
-						&& significant_vertices[e->source()->graph_index()]
-						&& significant_vertices[e->target()->graph_index()]) {
+						&& significant_vertices[e->source()]
+						&& significant_vertices[e->target()]) {
 						steps = 2;
 					}
 
@@ -221,8 +218,6 @@ namespace cartocrow::simplification {
 
 			void assign_directions() {
 
-				std::cout << "assign_directions\n";
-
 				size_t e_cnt = graph.number_of_edges();
 
 				edge_data.resize(e_cnt);
@@ -232,9 +227,9 @@ namespace cartocrow::simplification {
 				size_t v_cnt = significant_vertices.size();
 				for (int i = 0; i < v_cnt; i++) {
 
-					if (!significant_vertices[i]) continue;
-
 					Vertex_handle v = graph.vertex(i);
+
+					if (!significant_vertices[v]) continue;
 
 					size_t degree = v->degree();
 					std::vector<Vec> out;
@@ -252,8 +247,7 @@ namespace cartocrow::simplification {
 					for (size_t i = 0; i < degree; ++i) {
 
 						Edge_handle e = v->incident_edge(i);
-						size_t gi = e->graph_index();
-						EdgeData& edata = edge_data[gi];
+						EdgeData& edata = edge_data[e];
 						edata.significant = v;
 						edata.associated = associated_directions(v, e);
 						edata.assigned = best[i];
@@ -261,11 +255,9 @@ namespace cartocrow::simplification {
 						if (edata.associated.second < 0) {
 							if (best[i] == edata.associated.first) {
 								edata.type = EdgeType::ALIGN;
-								//std::cout << gi << " -- align\n";
 							}
 							else {
 								edata.type = EdgeType::DEV_ALIGN;
-								//std::cout << gi << " -- dev align\n";
 							}
 						}
 						else if (best[i] == edata.associated.first || best[i] == edata.associated.second) {
@@ -280,16 +272,13 @@ namespace cartocrow::simplification {
 
 							if (has_same) {
 								edata.type = EdgeType::EVADING;
-								//std::cout << gi << " -- evading\n";
 							}
 							else {
 								edata.type = EdgeType::UNALIGN;
-								//std::cout << gi << " -- unalign\n";
 							}
 						}
 						else {
 							edata.type = EdgeType::DEV_UNALIGN;
-							//std::cout << gi << " -- dev unalign\n";
 						}
 					}
 
@@ -299,18 +288,13 @@ namespace cartocrow::simplification {
 
 			void assign_double_insignificant() {
 
-				std::cout << "assign_double_insignificant\n";
+				for (Edge_handle e : graph.edges()) {
 
-				size_t e_cnt = graph.number_of_edges();
-
-				for (size_t i = 0; i < e_cnt; i++) {
-
-					EdgeData& edata = edge_data[i];
+					EdgeData& edata = edge_data[e];
 					if (edata.type != EdgeType::UNDETERMINED) {
 						continue;
 					}
 
-					Edge_handle e = graph.edge(i);
 					edata.significant = e->source();
 					edata.associated = associated_directions(e->source(), e);
 					if (edata.associated.second < 0) {
@@ -379,12 +363,10 @@ namespace cartocrow::simplification {
 			}
 
 			void determine_interference_regions(Num eps) {
-				size_t e_cnt = graph.number_of_edges();
 
-				for (size_t i = 0; i < e_cnt; i++) {
+				for (Edge_handle e: graph.edges()) {
 
-					Edge_handle e = graph.edge(i);
-					EdgeData& edata = edge_data[i];
+					EdgeData& edata = edge_data[e];
 
 					switch (edata.type) {
 					default: {
@@ -501,8 +483,6 @@ namespace cartocrow::simplification {
 			}
 
 			void assign_step_counts(Num eps) {
-
-				std::cout << "assign_step_counts\n";
 
 				size_t e_cnt = graph.number_of_edges();
 
@@ -653,7 +633,7 @@ namespace cartocrow::simplification {
 				for (size_t i = 0; i < e_cnt; i++) {
 
 					Edge_handle e = graph.edge(i);
-					EdgeData& edata = edge_data[i];
+					EdgeData& edata = edge_data[e];
 
 					switch (edata.type) {
 					default: {
@@ -682,7 +662,7 @@ namespace cartocrow::simplification {
 							if (common == nullptr) {
 								// no shared vertex, treat normally
 
-								if (!uncommon_interference(edata, edge_data[other->graph_index()])) {
+								if (!uncommon_interference(edata, edge_data[other])) {
 									continue;
 								}
 
@@ -691,7 +671,7 @@ namespace cartocrow::simplification {
 							else if (common == edata.significant) {
 								// the other edge must be also evading or deviating
 
-								EdgeData& odata = edge_data[other->graph_index()];
+								EdgeData& odata = edge_data[other];
 
 								if (!common_interference(edata, odata)) {
 									continue;
@@ -770,7 +750,7 @@ namespace cartocrow::simplification {
 							if (common == nullptr) {
 								// no shared vertex, treat normally
 
-								if (!uncommon_interference(edata, edge_data[other->graph_index()])) {
+								if (!uncommon_interference(edata, edge_data[other])) {
 									continue;
 								}
 
@@ -779,7 +759,7 @@ namespace cartocrow::simplification {
 							else if (common == edata.significant) {
 								// the other edge must be also evading or deviating
 
-								EdgeData& odata = edge_data[other->graph_index()];
+								EdgeData& odata = edge_data[other];
 
 								if (!common_interference(edata, odata)) {
 									continue;
@@ -816,7 +796,7 @@ namespace cartocrow::simplification {
 				for (size_t i = 0; i < e_cnt; i++) {
 
 					Edge_handle e = graph.edge(i);
-					EdgeData& edata = edge_data[i];
+					EdgeData& edata = edge_data[e];
 
 					switch (edata.type) {
 					default: {
@@ -843,7 +823,7 @@ namespace cartocrow::simplification {
 							if (common == nullptr) {
 								// no shared vertex, treat normally
 
-								if (!uncommon_interference(edata, edge_data[other->graph_index()])) {
+								if (!uncommon_interference(edata, edge_data[other])) {
 									continue;
 								}
 
@@ -854,7 +834,7 @@ namespace cartocrow::simplification {
 							else if (common == edata.significant) {
 								// the other edge must be deviating, either aligned or unaligned
 
-								EdgeData& odata = edge_data[other->graph_index()];
+								EdgeData& odata = edge_data[other];
 
 								if (!common_interference(edata, odata)) {
 									continue;
@@ -919,7 +899,7 @@ namespace cartocrow::simplification {
 							if (common == nullptr) {
 								// no shared vertex, treat normally
 
-								if (!uncommon_interference(edata, edge_data[other->graph_index()])) {
+								if (!uncommon_interference(edata, edge_data[other])) {
 									continue;
 								}
 
@@ -930,7 +910,7 @@ namespace cartocrow::simplification {
 							else if (common == edata.significant) {
 								// the other edge must be also evading or deviating
 
-								EdgeData& odata = edge_data[other->graph_index()];
+								EdgeData& odata = edge_data[other];
 
 								if (!common_interference(edata, odata)) {
 									continue;
@@ -996,14 +976,12 @@ namespace cartocrow::simplification {
 
 			void create_staircases(Num eps) {
 
-				std::cout << "create_staircases\n";
-
 				size_t e_cnt = graph.number_of_edges();
 
 				for (size_t i = 0; i < e_cnt; i++) {
 
 					Edge_handle e = graph.edge(i);
-					EdgeData& edata = edge_data[i];
+					EdgeData& edata = edge_data[e];
 					Vertex_handle v = edata.significant;
 
 					std::function<Edge_handle(Edge_handle, Point<Kernel>)> split;
