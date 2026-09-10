@@ -14,7 +14,7 @@ namespace cartocrow::simplification {
 			Number<K> cost;
 			std::vector<typename VertexRemovalGraph<K, H>::Vertex_handle> blocked_by;
 			std::vector<typename VertexRemovalGraph<K, H>::Vertex_handle> blocking;
-			int queue_index;
+			int queue_index = -1;
 		};
 
 		template<class G>

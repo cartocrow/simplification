@@ -15,15 +15,14 @@ namespace cartocrow::safe_test {
 		return a == b;
 	}
 	inline bool same_point(const Point<Inexact> a, const Point<Inexact> b) {
-		return std::abs(a.x() - b.x()) < M_EPSILON
-			&& std::abs(a.y() - b.y()) < M_EPSILON;
+		return close(a.x(), b.x()) && close(a.y(), b.y());
 	}
 
 	inline bool aligned_vectors(const Vector<Exact> a, const Vector<Exact> b) {
 		return a.direction() == b.direction();
 	}
 	inline bool aligned_vectors(const Vector<Inexact> a, const Vector<Inexact> b) {
-		return close(CGAL::determinant(a, b), M_EPSILON);
+		return close(CGAL::determinant(a, b), 0);
 	}
 
 	inline bool collinear(const Point<Exact> a, const Point<Exact> b, const Point<Exact> c) {

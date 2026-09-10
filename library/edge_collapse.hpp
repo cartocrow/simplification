@@ -22,7 +22,7 @@ namespace cartocrow::simplification {
 			bool blocked_by_degzero;
 			std::vector<typename EdgeCollapseGraph<K, H>::Edge_handle> blocked_by;
 			std::vector<typename EdgeCollapseGraph<K, H>::Edge_handle> blocking;
-			int queue_index;
+			int queue_index = -1;
 
 		};
 
