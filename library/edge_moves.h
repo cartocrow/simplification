@@ -11,6 +11,7 @@ namespace cartocrow::simplification {
 
 	namespace detail {
 
+		template<class G> class EdgeSet;
 
 		template<class G> struct BaseMove;
 		template<class G> struct SingleMove;
@@ -69,8 +70,10 @@ namespace cartocrow::simplification {
 		EdgeTree& sqt;
 		VertexTree& pqt;
 		Queue queue;
+		detail::EdgeSet<Graph> edgeset;
 
-		void update(Edge_handle e);
+		void update_singles(Edge_handle e);
+		void update_combo(Edge_handle e);
 		bool blocks(Edge_handle edge, Single& single);
 		bool blocks(Edge_handle edge, Combo& single);
 		bool test_topology(Single& single);
@@ -78,8 +81,12 @@ namespace cartocrow::simplification {
 		Single* find_compensate_move(Single& contract);
 
 		std::optional<Operation> findNextStep();
+		void move(Single& move, Number<Kernel> area);
 		void performStep(Single& contract, Single& compensate);
 		void performStep(Combo& combo);
+
+		void checkOut(Single& move_a, bool contract_a, Single& move_b, bool contract_b);
+		void postProcess();
 
 	public:
 		EdgeMoves(Graph& g, EdgeTree& sqt, VertexTree& pqt);
