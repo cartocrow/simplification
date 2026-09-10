@@ -1,13 +1,22 @@
 #include "cmd_arguments.h"
 
+#include <iostream>
+#include <algorithm>
+
 CommandLineArguments::CommandLineArguments(int argc, char* argv[]) {
 	for (int c = 0; c < argc; ++c) {
 		m_arguments.push_back(argv[c]);
 	}
 }
 
-bool CommandLineArguments::has_argument(const std::string val) const {
-	return find_argument_index(val) >= 0;
+bool CommandLineArguments::has_any_arguments() const {
+	return m_arguments.size() > 1; // NB: the first argument provided is just the program itself
+}
+
+
+bool CommandLineArguments::has_argument(const std::string val, const int params) const {	
+	int index = find_argument_index(val);
+	return 0 <= index && index + params < m_arguments.size();
 }
 
 int CommandLineArguments::find_argument_index(const std::string val) const {
@@ -124,5 +133,26 @@ double CommandLineArguments::get_double(const int index, const double deft) cons
 		return deft;
 	}
 	return std::stod(*v);
+}
+
+
+void CommandLineArguments::print_arguments(const std::string newline_prefix, const std::string newline_start, const std::string sep) const {
+	bool first = true;
+	for (std::string arg : m_arguments) {
+		if (first) {
+			first = false;
+		}
+		else {
+			auto res = std::mismatch(newline_prefix.begin(), newline_prefix.end(), arg.begin());
+			if (res.first == newline_prefix.end()) {
+				std::cout << std::endl << newline_start;
+			}
+			else {
+				std::cout << sep;
+			}
+		}
+		std::cout << arg;
+	}
+	std::cout << std::endl;
 }
 

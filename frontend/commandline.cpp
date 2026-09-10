@@ -1,16 +1,19 @@
 #include "commandline.h"
 
+#include <numbers>
 #include <cartocrow/core/stopwatch.h>
 
 #include "ipe_reader.h"
 #include "library/vertex_removal.h"
 #include "library/edge_collapse.h"
+#include "library/orientation_restriction.h"
+#include "library/edge_moves.h"
 
 using namespace cartocrow;
 using namespace cartocrow::simplification;
 using namespace std;
 
-template<bool ExactMode> 
+template<bool ExactMode>
 void runVW(const CommandLineArguments& cla) {
 
 	cout << "Running VW (ExactMode = " << ExactMode << ")" << endl;
@@ -21,8 +24,9 @@ void runVW(const CommandLineArguments& cla) {
 	using Alg = VisvalingamWhyatt<Graph>;
 
 	filesystem::path input = cla.get_string("-input");
-	int complexity = cla.get_integer("-target");
+	int target = cla.get_integer("-target");
 	filesystem::path output = cla.get_string("-output");
+	int depth = cla.get_integer("-depth", 10);
 
 	StopwatchPool pool("Timers");
 
@@ -33,28 +37,30 @@ void runVW(const CommandLineArguments& cla) {
 	Graph graph;
 	cout << "Loading " << input << endl;
 	load.start();
-	auto res = readIpeFile<Graph>(graph, input, 10, 0.0000001);
-	if (!res) {
+	PQT* pqt = readIpeFile<Graph>(graph, input, depth, 0.0000001);
+
+	if (pqt == nullptr) {
 		return;
 	}
-	PQT pqt = *res;
 	graph.initialize();
+
 	load.stop();
 	cout << "  Done, " << graph.number_of_edges() << " edges" << endl;
 
-	Alg alg(graph, pqt);
+	Alg alg(graph, *pqt);
 	cout << "Initializing" << endl;
 	init.start();
 	alg.initialize(false);
 	init.stop();
-	cout << "Running" << endl;
 	run.start();
-	alg.run([](int complexity, Number<Kernel> cost) {
-		return complexity <= 1; });
+	alg.run([&target](int complexity, Number<Kernel> cost) {
+		return complexity <= target; });
 	run.stop();
 	run.start();
 	cout << "Done, " << graph.number_of_edges() << " edges" << endl;
 	run.stop();
+
+	delete pqt;
 
 	writeIpeFile(graph, output);
 
@@ -73,10 +79,10 @@ void runKSBB(const CommandLineArguments& cla) {
 	using Alg = KronenfeldEtAl<Graph>;
 
 	filesystem::path input = cla.get_string("-input");
-	int complexity = cla.get_integer("-target", 1);
+	int target = cla.get_integer("-target", 1);
 	filesystem::path output = cla.get_string("-output");
-	int depth = 10;
-	Number<Kernel> fuzz = 0.05;
+	int depth = cla.get_integer("-depth", 10);
+	Number<Kernel> fuzz = cla.get_double("-fuzzy", 0.05);
 
 	StopwatchPool pool("Timers");
 
@@ -105,8 +111,70 @@ void runKSBB(const CommandLineArguments& cla) {
 	init.stop();
 	cout << "Running" << endl;
 	run.start();
-	alg.run([](int complexity, Number<Kernel> cost) {
-		return complexity <= 1; });
+	alg.run([&target](int complexity, Number<Kernel> cost) {
+		return complexity <= target; });
+	run.stop();
+	cout << "Done, " << graph.number_of_edges() << " edges" << endl;
+
+	writeIpeFile(graph, output);
+
+	pool.printAll();
+}
+
+template<bool ExactMode>
+void runBMRS(const CommandLineArguments& cla) {
+
+	cout << "Running BMRS (ExactMode = " << ExactMode << ")" << endl;
+
+	using Kernel = std::conditional<ExactMode, Exact, Inexact>::type;
+	using Graph = EdgeMovesGraph<Kernel, false>;
+	using PQT = VertexQuadTree<Graph>;
+	using SQT = EdgeQuadTree<Graph>;
+	using Alg = BuchinEtAl<Graph>;
+
+	filesystem::path input = cla.get_string("-input");
+	int target = cla.get_integer("-target", 1);
+	filesystem::path output = cla.get_string("-output");
+	int depth = cla.get_integer("-depth", 10);
+	Number<Kernel> fuzz = cla.get_double("-fuzzy", 0.05);
+
+	StopwatchPool pool("Timers");
+
+	Stopwatch& load = pool.get("load");
+	Stopwatch& init = pool.get("init");
+	Stopwatch& run = pool.get("run");
+
+	Graph graph;
+	cout << "Loading " << input << endl;
+	load.start();
+	auto res = readIpeFile<Graph>(graph, input, depth, 0.0000001);
+	if (!res) {
+		return;
+	}
+	PQT pqt = *res;
+	graph.initialize();
+	load.stop();
+	cout << "  Done, " << graph.number_of_edges() << " edges" << endl;
+
+	constexpr double deg_to_rad = numbers::pi / 180.0;
+
+	if (cla.has_argument("-restrict", 2)) {
+		int orientations = cla.get_integer("-restrict", 1);
+		double angle = cla.get_double("-restrict", 2) * deg_to_rad;
+		restrict_orientations(graph, orientations, angle);
+	}
+
+	Rectangle box = pqt.root_box();
+	SQT sqt(box, depth, fuzz);
+	Alg alg(graph, sqt, pqt);
+	cout << "Initializing" << endl;
+	init.start();
+	alg.initialize(false, true);
+	init.stop();
+	cout << "Running" << endl;
+	run.start();
+	alg.run([&target](int complexity, Number<Kernel> cost) {
+		return complexity <= target; });
 	run.stop();
 	cout << "Done, " << graph.number_of_edges() << " edges" << endl;
 
@@ -117,21 +185,23 @@ void runKSBB(const CommandLineArguments& cla) {
 
 void runCommand(const CommandLineArguments& cla) {
 
+	cla.print_arguments();
+	cout << endl;
 
 	bool errored = false;
-	if (!cla.has_argument("-alg")) {
+	if (!cla.has_argument("-alg", 1)) {
 		cout << "Error: missing -alg argument with desired algorithm (VW or KSBB)" << endl;
 		errored = true;
 	}
-	if (!cla.has_argument("-input")) {
+	if (!cla.has_argument("-input", 1)) {
 		cout << "Error: missing -input argument with input file location" << endl;
 		errored = true;
 	}
-	if (!cla.has_argument("-target")) {
+	if (!cla.has_argument("-target", 1)) {
 		cout << "Error: missing -target argument with desired number of edges" << endl;
 		errored = true;
 	}
-	if (!cla.has_argument("-output")) {
+	if (!cla.has_argument("-output", 1)) {
 		cout << "Error: missing -output argument with output file location" << endl;
 		errored = true;
 	}
@@ -157,8 +227,16 @@ void runCommand(const CommandLineArguments& cla) {
 			runKSBB<false>(cla);
 		}
 	}
+	else if (alg == "BMRS") {
+		if (exact) {
+			runBMRS<true>(cla);
+		}
+		else {
+			runBMRS<false>(cla);
+		}
+	}
 	else {
 		cout << "Error: unexpected algorithm " << alg << endl;
-		cout << "  should be one of VW or KSBB" << endl;
+		cout << "  should be one of VW, KSBB or BMRS" << endl;
 	}
 }

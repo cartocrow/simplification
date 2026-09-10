@@ -10,6 +10,8 @@
 #include "library/vertex_quad_tree.h"
 #include "library/utils.h"
 
+#include <cartocrow/core/stopwatch.h>
+
 using namespace cartocrow;
 using namespace cartocrow::simplification;
 
@@ -20,6 +22,8 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 
 	std::ifstream filestream(file);
 
+	using namespace std;
+
 	bool onpage = false;
 	bool inpath = false;
 
@@ -27,7 +31,7 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 	std::vector<bool> closed;
 
 	std::string line;
-	std::vector<Point<Kernel>>* building = nullptr;
+	bool building = false;
 	while (std::getline(filestream, line))
 	{
 		if (!onpage) {
@@ -40,19 +44,21 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 			inpath = line.starts_with("<path");
 		}
 		else if (line.starts_with("</path")) {
-			if (building != nullptr) {
+			if (building) {
 				closed.push_back(false);
-				building = nullptr;
+				building = false;
 			}
 			inpath = false;
 		}
 		else if (inpath) {
 			if (line.ends_with("m")) {
-				if (building != nullptr) {
+				if (building) {
 					closed.push_back(false);
 				}
+				else {
+					building = true;
+				}
 				lines.emplace_back();
-				building = &lines[lines.size() - 1];
 
 				std::istringstream iss(line);
 				double x, y;
@@ -60,7 +66,7 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 					std::cout << "Unexpected path command: " << line << std::endl;
 				}
 				else {
-					building->push_back(Point<Kernel>(x, y));				
+					lines.back().emplace_back(x, y);
 				}
 
 			}
@@ -71,13 +77,13 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 					std::cout << "Unexpected path command: " << line << std::endl;
 				}
 				else {
-					building->push_back(Point<Kernel>(x, y));
+					lines.back().emplace_back(x, y);
 				}
 			}
 			else if (line.ends_with("h")) {
-				if (building != nullptr) {
+				if (building) {
 					closed.push_back(true);
-					building = nullptr;
+					building = false;
 				}
 			}
 			else {
@@ -85,6 +91,8 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 			}
 		}
 	}
+
+	assert(lines.size() == closed.size());
 
 	if (lines.empty()) {
 		return nullptr;
@@ -123,6 +131,7 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 			graph.add_edge(prev, first);
 		}
 	}
+
 	return pqt;
 }
 

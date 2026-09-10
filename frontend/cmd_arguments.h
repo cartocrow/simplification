@@ -10,8 +10,11 @@ private:
 public:
 	CommandLineArguments(int argc, char* argv[]);
 
-	// checks whether the given string is one of the arguments
-	bool has_argument(const std::string val) const;
+	// checks whether there are arguments provided
+	bool has_any_arguments() const;
+
+	// checks whether the given string is one of the arguments, and whether there are the given number of parameters afterwards
+	bool has_argument(const std::string val, const int params = 0) const;
 
 	// finds the index of the given argument; will be -1 if the index was not found
 	int find_argument_index(const std::string val) const;
@@ -30,4 +33,6 @@ public:
 	std::optional<double> get_optional_double(const int index) const;
 	double get_double(const std::string val, const double deft = 0, const int offset = 1) const;
 	double get_double(const int index, const double deft = 0) const;
+
+	void print_arguments(const std::string newline_prefix = "-", const std::string newline_start = "  ", const std::string sep = " ") const;
 };
