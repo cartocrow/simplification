@@ -22,6 +22,13 @@ namespace cartocrow::safe_test {
 		return a.direction() == b.direction();
 	}
 	inline bool aligned_vectors(const Vector<Inexact> a, const Vector<Inexact> b) {
+		return close(CGAL::determinant(a, b), 0) && CGAL::scalar_product(a,b) > 0;
+	}
+
+	inline bool aligned_or_opposite_vectors(const Vector<Exact> a, const Vector<Exact> b) {
+		return a.direction() == b.direction() || a.direction() == -b.direction();
+	}
+	inline bool aligned_or_opposite_vectors(const Vector<Inexact> a, const Vector<Inexact> b) {
 		return close(CGAL::determinant(a, b), 0);
 	}
 
@@ -39,6 +46,13 @@ namespace cartocrow::safe_test {
 		return CGAL::squared_distance(l, p) < M_EPSILON;
 	}
 
+	inline bool convex_contains(const Point<Exact> a, const Polygon<Exact> p) {
+		return !p.has_on_unbounded_side(a);
+	}
+	inline bool convex_contains(const Point<Inexact> a, const Polygon<Inexact> p) {
+		// TODO: use M_EPSILON test for safety
+		return !p.has_on_unbounded_side(a);
+	}
 
 }
 

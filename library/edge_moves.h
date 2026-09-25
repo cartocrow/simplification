@@ -72,10 +72,10 @@ namespace cartocrow::simplification {
 		Queue queue;
 		detail::EdgeSet<Graph> edgeset;
 
+		bool validate_state();
+
 		void update_singles(Edge_handle e);
 		void update_combo(Edge_handle e);
-		bool blocks(Edge_handle edge, Single& single);
-		bool blocks(Edge_handle edge, Combo& single);
 		bool test_topology(Single& single);
 		bool test_topology(Combo& combo);
 		Single* find_compensate_move(Single& contract);

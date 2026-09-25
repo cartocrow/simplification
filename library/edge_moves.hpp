@@ -10,7 +10,7 @@ namespace cartocrow::simplification {
 
 	namespace detail {
 
-		template<typename Edge_handle> 
+		template<typename Edge_handle>
 		inline Edge_handle safe_next(Edge_handle e) {
 			if (e->target()->degree() == 2) {
 				return e->next();
@@ -30,7 +30,7 @@ namespace cartocrow::simplification {
 			}
 		}
 
-		template<typename G> 
+		template<typename G>
 		class EdgeSet {
 		private:
 			using Edge_handle = G::Edge_handle;
@@ -55,19 +55,19 @@ namespace cartocrow::simplification {
 			}
 
 			void remove(Edge_handle e) {
-				const long i = map[e];
+				const size_t i = map[e];
 				if (i > 0) {
 					if (i != contained.size()) {
-						contained[i-1] = contained.back();
-						map[contained[i-1]] = i;
+						contained[i - 1] = contained.back();
+						map[contained[i - 1]] = i;
 					}
 					contained.pop_back();
 					map[e] = 0;
 				}
 			}
 
-			bool contains(Edge_handle e) const {
-				return map[e] > 0;					
+			bool contains(Edge_handle e) {
+				return map[e] > 0;
 			}
 
 			size_t size() const {
@@ -80,6 +80,14 @@ namespace cartocrow::simplification {
 
 			std::vector<Edge_handle> edges() {
 				return contained;
+			}
+
+			std::vector<Edge_handle>::iterator begin() {
+				return contained.begin();
+			}
+
+			std::vector<Edge_handle>::iterator end() {
+				return contained.end();
 			}
 
 			void clear() {
@@ -124,6 +132,12 @@ namespace cartocrow::simplification {
 
 			bool blocked_by_degzero;
 			std::vector<typename G::Edge_handle> blocked_by;
+
+			virtual bool is_single() = 0;
+
+			bool is_blocked() const {
+				return blocked_by_degzero || !blocked_by.empty();
+			}
 		};
 
 		template<class G> struct SingleMove : public BaseMove<G> {
@@ -140,9 +154,69 @@ namespace cartocrow::simplification {
 			bool contract_merges_highdegrees;
 			int waiting_index = -1;
 
+			bool is_single() override {
+				return true;
+			}
+
+			bool is_blocked_by(Edge_handle candidate) {
+				return is_blocked_by(candidate, swept);
+			}
+
+			bool is_blocked_by(Edge_handle candidate, const Polygon<K>& swept_polygon) {
+				if (this->edge->common_vertex(candidate) != nullptr) {
+					// shares a vertex with the moving edge, part of configuration
+					return false;
+				}
+
+				Edge_handle prev = this->edge->prev(left);
+				Vertex_handle exclude = prev->common_vertex(candidate);
+
+				Edge_handle next = this->edge->next(!left);
+				Vertex_handle next_exclude = next->common_vertex(candidate);
+
+				if (next_exclude != nullptr) {
+					if (exclude != nullptr) {
+						// convex quad, just make sure candidate is not aligned with edge itself
+						Vector<K> dir_edge(this->edge->curve());
+						Vector<K> dir_cand(candidate->curve());
+						return safe_test::aligned_or_opposite_vectors(dir_edge, dir_cand);
+					}
+					else {
+						exclude = next_exclude;
+					}
+				}
+
+				if (exclude != candidate->source() && safe_test::convex_contains(candidate->source()->point(), swept_polygon)) {
+					return true;
+				}
+
+				if (exclude != candidate->target() && safe_test::convex_contains(candidate->target()->point(), swept_polygon)) {
+					return true;
+				}
+
+				const Segment<K> cc = candidate->curve();
+				for (const Segment<K> e : swept_polygon.edges()) {
+					auto is = CGAL::intersection(e, cc);
+					if (is) {
+						if (exclude != nullptr && std::holds_alternative<Point<K>>(is.value())) {
+							// make sure its not the endpoint (we could have just touched the corner of swept)
+							if (!safe_test::same_point(exclude->point(), std::get<Point<K>>(is.value()))) {
+								return true;
+							}
+						}
+						else {
+							// anything beyond a point must be a proper intersect
+							return true;
+						}
+					}
+				}
+
+				// no intersections were found, not blocking
+				return false;
+			}
+
 			bool can_compensate_for(const SingleMove<G>& contract, const int reduc, const Number<K> area) {
-				if (!this->blocked_by.empty()) {
-					// blocked move
+				if (this->is_blocked()) {
 					return false;
 				}
 
@@ -592,6 +666,17 @@ namespace cartocrow::simplification {
 			bool remove_self, merge_across;
 			bool prev_partial, next_partial;
 
+
+			bool is_single() override {
+				return false;
+			}
+
+			bool is_blocked_by(Edge_handle candidate) {
+
+				return prev_move->is_blocked_by(candidate, prev_swept)
+					|| next_move->is_blocked_by(candidate, next_swept);
+			}
+
 			void update() {
 
 				prev_swept.clear();
@@ -613,9 +698,9 @@ namespace cartocrow::simplification {
 					executable = false;
 					return;
 				}
-				std::cout << "making combo?" << std::endl;
+				//std::cout << "making combo?" << std::endl;
 
-				// TODO: use traits!
+				// TODO: use traits
 				if (left_at_source) {
 					prev_move = &(prev->data().left);
 					next_move = &(next->data().right);
@@ -768,7 +853,7 @@ namespace cartocrow::simplification {
 					Point<K> merge_point = this->edge->source()->point() + prev_ratio * convert_kernel<K>(prev_common_vector);
 					Point<K> prev_other_end = prev_move->swept[1] + prev_ratio * prev_move->source_move();
 
-					std::cout << " meeting point " << merge_point << std::endl;
+					//std::cout << " meeting point " << merge_point << std::endl;
 					prev_partial = !safe_test::same_point(merge_point, prev_swept[prev_swept.size() == 3 ? 0 : 3])
 						&& !safe_test::same_point(merge_point, prev_other_end)
 						&& !safe_test::same_point(prev_other_end, prev_move->swept[0]);
@@ -825,10 +910,10 @@ namespace cartocrow::simplification {
 						nextdir_at_join = next_swept[2] - next_swept[1];
 					}
 
-					std::cout << prevdir_at_join << "  ||  " << nextdir_at_join << std::endl;
-					std::cout << " -> det = " << CGAL::determinant(prevdir_at_join, nextdir_at_join) << std::endl;
+					//std::cout << prevdir_at_join << "  ||  " << nextdir_at_join << std::endl;
+					//std::cout << " -> det = " << CGAL::determinant(prevdir_at_join, nextdir_at_join) << std::endl;
 					merge_across = safe_test::aligned_vectors(prevdir_at_join, nextdir_at_join);
-					std::cout << " merge_across = " << merge_across << std::endl;
+					//std::cout << " merge_across = " << merge_across << std::endl;
 				}
 				else {
 					merge_across = false;
@@ -926,6 +1011,9 @@ namespace cartocrow::simplification {
 		// left
 		data.left.edge = e;
 		data.left.blocked_by_degzero = false;
+		for (Edge_handle b : data.left.blocked_by) {
+			utils::listRemove<Move>(&data.left, EMT::data(b).blocking);
+		}
 		data.left.blocked_by.clear();
 		data.left.left = true;
 
@@ -948,6 +1036,9 @@ namespace cartocrow::simplification {
 		// right
 		data.right.edge = e;
 		data.right.blocked_by_degzero = false;
+		for (Edge_handle b : data.right.blocked_by) {
+			utils::listRemove<Move>(&data.right, EMT::data(b).blocking);
+		}
 		data.right.blocked_by.clear();
 		data.right.left = false;
 
@@ -976,6 +1067,9 @@ namespace cartocrow::simplification {
 
 		data.combo.edge = e;
 		data.combo.blocked_by_degzero = false;
+		for (Edge_handle b : data.combo.blocked_by) {
+			utils::listRemove<Move>(&data.combo, EMT::data(b).blocking);
+		}
 		data.combo.blocked_by.clear();
 
 		data.combo.update();
@@ -993,18 +1087,6 @@ namespace cartocrow::simplification {
 		else {
 			queue.remove(&data.combo);
 		}
-	}
-
-	template <detail::EMTraits EMT>
-	bool EdgeMoves<EMT>::blocks(Edge_handle e, Single& move) {
-		// TODO
-		return false;
-	}
-
-	template <detail::EMTraits EMT>
-	bool EdgeMoves<EMT>::blocks(Edge_handle e, Combo& move) {
-		// TODO
-		return false;
 	}
 
 	template <detail::EMTraits EMT>
@@ -1075,7 +1157,7 @@ namespace cartocrow::simplification {
 			return false;
 
 		sqt.findOverlapped(rect, [this, &single](Edge_handle b) {
-			if (blocks(b, single)) {
+			if (single.is_blocked_by(b)) {
 				EMT::data(b).blocking.push_back(&single);
 				single.blocked_by.push_back(b);
 			}
@@ -1101,7 +1183,7 @@ namespace cartocrow::simplification {
 			return false;
 
 		sqt.findOverlapped(rect, [this, &combo](Edge_handle b) {
-			if (blocks(b, combo)) {
+			if (combo.is_blocked_by(b)) {
 				EMT::data(b).blocking.push_back(&combo);
 				combo.blocked_by.push_back(b);
 			}
@@ -1128,15 +1210,14 @@ namespace cartocrow::simplification {
 		const int reduc = contract.decrease_on_contract();
 		const Number<Kernel> area = contract.swept_area();
 
-		// TODO: partial blocked...
+		// TODO: partial blocked...?
 		while (walkBck != nullptr || walkFwd != nullptr) {
 			if (walkBck != nullptr) {
 				// take a step back and test
 				Single& candidate = contract.left ? EMT::data(walkBck).right : EMT::data(walkBck).left;
 				if (candidate.can_compensate_for(contract, reduc, area)) {
 
-					test_topology(candidate);
-					if (candidate.blocked_by.empty()) {
+					if (test_topology(candidate)) {
 						return &candidate;
 					}
 					else {
@@ -1157,8 +1238,7 @@ namespace cartocrow::simplification {
 				Single& candidate = contract.left ? EMT::data(walkFwd).right : EMT::data(walkFwd).left;
 				if (candidate.can_compensate_for(contract, reduc, area)) {
 
-					test_topology(candidate);
-					if (candidate.blocked_by.empty()) {
+					if (test_topology(candidate)) {
 						return &candidate;
 					}
 					else {
@@ -1185,8 +1265,9 @@ namespace cartocrow::simplification {
 		while (!queue.empty()) {
 			Move* m = queue.peek();
 
-			if (Single* sm = dynamic_cast<Single*>(m)) {
+			if (m->is_single()) {
 
+				Single* sm = static_cast<Single*>(m);
 				if (test_topology(*sm)) {
 
 					Single* compensate = find_compensate_move(*sm);
@@ -1223,7 +1304,6 @@ namespace cartocrow::simplification {
 
 		assert(area >= 0);
 
-		// TODO track changed edges
 		using namespace detail;
 
 		const bool contract = move.swept_area() <= area;
@@ -1248,14 +1328,14 @@ namespace cartocrow::simplification {
 		case DEG_THREE_SUPPORT: {
 			Edge_handle other_prev = move.edge->prev(!move.left);
 			bool add_inc = other_prev->source() == move.edge->source();
-			Vertex_handle v = graph.subdivide_edge(other_prev, move.edge->source()->point(), !add_inc);			
+			Vertex_handle v = graph.subdivide_edge(other_prev, move.edge->source()->point(), !add_inc);
 			edgeset.add(add_inc ? v->incoming() : v->outgoing());
 			// NB: prev-edge on same face will be handled later
 			break;
 		}
 		case DEG_THREE_ALIGNED:
 		case DEG_THREE_NO_SUPPORT: {
-			graph.subdivide_edge(move.edge, move.edge->source()->point(), false); 
+			graph.subdivide_edge(move.edge, move.edge->source()->point(), false);
 			// newedge is the prev edge, will be added later to edgeset
 			break;
 		}
@@ -1299,16 +1379,16 @@ namespace cartocrow::simplification {
 			if (move.remove_self) {
 				Vertex_handle v = graph.collapse_edge(move.edge, move.source_destination()); // removed edge and places the new point at the location
 				if (move.remove_previous) {
-					graph.merge_with_next(prev); 
+					graph.merge_with_next(prev);
 					if (move.merge_previous) {
-						graph.merge_with_next(next->prev()); 
+						graph.merge_with_next(next->prev());
 					}
 					edgeset.add(next);
 				}
 				else if (move.remove_next) {
-					graph.merge_with_prev(next); 
+					graph.merge_with_prev(next);
 					if (move.merge_next) {
-						graph.merge_with_prev(prev->next()); 
+						graph.merge_with_prev(prev->next());
 					}
 					edgeset.add(prev);
 				}
@@ -1324,7 +1404,7 @@ namespace cartocrow::simplification {
 					if (v->degree() == 2) {
 						graph.merge_with_next(prev);
 						if (move.merge_previous) {
-							graph.merge_with_next(move.edge->prev()); 
+							graph.merge_with_next(move.edge->prev());
 						}
 					}
 					else {
@@ -1332,7 +1412,7 @@ namespace cartocrow::simplification {
 						assert(!move.merge_previous);
 						assert(pv->degree() != 2);
 						graph.merge_vertex(pv, pv->outgoing() == prev); // make sure to erase prev. NB: combined with the move, the other edge at pv does not change
-						graph.move_vertex(v, move.source_destination());						
+						graph.move_vertex(v, move.source_destination());
 					}
 				}
 				else {
@@ -1345,7 +1425,7 @@ namespace cartocrow::simplification {
 					if (v->degree() == 2) {
 						graph.merge_with_prev(next);
 						if (move.merge_next) {
-							graph.merge_with_prev(move.edge->next()); 
+							graph.merge_with_prev(move.edge->next());
 						}
 					}
 					else {
@@ -1366,6 +1446,9 @@ namespace cartocrow::simplification {
 			auto [s, t] = move.end_positions_for(area).value();
 			graph.move_vertex(move.edge->source(), s);
 			graph.move_vertex(move.edge->target(), t);
+			edgeset.add(prev);
+			edgeset.add(move.edge);
+			edgeset.add(next);
 		}
 	}
 
@@ -1375,6 +1458,12 @@ namespace cartocrow::simplification {
 		assert(graph.can_perform_operation());
 
 		std::cout << "Paired move" << std::endl;
+		if (graph.edge(contract.edge->graph_index()) != contract.edge) {
+			std::cout << " invalid contract?" << std::endl;
+		}
+		if (graph.edge(compensate.edge->graph_index()) != compensate.edge) {
+			std::cout << " invalid compensate?" << std::endl;
+		}
 
 		Number<Kernel> area = contract.swept_area();
 
@@ -1431,8 +1520,224 @@ namespace cartocrow::simplification {
 	}
 
 	template <detail::EMTraits EMT>
+	bool EdgeMoves<EMT>::validate_state() {
+		bool correct_state = true;
+
+		for (Move* m : queue.content()) {
+			if (graph.edge(m->edge->graph_index()) != m->edge) {
+				std::cout << "! move in queue for edge " << *m->edge << "  that is not in graph" << std::endl;
+				correct_state = false;
+			}
+		}
+
+		for (Edge_handle e : graph.edges()) {
+
+			Data& edata = EMT::data(e);
+			auto& pdata = EMT::data(e->path());
+
+			// left check
+			if (edata.left.movable()) {
+				if (edata.left.is_blocked()) {
+					if (queue.contains(&edata.left)) {
+						std::cout << "! move in queue that is blocked: left move for " << *e << std::endl;
+						correct_state = false;
+					}
+
+					for (Edge_handle b : edata.left.blocked_by) {
+						Data& bdata = EMT::data(b);
+						if (std::find(bdata.blocking.begin(), bdata.blocking.end(), &edata.left) == bdata.blocking.end()) {
+							std::cout << "! left move for edge " << *e << " says its blocked by edge" << *b << ", but is not in its blocking list" << std::endl;
+							correct_state = false;
+						}
+					}
+				}
+				else if (edata.left.waiting_index < 0) {
+					if (!queue.contains(&edata.left)) {
+						std::cout << "! move not in queue that is movable, not blocked and not waiting: left move for " << *e << std::endl;
+						correct_state = false;
+					}
+				}
+				else {
+					if (pdata.left_waiting[edata.left.waiting_index] != &edata.left) {
+						std::cout << "! move is waiting, but not in waiting list: left move for " << *e << std::endl;
+						correct_state = false;
+					}
+				}
+			}
+			else {
+				if (queue.contains(&edata.left)) {
+					std::cout << "! move in queue that is not movable: left move for " << *e << std::endl;
+					correct_state = false;
+				}
+			}
+
+			// right check
+			if (edata.right.movable()) {
+				if (edata.right.is_blocked()) {
+					if (queue.contains(&edata.right)) {
+						std::cout << "! move in queue that is blocked: right move for " << *e << std::endl;
+						correct_state = false;
+					}
+
+					for (Edge_handle b : edata.right.blocked_by) {
+						Data& bdata = EMT::data(b);
+						if (std::find(bdata.blocking.begin(), bdata.blocking.end(), &edata.right) == bdata.blocking.end()) {
+							std::cout << "! right move for edge " << *e << " says its blocked by edge" << *b << ", but is not in its blocking list" << std::endl;
+							correct_state = false;
+						}
+					}
+				}
+				else if (edata.right.waiting_index < 0) {
+					if (!queue.contains(&edata.right)) {
+						std::cout << "! move not in queue that is movable, not blocked and not waiting: right move for " << *e << std::endl;
+						correct_state = false;
+					}
+				}
+				else {
+					if (pdata.right_waiting[edata.right.waiting_index] != &edata.right) {
+						std::cout << "! move is waiting, but not in waiting list: right move for " << *e << std::endl;
+						correct_state = false;
+					}
+				}
+			}
+			else {
+				if (queue.contains(&edata.right)) {
+					std::cout << "! move in queue that is not movable: right move for " << *e << std::endl;
+					correct_state = false;
+				}
+			}
+
+			// combo check
+			if (edata.combo.is_executable()) {
+				if (edata.combo.is_blocked()) {
+					if (queue.contains(&edata.combo)) {
+						std::cout << "! move in queue that is blocked: combo move for " << *e << std::endl;
+						correct_state = false;
+					}
+
+					for (Edge_handle b : edata.combo.blocked_by) {
+						Data& bdata = EMT::data(b);
+						if (std::find(bdata.blocking.begin(), bdata.blocking.end(), &edata.combo) == bdata.blocking.end()) {
+							std::cout << "! combo move for edge " << *e << " says its blocked by edge" << *b << ", but is not in its blocking list" << std::endl;
+							correct_state = false;
+						}
+					}
+				}
+				else {
+					if (!queue.contains(&edata.combo)) {
+						std::cout << "! move not in queue that is movable and not blocked: combo move for " << *e << std::endl;
+						correct_state = false;
+					}
+				}
+			}
+			else {
+				if (queue.contains(&edata.combo)) {
+					std::cout << "! move in queue that is not movable: combo move for " << *e << std::endl;
+					correct_state = false;
+				}
+			}
+
+
+			for (Move* m : edata.blocking) {
+				if (std::find(m->blocked_by.begin(), m->blocked_by.end(), e) == m->blocked_by.end()) {
+					std::cout << "! edge " << *e << " says its blocking a move for " << *m->edge << ", but is not in its blocked_by list" << std::endl;
+					correct_state = false;
+				}
+			}
+
+		}
+
+		return correct_state;
+	}
+
+	template <detail::EMTraits EMT>
 	void EdgeMoves<EMT>::checkOut(Single& move_a, bool contract_a, Single& move_b, bool contract_b) {
-		// TODO
+
+		// TODO: refine what actually changes around high-degree vertices? (is that possible...?)
+		edgeset.addAll(move_a.edge->source()->incident_edges());
+		edgeset.addAll(move_a.edge->target()->incident_edges());
+		if (contract_a) {
+			if (move_a.merge_previous) {
+				edgeset.add(move_a.edge->prev()->prev());
+			}
+			if (move_a.merge_next) {
+				edgeset.add(move_a.edge->next()->next());
+			}
+		}
+
+		edgeset.addAll(move_b.edge->source()->incident_edges());
+		edgeset.addAll(move_b.edge->target()->incident_edges());
+		if (contract_b) {
+			if (move_b.merge_previous) {
+				edgeset.add(move_b.edge->prev()->prev());
+			}
+			if (move_b.merge_next) {
+				edgeset.add(move_b.edge->next()->next());
+			}
+		}
+
+		for (Edge_handle e : edgeset) {
+			sqt.remove(e);
+
+			Data& edata = EMT::data(e);
+
+			if (edata.left.movable()) {
+				queue.remove(&edata.left);
+				if (edata.left.waiting_index >= 0) {
+					EMT::data(e->path()).remove_waiting(&edata.left);
+				}
+
+				for (Edge_handle b : edata.left.blocked_by) {
+					utils::listRemove<Move>(&edata.left, EMT::data(b).blocking);
+				}
+				edata.left.blocked_by.clear();
+			}
+
+			if (edata.right.movable()) {
+				queue.remove(&edata.right);
+				if (edata.right.waiting_index >= 0) {
+					EMT::data(e->path()).remove_waiting(&edata.right);
+				}
+
+				for (Edge_handle b : edata.right.blocked_by) {
+					utils::listRemove<Move>(&edata.right, EMT::data(b).blocking);
+				}
+				edata.right.blocked_by.clear();
+			}
+
+			if (edata.combo.is_executable()) {
+				queue.remove(&edata.combo);
+
+				for (Edge_handle b : edata.combo.blocked_by) {
+					utils::listRemove<Move>(&edata.combo, EMT::data(b).blocking);
+				}
+				edata.combo.blocked_by.clear();
+			}
+
+			for (Move* move : edata.blocking) {
+				assert(!queue.contains(move));
+
+				utils::listRemove(e, move->blocked_by);
+
+				if (move->blocked_by.empty() && !move->blocked_by_degzero && !edgeset.contains(move->edge)) {
+
+					if (move->is_single()) {
+						Single* sm = static_cast<Single*>(move);
+						if (sm->waiting_index < 0) {
+							// not waiting!
+							queue.push(move);
+						}
+					}
+					else {
+						// combined move
+						queue.push(move);
+					}
+				}
+			}
+			edata.blocking.clear();
+
+		}
+		edgeset.clear();
 	}
 
 	template <detail::EMTraits EMT>
@@ -1452,16 +1757,19 @@ namespace cartocrow::simplification {
 		size_t movechanged = edgeset.size();
 		for (size_t i = 0; i < movechanged; ++i) {
 			Edge_handle e = edgeset.edge(i);
-			update_singles(e);			
+			update_singles(e);
 			edgeset.addAll(e->source()->incident_edges());
 			edgeset.addAll(e->target()->incident_edges());
 		}
 
-		for (Edge_handle e : edgeset.edges()) {
+		for (Edge_handle e : edgeset) {
 			update_combo(e);
 		}
 
 		edgeset.clear();
+
+		std::cout << "--- reached " << graph.number_of_edges() << " edges -------------------------" << std::endl;
+		assert(validate_state());
 	}
 
 	template <detail::EMTraits EMT>

@@ -108,14 +108,14 @@ struct BMRSBaseSimplifier {
 
 	void clear() {
 		if (hasResult()) {
-			delete m_graph;
-			m_graph = nullptr;
-
 			delete m_alg;
 			m_alg = nullptr;
 
 			delete m_pqt;
 			m_pqt = nullptr;
+
+			delete m_graph;
+			m_graph = nullptr;
 		}
 
 		clearSmoothResult();
