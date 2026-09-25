@@ -11,6 +11,13 @@ namespace cartocrow::safe_test {
 		return std::abs(a - b) < M_EPSILON;
 	}
 
+	inline bool leq(const Number<Exact> a, const Number<Exact> b) {
+		return a <= b;
+	}
+	inline bool leq(const Number<Inexact> a, const Number<Inexact> b) {
+		return a <= b + M_EPSILON;
+	}
+
 	inline bool same_point(const Point<Exact> a, const Point<Exact> b) {
 		return a == b;
 	}

@@ -1306,7 +1306,7 @@ namespace cartocrow::simplification {
 
 		using namespace detail;
 
-		const bool contract = move.swept_area() <= area;
+		const bool contract = safe_test::leq(move.swept_area(), area);
 		if (contract) {
 			std::cout << "Contracting " << *move.edge << (move.left ? " left" : " right") << " for area " << move.swept_area() << std::endl;
 		}
