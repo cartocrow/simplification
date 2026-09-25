@@ -521,7 +521,7 @@ namespace cartocrow::simplification {
 					else {
 						// check alignment with self
 						merge_previous = safe_test::aligned_vectors(a->point() - a->prev()->point(),
-							c->point() - d->point());
+							c->point() - b->point());
 					}
 				}
 				else {
@@ -1377,17 +1377,22 @@ namespace cartocrow::simplification {
 
 		if (contract) {
 			if (move.remove_self) {
+				std::cout << "  remove self" << std::endl;
 				Vertex_handle v = graph.collapse_edge(move.edge, move.source_destination()); // removed edge and places the new point at the location
 				if (move.remove_previous) {
+					std::cout << "  remove prev" << std::endl;
 					graph.merge_with_next(prev);
 					if (move.merge_previous) {
+						std::cout << "  merge prev" << std::endl;
 						graph.merge_with_next(next->prev());
 					}
 					edgeset.add(next);
 				}
 				else if (move.remove_next) {
+					std::cout << "  remove next" << std::endl;
 					graph.merge_with_prev(next);
 					if (move.merge_next) {
+						std::cout << "  merge next" << std::endl;
 						graph.merge_with_prev(prev->next());
 					}
 					edgeset.add(prev);
@@ -1402,12 +1407,15 @@ namespace cartocrow::simplification {
 				if (move.remove_previous) {
 					Vertex_handle v = move.edge->source();
 					if (v->degree() == 2) {
+					    std::cout << "  remove prev" << std::endl;
 						graph.merge_with_next(prev);
 						if (move.merge_previous) {
+							std::cout << "  merge prev" << std::endl;
 							graph.merge_with_next(move.edge->prev());
 						}
 					}
 					else {
+						std::cout << "  remove prev, deg != 2" << std::endl;
 						Vertex_handle pv = prev->other(v);
 						assert(!move.merge_previous);
 						assert(pv->degree() != 2);
@@ -1423,12 +1431,15 @@ namespace cartocrow::simplification {
 				if (move.remove_next) {
 					Vertex_handle v = move.edge->target();
 					if (v->degree() == 2) {
+						std::cout << "  remove next" << std::endl;
 						graph.merge_with_prev(next);
 						if (move.merge_next) {
+							std::cout << "  merge next" << std::endl;
 							graph.merge_with_prev(move.edge->next());
 						}
 					}
 					else {
+						std::cout << "  remove next, deg != 2" << std::endl;
 						Vertex_handle nv = next->other(v);
 						assert(nv->degree() != 2);
 						assert(!move.merge_next);
@@ -1458,12 +1469,6 @@ namespace cartocrow::simplification {
 		assert(graph.can_perform_operation());
 
 		std::cout << "Paired move" << std::endl;
-		if (graph.edge(contract.edge->graph_index()) != contract.edge) {
-			std::cout << " invalid contract?" << std::endl;
-		}
-		if (graph.edge(compensate.edge->graph_index()) != compensate.edge) {
-			std::cout << " invalid compensate?" << std::endl;
-		}
 
 		Number<Kernel> area = contract.swept_area();
 
@@ -1502,14 +1507,14 @@ namespace cartocrow::simplification {
 		assert(graph.edge(combo.edge->graph_index()) == combo.edge); // if violated, something goes wrong with degeneracy handling above?
 
 		if (combo.remove_self) {
-			std::cout << "  remove self" << std::endl;
+			std::cout << "  combo: remove self" << std::endl;
 			// NB: the two points should already be on top of eachother by the two moves
 			Vertex_handle src = combo.edge->source();
 			Vertex_handle tar = combo.edge->target();
 			edgeset.remove(combo.edge);
 			graph.merge_vertex(src, true); // removes combo.edge
 			if (combo.merge_across) {
-				std::cout << "  merge across" << std::endl;
+				std::cout << "  combo: merge across" << std::endl;
 				edgeset.remove(tar->outgoing());
 				graph.merge_vertex(tar, true); // removes tar.outgoing
 			}
