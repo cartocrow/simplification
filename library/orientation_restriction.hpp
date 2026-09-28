@@ -1211,6 +1211,8 @@ namespace cartocrow::simplification {
 			ar.determine_interference_regions(eps);
 			ar.assign_step_counts(eps);
 			ar.create_staircases(eps);
+
+			assert(graph.is_initialized());
 		}
 
 	} // namespace detail

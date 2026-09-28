@@ -283,8 +283,8 @@ namespace cartocrow::simplification {
 					}
 					else {
 						// make sure its not convex-reflex sequence
-						bool left_at_source = CGAL::left_turn(contract.edge->source()->point(), next->source()->point(), next->target()->point());
-						bool right_at_target = CGAL::right_turn(next->source()->point(), next->target()->point(), this->edge->target()->point());
+						bool left_at_source = CGAL::left_turn(contract.edge->source()->point(), prev->source()->point(), prev->target()->point());
+						bool right_at_target = CGAL::right_turn(prev->source()->point(), prev->target()->point(), this->edge->target()->point());
 
 						if (left_at_source == right_at_target) {
 							// different turns, disallow, and leave to CombinedMove
@@ -919,7 +919,12 @@ namespace cartocrow::simplification {
 					merge_across = false;
 				}
 
-				executable = true;
+				int reduc = prev_partial ? -prev_move->increase_on_move() : prev_move->decrease_on_contract();
+				reduc += next_partial ? -next_move->increase_on_move() : next_move->decrease_on_contract();				
+				if (remove_self) reduc++;
+				if (merge_across) reduc++;
+
+				executable = reduc > 0;
 			}
 
 			bool is_executable() {
@@ -947,10 +952,12 @@ namespace cartocrow::simplification {
 
 			void add_waiting(Single* single) {
 				if (single->left) {
+					std::cout << ">> left move waiting for edge " << *single->edge << ", index = " << left_waiting.size() << std::endl;
 					single->waiting_index = left_waiting.size();
 					left_waiting.push_back(single);
 				}
 				else {
+					std::cout << ">> right move waiting for edge " << *single->edge << ", index = " << right_waiting.size() << std::endl;
 					single->waiting_index = right_waiting.size();
 					right_waiting.push_back(single);
 				}
@@ -958,18 +965,20 @@ namespace cartocrow::simplification {
 
 			void remove_waiting(Single* single) {
 				if (single->left) {
+					std::cout << ">> left move no longer waiting for edge " << *single->edge << std::endl;
 					Single* other = utils::swapRemove(single->waiting_index, left_waiting);
 					if (other != nullptr) {
 						other->waiting_index = single->waiting_index;
-						single->waiting_index = -1;
 					}
+					single->waiting_index = -1;
 				}
 				else {
+					std::cout << ">> right move no longer waiting for edge " << *single->edge << std::endl;
 					Single* other = utils::swapRemove(single->waiting_index, right_waiting);
 					if (other != nullptr) {
 						other->waiting_index = single->waiting_index;
-						single->waiting_index = -1;
 					}
+					single->waiting_index = -1;
 				}
 			}
 		};
@@ -1004,60 +1013,56 @@ namespace cartocrow::simplification {
 	} // namespace detail
 
 	template <detail::EMTraits EMT>
+	template <bool LEFT>
+	void EdgeMoves<EMT>::update_single(Edge_handle e, Single& single) {
+
+		single.edge = e;
+		single.blocked_by_degzero = false;
+		for (Edge_handle b : single.blocked_by) {
+			utils::listRemove<Move>(&single, EMT::data(b).blocking);
+		}
+		single.blocked_by.clear();
+		single.left = LEFT;
+
+		if (single.waiting_index >= 0) {
+			EMT::data(single.edge->path()).remove_waiting(&single);
+			single.waiting_index = -1;
+		}
+
+		single.update();
+
+		if (single.movable()) {
+
+			std::vector<Single*>& waiting = LEFT ? EMT::data(single.edge->path()).right_waiting : EMT::data(single.edge->path()).left_waiting;
+			for (Single* other : waiting) {
+				other->waiting_index = -1;
+				queue.push(other);
+			}
+			waiting.clear();
+		}
+
+		if (single.contractable()) {
+			single.cost = EMT::determineSingleCost(single);
+
+			if (queue.contains(&single)) {
+				queue.update(&single);
+			}
+			else {
+				queue.push(&single);
+			}
+		}
+		else {
+			queue.remove(&single);
+		}
+
+	}
+
+	template <detail::EMTraits EMT>
 	void EdgeMoves<EMT>::update_singles(Edge_handle e) {
 
 		Data& data = EMT::data(e);
-
-		// left
-		data.left.edge = e;
-		data.left.blocked_by_degzero = false;
-		for (Edge_handle b : data.left.blocked_by) {
-			utils::listRemove<Move>(&data.left, EMT::data(b).blocking);
-		}
-		data.left.blocked_by.clear();
-		data.left.left = true;
-
-		data.left.update();
-
-		if (data.left.contractable()) {
-			data.left.cost = EMT::determineSingleCost(data.left);
-
-			if (queue.contains(&data.left)) {
-				queue.update(&data.left);
-			}
-			else {
-				queue.push(&data.left);
-			}
-		}
-		else {
-			queue.remove(&data.left);
-		}
-
-		// right
-		data.right.edge = e;
-		data.right.blocked_by_degzero = false;
-		for (Edge_handle b : data.right.blocked_by) {
-			utils::listRemove<Move>(&data.right, EMT::data(b).blocking);
-		}
-		data.right.blocked_by.clear();
-		data.right.left = false;
-
-		data.right.update();
-
-		if (data.right.contractable()) {
-			data.right.cost = EMT::determineSingleCost(data.right);
-
-			if (queue.contains(&data.right)) {
-				queue.update(&data.right);
-			}
-			else {
-				queue.push(&data.right);
-			}
-		}
-		else {
-			queue.remove(&data.right);
-		}
-
+		update_single<true>(e, data.left);
+		update_single<false>(e, data.right);
 	}
 
 	template <detail::EMTraits EMT>
@@ -1139,6 +1144,8 @@ namespace cartocrow::simplification {
 		for (Edge_handle e : graph.edges()) {
 			update_combo(e);
 		}
+
+		assert(validate_state());
 	}
 
 	template <detail::EMTraits EMT>
@@ -1418,7 +1425,7 @@ namespace cartocrow::simplification {
 						std::cout << "  remove prev, deg != 2" << std::endl;
 						Vertex_handle pv = prev->other(v);
 						assert(!move.merge_previous);
-						assert(pv->degree() != 2);
+						assert(pv->degree() == 2);
 						graph.merge_vertex(pv, pv->outgoing() == prev); // make sure to erase prev. NB: combined with the move, the other edge at pv does not change
 						graph.move_vertex(v, move.source_destination());
 					}
@@ -1441,8 +1448,8 @@ namespace cartocrow::simplification {
 					else {
 						std::cout << "  remove next, deg != 2" << std::endl;
 						Vertex_handle nv = next->other(v);
-						assert(nv->degree() != 2);
 						assert(!move.merge_next);
+						assert(nv->degree() == 2);
 						graph.merge_vertex(nv, nv->outgoing() == next); // make sure to erase next. NB: combined with the move, the other edge at nv does not change
 						graph.move_vertex(v, move.target_destination());
 					}
@@ -1541,7 +1548,7 @@ namespace cartocrow::simplification {
 			auto& pdata = EMT::data(e->path());
 
 			// left check
-			if (edata.left.movable()) {
+			if (edata.left.contractable()) {
 				if (edata.left.is_blocked()) {
 					if (queue.contains(&edata.left)) {
 						std::cout << "! move in queue that is blocked: left move for " << *e << std::endl;
@@ -1558,7 +1565,7 @@ namespace cartocrow::simplification {
 				}
 				else if (edata.left.waiting_index < 0) {
 					if (!queue.contains(&edata.left)) {
-						std::cout << "! move not in queue that is movable, not blocked and not waiting: left move for " << *e << std::endl;
+						std::cout << "! move not in queue that is contractable, not blocked and not waiting: left move for " << *e << std::endl;
 						correct_state = false;
 					}
 				}
@@ -1571,13 +1578,13 @@ namespace cartocrow::simplification {
 			}
 			else {
 				if (queue.contains(&edata.left)) {
-					std::cout << "! move in queue that is not movable: left move for " << *e << std::endl;
+					std::cout << "! move in queue that is not contractable: left move for " << *e << std::endl;
 					correct_state = false;
 				}
 			}
 
 			// right check
-			if (edata.right.movable()) {
+			if (edata.right.contractable()) {
 				if (edata.right.is_blocked()) {
 					if (queue.contains(&edata.right)) {
 						std::cout << "! move in queue that is blocked: right move for " << *e << std::endl;
@@ -1594,7 +1601,7 @@ namespace cartocrow::simplification {
 				}
 				else if (edata.right.waiting_index < 0) {
 					if (!queue.contains(&edata.right)) {
-						std::cout << "! move not in queue that is movable, not blocked and not waiting: right move for " << *e << std::endl;
+						std::cout << "! move not in queue that is contractable, not blocked and not waiting: right move for " << *e << std::endl;
 						correct_state = false;
 					}
 				}
@@ -1607,7 +1614,7 @@ namespace cartocrow::simplification {
 			}
 			else {
 				if (queue.contains(&edata.right)) {
-					std::cout << "! move in queue that is not movable: right move for " << *e << std::endl;
+					std::cout << "! move in queue that is not contractable: right move for " << *e << std::endl;
 					correct_state = false;
 				}
 			}
@@ -1724,17 +1731,30 @@ namespace cartocrow::simplification {
 
 				utils::listRemove(e, move->blocked_by);
 
-				if (move->blocked_by.empty() && !move->blocked_by_degzero && !edgeset.contains(move->edge)) {
+				if (!move->is_blocked() && !edgeset.contains(move->edge)) {
 
 					if (move->is_single()) {
-						Single* sm = static_cast<Single*>(move);
-						if (sm->waiting_index < 0) {
-							// not waiting!
+						Single* single = static_cast<Single*>(move);
+						assert(single->waiting_index < 0);
+						// NB: single move can also be blocked because it was checked as a compensating move, but not be actually contractable itself
+						if (single->contractable()) 
 							queue.push(move);
+
+						// but it's movable in any case (otherwise, it would not have been blocked)
+						// so it may be movable now, pop waiting from the other side
+						auto& pdata = EMT::data(single->edge->path());
+						std::vector<Single*>& waiting = single->left ? pdata.right_waiting : pdata.left_waiting;
+						for (Single* other : waiting) {
+							if (!edgeset.contains(other->edge)) {
+								queue.push(other);
+							}
+							other->waiting_index = -1;
 						}
+						waiting.clear();
+
 					}
 					else {
-						// combined move
+						// Combo move: would only have been blocked if it was indeed executable
 						queue.push(move);
 					}
 				}

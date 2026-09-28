@@ -74,6 +74,8 @@ namespace cartocrow::simplification {
 
 		bool validate_state();
 
+		template<bool LEFT>
+		void update_single(Edge_handle e, Single& single);
 		void update_singles(Edge_handle e);
 		void update_combo(Edge_handle e);
 		bool test_topology(Single& single);
