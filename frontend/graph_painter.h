@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <cartocrow/renderer/geometry_painting.h>
 
 using namespace cartocrow;
@@ -14,8 +15,8 @@ enum VertexMode {
 template<class Graph>
 class GraphPainting : public GeometryPainting {
 public:
-	GraphPainting(Graph& graph, const Color color, const double linewidth, const VertexMode vmode)
-		: m_graph(graph), m_color(color), m_linewidth(linewidth), m_vmode(vmode) {
+	GraphPainting(std::shared_ptr<Graph> graph, const Color color, const double linewidth, const VertexMode vmode)
+		: m_graph(std::move(graph)), m_color(color), m_linewidth(linewidth), m_vmode(vmode) {
 	}
 
 protected:
@@ -24,11 +25,11 @@ protected:
 
 		renderer.setStroke(m_color, m_linewidth);
 
-		for (typename Graph::Edge_const_handle e : m_graph.edges()) {
+		for (typename Graph::Edge_const_handle e : m_graph->edges()) {
 			renderer.draw(e->curve());
 		}
 
-		for (typename Graph::Vertex_const_handle v : m_graph.vertices()) {
+		for (typename Graph::Vertex_const_handle v : m_graph->vertices()) {
 			bool render = false;
 			switch (m_vmode) {
 			case DEG0_ONLY:
@@ -49,7 +50,7 @@ protected:
 	}
 
 private:
-	Graph& m_graph;
+	std::shared_ptr<Graph> m_graph;
 	const Color m_color;
 	const double m_linewidth;
 	const VertexMode m_vmode;

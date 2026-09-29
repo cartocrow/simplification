@@ -6,6 +6,7 @@
 #include <QComboBox>
 #include <QSlider>
 #include <QLabel>
+#include <memory>
 
 #include <ogrsf_frmts.h>
 
@@ -27,8 +28,8 @@ private:
 	GeometryWidget* m_renderer = nullptr;
 	RegionSet<Exact>* m_regions = nullptr;
 	std::optional<std::string> m_spatialRef;
-	InputGraph* input = nullptr;
-	InputGraph* preprocessed = nullptr;
+	std::shared_ptr<InputGraph> input = nullptr;
+	std::shared_ptr<InputGraph> preprocessed = nullptr;
 	std::vector<SimplificationAlgorithm*> algorithms;
 
 	PersistentSettings m_settings = PersistentSettings("settings");
@@ -63,7 +64,7 @@ public:
 	SimplificationGUI();
 	~SimplificationGUI();
 
-	void loadInput(InputGraph* graph, const bool keepregions);
+	void loadInput(std::shared_ptr<InputGraph> graph, const bool keepregions);
 	void loadInput(const std::filesystem::path& path, const int depth);
 };
 

@@ -14,22 +14,22 @@ struct VWBaseSimplifier {
 	using VWPQT = VertexQuadTree<VWGraph>;
 	using VW = VisvalingamWhyatt<VWGraph>;
 
-	VWGraph* m_graph = nullptr;
+	std::shared_ptr<VWGraph> m_graph = nullptr;
 	VWPQT* m_pqt = nullptr;
 	VW* m_alg = nullptr;
-	SmoothGraph* m_smooth = nullptr;
+	std::shared_ptr<SmoothGraph> m_smooth = nullptr;
 	int m_init_complexity = -1;
 	Color m_color, m_smooth_color;
 
 	VWBaseSimplifier(Color color, Color smooth_color) : m_color(color), m_smooth_color(smooth_color) {}
 
-	void initialize(InputGraph* graph, const int depth) {
+	void initialize(std::shared_ptr<InputGraph> graph, const int depth) {
 
 		if (hasResult()) {
 			clear();
 		}
 
-		m_graph = new VWGraph();
+		m_graph = std::make_shared<VWGraph>();
 
 		graph_2_copy(*graph, *m_graph);
 
@@ -96,7 +96,7 @@ struct VWBaseSimplifier {
 
 	std::shared_ptr<GeometryPainting> getPainting(const VertexMode vmode) {
 		if (hasResult()) {
-			return std::make_shared<GraphPainting<VWGraph>>(*m_graph, m_color, 2, vmode);
+			return std::make_shared<GraphPainting<VWGraph>>(m_graph, m_color, 2, vmode);
 		}
 		else {
 			return nullptr;
@@ -112,7 +112,6 @@ struct VWBaseSimplifier {
 			delete m_pqt;
 			m_pqt = nullptr;
 
-			delete m_graph;
 			m_graph = nullptr;
 		}
 
@@ -130,27 +129,24 @@ struct VWBaseSimplifier {
 	}
 
 	std::shared_ptr<GeometryPainting> getSmoothPainting() {
-		return std::make_shared<GraphPainting<SmoothGraph>>(*m_smooth, m_smooth_color, 2, VertexMode::DEG0_ONLY);
+		return std::make_shared<GraphPainting<SmoothGraph>>(m_smooth, m_smooth_color, 2, VertexMode::DEG0_ONLY);
 	}
 
 	void clearSmoothResult() {
-		if (m_smooth != nullptr) {
-			delete m_smooth;
 			m_smooth = nullptr;
-		}
 	}
 
-	InputGraph* resultToGraph() {
+	std::shared_ptr<InputGraph> resultToGraph() {
 		if (m_graph == nullptr) {
 			return nullptr;
 		}
 		else if (m_smooth == nullptr) {
-			InputGraph* res = new InputGraph();
+			std::shared_ptr<InputGraph> res = std::make_shared<InputGraph>();
 			graph_2_copy(*m_graph, *res);
 			return res;
 		}
 		else {
-			InputGraph* res = new InputGraph();
+			std::shared_ptr<InputGraph> res = std::make_shared<InputGraph>();
 			graph_2_copy(*m_smooth, *res);
 			return res;
 		}
@@ -170,7 +166,7 @@ VWSimplifier& VWSimplifier::getInstance() {
 	return *exact_instance;
 }
 
-void VWSimplifier::initialize(InputGraph* graph, const int depth) {
+void VWSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int depth) {
 	exact_base->initialize(graph, depth);
 }
 
@@ -215,7 +211,7 @@ void VWSimplifier::clearSmoothResult() {
 	exact_base->clearSmoothResult();
 }
 
-InputGraph* VWSimplifier::resultToGraph() {
+std::shared_ptr<InputGraph> VWSimplifier::resultToGraph() {
 	return exact_base->resultToGraph();
 }
 
@@ -232,7 +228,7 @@ VWInexactSimplifier& VWInexactSimplifier::getInstance() {
 	return *inexact_instance;
 }
 
-void VWInexactSimplifier::initialize(InputGraph* graph, const int depth) {
+void VWInexactSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int depth) {
 	inexact_base->initialize(graph, depth);
 }
 
@@ -277,6 +273,6 @@ void VWInexactSimplifier::clearSmoothResult() {
 	inexact_base->clearSmoothResult();
 }
 
-InputGraph* VWInexactSimplifier::resultToGraph() {
+std::shared_ptr<InputGraph> VWInexactSimplifier::resultToGraph() {
 	return inexact_base->resultToGraph();
 }

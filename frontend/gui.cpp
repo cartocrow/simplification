@@ -34,12 +34,12 @@ void SimplificationGUI::updatePaintings() {
 	VertexMode vmode = static_cast<VertexMode>(vertexMode->currentIndex());
 
 	if (input != nullptr) {
-		auto paint = std::make_shared<GraphPainting<InputGraph>>(*input, m_input_color, 1, vmode);
+		auto paint = std::make_shared<GraphPainting<InputGraph>>(input, m_input_color, 1, vmode);
 		m_renderer->addPainting(paint, "Input");
 	}
 
 	if (preprocessed != nullptr) {
-		auto paint = std::make_shared<GraphPainting<InputGraph>>(*preprocessed, m_preprocessed_color, 2, vmode);
+		auto paint = std::make_shared<GraphPainting<InputGraph>>(preprocessed, m_preprocessed_color, 2, vmode);
 		m_renderer->addPainting(paint, "Preprocessed");
 	}
 
@@ -146,11 +146,11 @@ void SimplificationGUI::addIOTab() {
 		progress.setMinimumDuration(1000);
 		progress.setValue(1);
 
-		InputGraph* graph;
+		std::shared_ptr<InputGraph> graph;
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 		if (!alg->hasResult()) {
 			std::cout << "Warning: selected algorithm has no result -- exporting input / preprocessed graph instead." << std::endl;
-			if (preprocessed == nullptr) {
+			if (!preprocessed) {
 				graph = input;
 			}
 			else {
@@ -161,7 +161,7 @@ void SimplificationGUI::addIOTab() {
 			graph = alg->resultToGraph();
 		}
 
-		exportRegionSetUsingGDAL<InputGraph>(filePath, graph, *m_regions, m_spatialRef);
+		exportRegionSetUsingGDAL<InputGraph>(filePath, graph.get(), *m_regions, m_spatialRef);
 
 		progress.setValue(2);
 
@@ -196,11 +196,7 @@ void SimplificationGUI::addPreprocessTab() {
 		if (input == nullptr) {
 			return;
 		}
-		if (preprocessed != nullptr) {
-			delete preprocessed;
-			preprocessed = nullptr;
-		}
-		preprocessed = new InputGraph();
+		preprocessed = std::make_shared<InputGraph>();
 		graph_2_copy(*input, *preprocessed);
 		restrict(preprocessed, 2, 0);
 		updatePaintings();
@@ -210,11 +206,7 @@ void SimplificationGUI::addPreprocessTab() {
 		if (input == nullptr) {
 			return;
 		}
-		if (preprocessed != nullptr) {
-			delete preprocessed;
-			preprocessed = nullptr;
-		}
-		preprocessed = new InputGraph();
+		preprocessed = std::make_shared<InputGraph>();
 		graph_2_copy(*input, *preprocessed);
 		restrict(preprocessed, 3, 0);
 		updatePaintings();
@@ -224,11 +216,7 @@ void SimplificationGUI::addPreprocessTab() {
 		if (input == nullptr) {
 			return;
 		}
-		if (preprocessed != nullptr) {
-			delete preprocessed;
-			preprocessed = nullptr;
-		}
-		preprocessed = new InputGraph();
+		preprocessed = std::make_shared<InputGraph>();
 		graph_2_copy(*input, *preprocessed);
 		restrict(preprocessed, 3, std::numbers::pi / 6.0);
 		updatePaintings();
@@ -238,21 +226,14 @@ void SimplificationGUI::addPreprocessTab() {
 		if (input == nullptr) {
 			return;
 		}
-		if (preprocessed != nullptr) {
-			delete preprocessed;
-			preprocessed = nullptr;
-		}
-		preprocessed = new InputGraph();
+		preprocessed = std::make_shared<InputGraph>();
 		graph_2_copy(*input, *preprocessed);
 		restrict(preprocessed, 4, 0);
 		updatePaintings();
 		});
 
 	connect(buttonClear, &QPushButton::clicked, [this]() {
-		if (preprocessed != nullptr) {
-			delete preprocessed;
-			preprocessed = nullptr;
-		}
+		preprocessed = nullptr;
 		updatePaintings();
 		});
 }
@@ -602,28 +583,23 @@ SimplificationGUI::~SimplificationGUI() {
 	if (m_renderer != nullptr) {
 		delete m_renderer;
 	}
-	if (input != nullptr) {
-		delete input;
-	}
-	if (preprocessed != nullptr) {
-		delete preprocessed;
-	}
+	input = nullptr;
+	preprocessed = nullptr;
+
 	if (m_regions != nullptr) {
 		delete m_regions;
 	}
 }
 
-void SimplificationGUI::loadInput(InputGraph* graph, const bool keepregions) {
+void SimplificationGUI::loadInput(std::shared_ptr<InputGraph> graph, const bool keepregions) {
 	if (input != nullptr) {
-		delete input;
-
 		for (SimplificationAlgorithm* alg : algorithms) {
 			alg->clear();
 		}
 		input = nullptr;
 	}
+
 	if (preprocessed != nullptr) {
-		delete preprocessed;
 		preprocessed = nullptr;
 	}
 
@@ -639,7 +615,7 @@ void SimplificationGUI::loadInput(InputGraph* graph, const bool keepregions) {
 
 	updatePaintings();
 
-	if (input != nullptr) {
+	if (input) {
 		input->initialize();
 		desiredComplexity->setMaximum(input->number_of_edges());
 		complexitySlider->setMaximum(input->number_of_edges());
@@ -655,9 +631,9 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path, const int d
 		m_spatialRef = std::nullopt;
 	}
 
-	InputGraph* graph;
+	std::shared_ptr<InputGraph> graph;
 	if (path.extension() == ".ipe") {
-		graph = readIpeFile<InputGraph>(path, depth, M_EPSILON);
+		graph.reset(readIpeFile<InputGraph>(path, depth, M_EPSILON));
 		curr_file->setText(QString::fromStdString(path.filename().string()));
 		curr_srs->setText(QString::fromStdString("<i>No spatial reference</i>"));
 	}
@@ -679,7 +655,7 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path, const int d
 		else {
 			curr_srs->setText(QString::fromStdString("<i>No spatial reference</i>"));
 		}
-		graph = constructGraphAndRegisterBoundaries(*m_regions, depth);
+		graph.reset(constructGraphAndRegisterBoundaries(*m_regions, depth));
 	}
 	else {
 		std::cout << "Unexpected file extension: " << path.extension() << std::endl;

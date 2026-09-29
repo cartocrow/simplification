@@ -11,9 +11,9 @@ using SmoothGraph = Straight_graph_2<std::monostate, std::monostate, Inexact, De
 void smooth(SmoothGraph* graph, const Number<Inexact> radius, const int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress);
 
 template<class Graph>
-SmoothGraph* smoothGraph(Graph* graph, const Number<Inexact> radiusfrac, const int edges_on_semicircle, std::optional<std::function<void(std::string,int,int)>> progress) {
-	SmoothGraph* result = new SmoothGraph();
+std::shared_ptr<SmoothGraph> smoothGraph(std::shared_ptr<Graph> graph, const Number<Inexact> radiusfrac, const int edges_on_semicircle, std::optional<std::function<void(std::string,int,int)>> progress) {
+	std::shared_ptr<SmoothGraph> result = std::make_shared<SmoothGraph>();
 	graph_2_copy(*graph, *result);
-	smooth(result, radiusfrac, edges_on_semicircle, progress);
+	smooth(result.get(), radiusfrac, edges_on_semicircle, progress);
 	return result;
 }

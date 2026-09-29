@@ -11,7 +11,7 @@ private:
 public:
 	static VWSimplifier& getInstance();
 
-	void initialize(InputGraph* graph, const int depth) override;
+	void initialize(std::shared_ptr<InputGraph> graph, const int depth) override;
 	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
 		std::optional<std::function<bool()>> cancelled = std::nullopt)  override;
 	int getComplexity() override;
@@ -29,7 +29,7 @@ public:
 		return "Visvalingam-Whyatt";
 	}
 
-	InputGraph* resultToGraph() override;
+	std::shared_ptr<InputGraph> resultToGraph() override;
 };
 
 class VWInexactSimplifier : public SimplificationAlgorithm {
@@ -38,7 +38,7 @@ private:
 public:
 	static VWInexactSimplifier& getInstance();
 
-	void initialize(InputGraph* graph, const int depth) override;
+	void initialize(std::shared_ptr<InputGraph> graph, const int depth) override;
 	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
 		std::optional<std::function<bool()>> cancelled = std::nullopt)  override;
 	int getComplexity() override;
@@ -56,5 +56,5 @@ public:
 		return "Visvalingam-Whyatt (inexact)";
 	}
 
-	InputGraph* resultToGraph() override;
+	std::shared_ptr<InputGraph> resultToGraph() override;
 };
