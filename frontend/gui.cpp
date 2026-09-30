@@ -291,6 +291,9 @@ void SimplificationGUI::addSimplifyTab() {
 	complexitySlider->setMinimum(0);
 	layout->addWidget(complexitySlider);
 
+	auto* debugButton = new QPushButton("Draw current state");
+	layout->addWidget(debugButton);
+
 	auto runAlg = [this](SimplificationAlgorithm* alg, int target) {
 
 		int start = alg->getComplexity();
@@ -430,6 +433,13 @@ void SimplificationGUI::addSimplifyTab() {
 		desiredComplexity->setValue(c);
 		complexitySlider->setMaximum(mc);
 		complexitySlider->setValue(c);
+		});
+
+	connect(debugButton, &QPushButton::clicked, [this]() {
+		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		for (std::pair<std::shared_ptr<GeometryPainting>,std::string> p : alg->getDebugPaintings()) {
+			m_renderer->addPainting(p.first, p.second);
+		}
 		});
 }
 

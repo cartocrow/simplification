@@ -1,5 +1,7 @@
 #include "BMRS.h"
 
+#include <memory>
+
 #include <cartocrow/data_structures/graph_map_2.h>
 
 #include "library/edge_moves.h"
@@ -7,6 +9,55 @@
 #include "smoother.h"
 
 using namespace cartocrow::simplification;
+
+template<typename Kernel>
+struct BMRSDebugPainting : public GeometryPainting {
+	using BMRSGraph = EdgeMovesGraph<Kernel, true>;
+	using Single = simplification::detail::SingleMove<BMRSGraph>;
+
+public:
+	BMRSDebugPainting(std::shared_ptr<BMRSGraph> graph)
+		: m_graph(std::move(graph)) {
+	}
+
+protected:
+	void render(const Single& move, GeometryRenderer& renderer) const {
+		if (!move.movable()) {
+			return;
+		}
+
+		if (move.is_blocked()) {
+			renderer.setFill({ 200, 20, 20 });
+		}
+		else if (move.waiting_index >= 0) {
+			renderer.setFill({ 20, 20, 200 });
+		}
+		else if (!move.contractable()) {
+			renderer.setFill({ 20, 200, 200 });
+		}
+		else {
+			renderer.setFill({ 20, 200, 20 });
+		}
+
+		renderer.draw(move.swept);
+	}
+
+	void paint(GeometryRenderer& renderer) const override {
+
+
+		renderer.setMode(GeometryRenderer::fill);
+		renderer.setFillOpacity(100);
+
+		for (typename BMRSGraph::Edge_const_handle e : m_graph->edges()) {
+			auto& edata = e->data();
+			render(edata.left, renderer);
+			render(edata.right, renderer);
+		}
+	}
+
+private:
+	std::shared_ptr<BMRSGraph> m_graph;
+};
 
 template<typename Kernel>
 struct BMRSBaseSimplifier {
@@ -135,7 +186,7 @@ struct BMRSBaseSimplifier {
 	}
 
 	void clearSmoothResult() {
-			m_smooth = nullptr;
+		m_smooth = nullptr;
 	}
 
 	std::shared_ptr<InputGraph> resultToGraph() {
@@ -152,6 +203,15 @@ struct BMRSBaseSimplifier {
 			graph_2_copy(*m_smooth, *res);
 			return res;
 		}
+	}
+
+	std::vector<std::pair<std::shared_ptr<GeometryPainting>, std::string>> getDebugPaintings() {
+		std::vector< std::pair<std::shared_ptr<GeometryPainting>, std::string>> paintings;
+
+		std::shared_ptr<BMRSDebugPainting<Kernel>> single_painting = std::make_shared<BMRSDebugPainting<Kernel>>(m_graph);
+		paintings.push_back({ single_painting, "STATE: Single moves" });
+
+		return paintings;
 	}
 };
 
@@ -217,6 +277,10 @@ std::shared_ptr<InputGraph> BMRSSimplifier::resultToGraph() {
 	return exact_base->resultToGraph();
 }
 
+std::vector<std::pair<std::shared_ptr<GeometryPainting>, std::string>> BMRSSimplifier::getDebugPaintings() {
+	return exact_base->getDebugPaintings();
+}
+
 
 using BMRSInexactBase = BMRSBaseSimplifier<Inexact>;
 static BMRSInexactSimplifier* inexact_instance = nullptr;
@@ -277,4 +341,8 @@ void BMRSInexactSimplifier::clearSmoothResult() {
 
 std::shared_ptr<InputGraph> BMRSInexactSimplifier::resultToGraph() {
 	return inexact_base->resultToGraph();
+}
+
+std::vector<std::pair<std::shared_ptr<GeometryPainting>, std::string>> BMRSInexactSimplifier::getDebugPaintings() {
+	return inexact_base->getDebugPaintings();
 }

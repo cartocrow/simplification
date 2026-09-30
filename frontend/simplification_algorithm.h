@@ -9,7 +9,7 @@
 using namespace cartocrow;
 using namespace cartocrow::renderer;
 
-using InputGraph = Straight_graph_2<std::monostate, std::monostate, Exact, CustomGraphTraits<false,true, true, true, std::monostate>>;
+using InputGraph = Straight_graph_2<std::monostate, std::monostate, Exact, CustomGraphTraits<false, true, true, true, std::monostate>>;
 extern template GraphPainting<InputGraph>;
 
 class SimplificationAlgorithm {
@@ -31,4 +31,8 @@ public:
 	virtual std::string getName() = 0;
 
 	virtual std::shared_ptr<InputGraph> resultToGraph() = 0;
+
+	virtual std::vector<std::pair<std::shared_ptr<GeometryPainting>, std::string>> getDebugPaintings() {
+		return std::vector<std::pair<std::shared_ptr<GeometryPainting>, std::string>>();
+	}
 };

@@ -64,7 +64,7 @@ namespace cartocrow::simplification {
 		using Queue = cartocrow::data_structures::IndexedPriorityQueue<detail::MoveQueueTraits<Graph>>;
 		
 		using PairedSingles = std::pair<Single*, Single*>;
-		using Operation = std::variant<Combo*, PairedSingles>;
+		using Operation = std::variant<Combo*, PairedSingles, Single*>;
 
 		Graph& graph;
 		EdgeTree& sqt;
@@ -80,14 +80,16 @@ namespace cartocrow::simplification {
 		void update_combo(Edge_handle e);
 		bool test_topology(Single& single);
 		bool test_topology(Combo& combo);
-		Single* find_compensate_move(Single& contract);
+		Single* find_compensate_move(Single& contract, Number<Kernel> area);
 
 		std::optional<Operation> findNextStep();
 		void move(Single& move, Number<Kernel> area);
 		void performStep(Single& contract, Single& compensate);
 		void performStep(Combo& combo);
+		void performStep(Single& contact);
 
-		void checkOut(Single& move_a, bool contract_a, Single& move_b, bool contract_b);
+		void determineCheckout(Single& move, bool contract);
+		void checkOut();
 		void postProcess();
 
 	public:

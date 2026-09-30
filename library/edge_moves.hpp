@@ -133,7 +133,7 @@ namespace cartocrow::simplification {
 			bool blocked_by_degzero;
 			std::vector<typename G::Edge_handle> blocked_by;
 
-			virtual bool is_single() = 0;
+			virtual bool is_single() const = 0;
 
 			bool is_blocked() const {
 				return blocked_by_degzero || !blocked_by.empty();
@@ -154,15 +154,15 @@ namespace cartocrow::simplification {
 			bool contract_merges_highdegrees;
 			int waiting_index = -1;
 
-			bool is_single() override {
+			bool is_single() const override {
 				return true;
 			}
 
-			bool is_blocked_by(Edge_handle candidate) {
+			bool is_blocked_by(Edge_handle candidate) const  {
 				return is_blocked_by(candidate, swept);
 			}
 
-			bool is_blocked_by(Edge_handle candidate, const Polygon<K>& swept_polygon) {
+			bool is_blocked_by(Edge_handle candidate, const Polygon<K>& swept_polygon) const  {
 				if (this->edge->common_vertex(candidate) != nullptr) {
 					// shares a vertex with the moving edge, part of configuration
 					return false;
@@ -215,7 +215,7 @@ namespace cartocrow::simplification {
 				return false;
 			}
 
-			bool can_compensate_for(const SingleMove<G>& contract, const int reduc, const Number<K> area) {
+			bool can_compensate_for(const SingleMove<G>& contract, const int reduc, const Number<K> area) const {
 				if (this->is_blocked()) {
 					return false;
 				}
@@ -296,15 +296,15 @@ namespace cartocrow::simplification {
 				return true;
 			}
 
-			bool movable() {
+			bool movable() const {
 				return src_type != UNMOVABLE && tar_type != UNMOVABLE;
 			}
 
-			bool contractable() {
+			bool contractable() const {
 				return movable() && !contract_merges_highdegrees && decrease_on_contract() > 0;
 			}
 
-			int increase_on_move() {
+			int increase_on_move() const {
 				int inc = 0;
 				switch (src_type) {
 				case DEG_THREE_NO_SUPPORT:
@@ -323,7 +323,7 @@ namespace cartocrow::simplification {
 				return inc;
 			}
 
-			int decrease_on_contract() {
+			int decrease_on_contract() const {
 				int dec = 0;
 				if (remove_next) {
 					dec++;
@@ -594,43 +594,43 @@ namespace cartocrow::simplification {
 				}
 			}
 
-			Number<Inexact> base_length() {
+			Number<Inexact> base_length() const {
 				return std::sqrt(approximate(CGAL::squared_distance(source(), target())));
 			}
-			Number<Inexact> end_length() {
+			Number<Inexact> end_length() const {
 				return swept.size() == 3 ? 0 : std::sqrt(approximate(CGAL::squared_distance(source_destination(), target_destination())));
 			}
-			Vector<Inexact> move_direction() {
+			Vector<Inexact> move_direction() const {
 				Vector<K> vec = edge_vector();
 				Vector<Inexact> dir = approximate(left ? vec.perpendicular(CGAL::COUNTERCLOCKWISE) : vec.perpendicular(CGAL::CLOCKWISE));
 				return dir / std::sqrt(dir.squared_length());
 			}
-			Vector<K> edge_vector() {
+			Vector<K> edge_vector() const {
 				return this->edge->target()->point() - this->edge->source()->point();
 			}
-			Point<K> source() {
+			Point<K> source() const {
 				return swept[1];
 			}
-			Point<K> source_destination() {
+			Point<K> source_destination() const {
 				return swept[0];
 			}
-			Point<K> target() {
+			Point<K> target() const {
 				return swept[2];
 			}
-			Point<K> target_destination() {
+			Point<K> target_destination() const {
 				return swept[swept.size() == 3 ? 0 : 3];
 			}
-			Vector<K> source_move() {
+			Vector<K> source_move() const {
 				return source_destination() - source();
 			}
-			Vector<K> target_move() {
+			Vector<K> target_move() const {
 				return target_destination() - target();
 			}
-			Number<K> swept_area() {
+			Number<K> swept_area() const {
 				return CGAL::abs(swept.area());
 			}
 
-			std::optional<std::pair<Point<K>, Point<K>>> end_positions_for(Number<K> area) {
+			std::optional<std::pair<Point<K>, Point<K>>> end_positions_for(const Number<K> area) const {
 
 				Vector<Inexact> movedir = move_direction();
 				Number<Inexact> len = base_length();
@@ -667,11 +667,11 @@ namespace cartocrow::simplification {
 			bool prev_partial, next_partial;
 
 
-			bool is_single() override {
+			bool is_single() const override {
 				return false;
 			}
 
-			bool is_blocked_by(Edge_handle candidate) {
+			bool is_blocked_by(Edge_handle candidate) const {
 
 				return prev_move->is_blocked_by(candidate, prev_swept)
 					|| next_move->is_blocked_by(candidate, next_swept);
@@ -920,18 +920,18 @@ namespace cartocrow::simplification {
 				}
 
 				int reduc = prev_partial ? -prev_move->increase_on_move() : prev_move->decrease_on_contract();
-				reduc += next_partial ? -next_move->increase_on_move() : next_move->decrease_on_contract();				
+				reduc += next_partial ? -next_move->increase_on_move() : next_move->decrease_on_contract();
 				if (remove_self) reduc++;
 				if (merge_across) reduc++;
 
 				executable = reduc > 0;
 			}
 
-			bool is_executable() {
+			bool is_executable() const {
 				return executable;
 			}
 
-			Number<K> swept_area() {
+			Number<K> swept_area() const {
 				return CGAL::abs(prev_swept.area());
 			}
 		};
@@ -1200,7 +1200,7 @@ namespace cartocrow::simplification {
 	}
 
 	template <detail::EMTraits EMT>
-	detail::SingleMove<typename EMT::Graph>* EdgeMoves<EMT>::find_compensate_move(Single& contract) {
+	detail::SingleMove<typename EMT::Graph>* EdgeMoves<EMT>::find_compensate_move(Single& contract, Number<Kernel> area) {
 		// find compensating move		
 
 		using namespace detail;
@@ -1215,7 +1215,6 @@ namespace cartocrow::simplification {
 		}
 
 		const int reduc = contract.decrease_on_contract();
-		const Number<Kernel> area = contract.swept_area();
 
 		// TODO: partial blocked...?
 		while (walkBck != nullptr || walkFwd != nullptr) {
@@ -1265,7 +1264,7 @@ namespace cartocrow::simplification {
 	}
 
 	template <detail::EMTraits EMT>
-	std::optional<std::variant<detail::ComboMove<typename EMT::Graph>*, std::pair<detail::SingleMove<typename EMT::Graph>*, detail::SingleMove<typename EMT::Graph>*>>>
+	std::optional<std::variant<detail::ComboMove<typename EMT::Graph>*, std::pair<detail::SingleMove<typename EMT::Graph>*, detail::SingleMove<typename EMT::Graph>*>, detail::SingleMove<typename EMT::Graph>*>>
 		EdgeMoves<EMT>::findNextStep() {
 
 		assert(graph.can_perform_operation());
@@ -1277,12 +1276,20 @@ namespace cartocrow::simplification {
 				Single* sm = static_cast<Single*>(m);
 				if (test_topology(*sm)) {
 
-					Single* compensate = find_compensate_move(*sm);
-					if (compensate != nullptr) {
-						return Operation(PairedSingles(sm, compensate));
+					Number<Kernel> area = sm->swept_area();
+
+					if (area < M_EPSILON) { // TODO: can we avoid this check for exact mode?
+						// tiny move, no compensation used
+						return Operation(sm);
 					}
 					else {
-						EMT::data(sm->edge->path()).add_waiting(sm);
+						Single* compensate = find_compensate_move(*sm, area);
+						if (compensate != nullptr) {
+							return Operation(PairedSingles(sm, compensate));
+						}
+						else {
+							EMT::data(sm->edge->path()).add_waiting(sm);
+						}
 					}
 				}
 				// if it arrived here: not a valid operation, pop it
@@ -1385,22 +1392,60 @@ namespace cartocrow::simplification {
 		if (contract) {
 			if (move.remove_self) {
 				std::cout << "  remove self" << std::endl;
-				Vertex_handle v = graph.collapse_edge(move.edge, move.source_destination()); // removed edge and places the new point at the location
+				Vertex_handle v;
+				if (move.edge->source()->degree() != 2) {
+					// target must be degree-2
+					v = move.edge->source();
+					graph.merge_with_next(move.edge);
+				}
+				else {
+					// source is degree-2
+					v = move.edge->target();
+					graph.merge_with_prev(move.edge);
+				}
+				graph.move_vertex(v, move.source_destination());
+
+				assert(!move.remove_previous || !move.remove_next);
+
 				if (move.remove_previous) {
-					std::cout << "  remove prev" << std::endl;
-					graph.merge_with_next(prev);
-					if (move.merge_previous) {
-						std::cout << "  merge prev" << std::endl;
-						graph.merge_with_next(next->prev());
+					if (v->degree() == 2) {
+						std::cout << "  remove prev" << std::endl;
+						graph.merge_with_next(prev);
+
+						if (move.merge_previous) {
+							std::cout << "  merge prev" << std::endl;
+							graph.merge_with_next(next->prev());
+						}
+					}
+					else {
+						std::cout << "  remove prev, deg != 2" << std::endl;
+						Vertex_handle pv = prev->other(v);
+						assert(!move.merge_previous);
+						assert(pv->degree() == 2);
+						Edge_handle pe = graph.merge_vertex(pv, pv->outgoing() == prev); // make sure to erase prev. NB: combined with the move, the other edge at pv does not change
+						graph.move_vertex(v, move.source_destination());
+						edgeset.add(pe);
 					}
 					edgeset.add(next);
 				}
 				else if (move.remove_next) {
-					std::cout << "  remove next" << std::endl;
-					graph.merge_with_prev(next);
-					if (move.merge_next) {
-						std::cout << "  merge next" << std::endl;
-						graph.merge_with_prev(prev->next());
+					if (v->degree() == 2) {
+						std::cout << "  remove next" << std::endl;
+						graph.merge_with_prev(next);
+
+						if (move.merge_next) {
+							std::cout << "  merge next" << std::endl;
+							graph.merge_with_prev(prev->next());
+						}
+					}
+					else {
+						std::cout << "  remove next, deg != 2" << std::endl;
+						Vertex_handle nv = next->other(v);
+						assert(!move.merge_next);
+						assert(nv->degree() == 2);
+						Edge_handle ne = graph.merge_vertex(nv, nv->outgoing() == next); // make sure to erase next. NB: combined with the move, the other edge at nv does not change
+						graph.move_vertex(v, move.target_destination());
+						edgeset.add(ne);
 					}
 					edgeset.add(prev);
 				}
@@ -1414,7 +1459,7 @@ namespace cartocrow::simplification {
 				if (move.remove_previous) {
 					Vertex_handle v = move.edge->source();
 					if (v->degree() == 2) {
-					    std::cout << "  remove prev" << std::endl;
+						std::cout << "  remove prev" << std::endl;
 						graph.merge_with_next(prev);
 						if (move.merge_previous) {
 							std::cout << "  merge prev" << std::endl;
@@ -1426,8 +1471,9 @@ namespace cartocrow::simplification {
 						Vertex_handle pv = prev->other(v);
 						assert(!move.merge_previous);
 						assert(pv->degree() == 2);
-						graph.merge_vertex(pv, pv->outgoing() == prev); // make sure to erase prev. NB: combined with the move, the other edge at pv does not change
+						Edge_handle pe = graph.merge_vertex(pv, pv->outgoing() == prev); // make sure to erase prev. NB: combined with the move, the other edge at pv does not change
 						graph.move_vertex(v, move.source_destination());
+						edgeset.add(pe);
 					}
 				}
 				else {
@@ -1450,8 +1496,9 @@ namespace cartocrow::simplification {
 						Vertex_handle nv = next->other(v);
 						assert(!move.merge_next);
 						assert(nv->degree() == 2);
-						graph.merge_vertex(nv, nv->outgoing() == next); // make sure to erase next. NB: combined with the move, the other edge at nv does not change
+						Edge_handle ne = graph.merge_vertex(nv, nv->outgoing() == next); // make sure to erase next. NB: combined with the move, the other edge at nv does not change
 						graph.move_vertex(v, move.target_destination());
+						edgeset.add(ne);
 					}
 				}
 				else {
@@ -1479,11 +1526,32 @@ namespace cartocrow::simplification {
 
 		Number<Kernel> area = contract.swept_area();
 
-		checkOut(contract, true, compensate, compensate.swept_area() <= area);
+		determineCheckout(contract, true);
+		determineCheckout(compensate, compensate.swept_area() <= area);
+		checkOut();
 
 		graph.start_operation_group();
 		move(contract, area);
 		move(compensate, area);
+		graph.end_operation_group();
+
+		postProcess();
+	}
+
+	template <detail::EMTraits EMT>
+	void EdgeMoves<EMT>::performStep(Single& contract) {
+
+		assert(graph.can_perform_operation());
+
+		std::cout << "Tiny move" << std::endl;
+
+		Number<Kernel> area = contract.swept_area();
+
+		determineCheckout(contract, true);
+		checkOut();
+
+		graph.start_operation_group();
+		move(contract, area);
 		graph.end_operation_group();
 
 		postProcess();
@@ -1496,7 +1564,9 @@ namespace cartocrow::simplification {
 
 		std::cout << "Combo move" << std::endl;
 
-		checkOut(*combo.prev_move, combo.prev_partial, *combo.next_move, combo.next_partial);
+		determineCheckout(*combo.prev_move, !combo.prev_partial);
+		determineCheckout(*combo.next_move, !combo.next_partial);
+		checkOut();
 
 		// perform
 
@@ -1537,10 +1607,40 @@ namespace cartocrow::simplification {
 
 		for (Move* m : queue.content()) {
 			if (graph.edge(m->edge->graph_index()) != m->edge) {
-				std::cout << "! move in queue for edge " << *m->edge << "  that is not in graph" << std::endl;
+				std::cout << "! move in queue for edge " << *m->edge << "  that is not in graph: ";
+				if (m->is_single()) {
+					if (static_cast<Single*>(m)->left) {
+						std::cout << "left move";
+					}
+					else {
+						std::cout << "right move";
+					}
+				}
+				else {
+					std::cout << "combo move";
+				}
+				std::cout << std::endl;
 				correct_state = false;
 			}
 		}
+
+		Graph_static_edge_map<Graph, int> emap(graph, 0);
+
+		Rectangle<Kernel> rect = sqt.root_box();
+		sqt.findOverlapped(rect, [this, &emap](Edge_handle e) {
+			if (this->graph.edge(e->graph_index()) != e) {
+				std::cout << "! edge in SQT that is not in graph: " << *e << std::endl;
+			}
+			else {
+				emap[e] = emap[e] + 1;
+			}
+			});
+		for (Edge_handle e : graph.edges()) {
+			if (emap[e] != 1) {
+				std::cout << "! edge not exactly once in SQT: " << *e << " occurs " << emap[e] << " times" << std::endl;
+			}
+		}
+
 
 		for (Edge_handle e : graph.edges()) {
 
@@ -1663,32 +1763,38 @@ namespace cartocrow::simplification {
 	}
 
 	template <detail::EMTraits EMT>
-	void EdgeMoves<EMT>::checkOut(Single& move_a, bool contract_a, Single& move_b, bool contract_b) {
+	void EdgeMoves<EMT>::determineCheckout(Single& move, bool contract) {
 
 		// TODO: refine what actually changes around high-degree vertices? (is that possible...?)
-		edgeset.addAll(move_a.edge->source()->incident_edges());
-		edgeset.addAll(move_a.edge->target()->incident_edges());
-		if (contract_a) {
-			if (move_a.merge_previous) {
-				edgeset.add(move_a.edge->prev()->prev());
+		edgeset.addAll(move.edge->source()->incident_edges());
+		edgeset.addAll(move.edge->target()->incident_edges());
+		if (contract) {
+			if (move.merge_previous) {
+				edgeset.add(move.edge->prev()->prev());
 			}
-			if (move_a.merge_next) {
-				edgeset.add(move_a.edge->next()->next());
+			else if (move.remove_previous && move.edge->source()->degree() != 2) {
+				// vertex of deg 2 will be replaced by vertex of degree != 2
+				Edge_handle pe = move.edge->prev(move.left);
+				edgeset.add(pe->source() == move.edge->source() ? pe->next() : pe->prev());
+			}
+
+			if (move.merge_next) {
+				edgeset.add(move.edge->next()->next());
+			}
+			else if (move.remove_next && move.edge->target()->degree() != 2) {
+				// vertex of deg 2 will be replaced by vertex of degree != 2
+				Edge_handle ne = move.edge->next(!move.left);
+				edgeset.add(ne->source() == move.edge->target() ? ne->next() : ne->prev());
 			}
 		}
+	}
 
-		edgeset.addAll(move_b.edge->source()->incident_edges());
-		edgeset.addAll(move_b.edge->target()->incident_edges());
-		if (contract_b) {
-			if (move_b.merge_previous) {
-				edgeset.add(move_b.edge->prev()->prev());
-			}
-			if (move_b.merge_next) {
-				edgeset.add(move_b.edge->next()->next());
-			}
-		}
+	template <detail::EMTraits EMT>
+	void EdgeMoves<EMT>::checkOut() {
 
+		std::cout << "checking out..." << std::endl;
 		for (Edge_handle e : edgeset) {
+			std::cout << "  " << *e << std::endl;
 			sqt.remove(e);
 
 			Data& edata = EMT::data(e);
@@ -1704,6 +1810,7 @@ namespace cartocrow::simplification {
 				}
 				edata.left.blocked_by.clear();
 			}
+			assert(!queue.contains(&edata.left));
 
 			if (edata.right.movable()) {
 				queue.remove(&edata.right);
@@ -1716,6 +1823,7 @@ namespace cartocrow::simplification {
 				}
 				edata.right.blocked_by.clear();
 			}
+			assert(!queue.contains(&edata.right));
 
 			if (edata.combo.is_executable()) {
 				queue.remove(&edata.combo);
@@ -1725,6 +1833,7 @@ namespace cartocrow::simplification {
 				}
 				edata.combo.blocked_by.clear();
 			}
+			assert(!queue.contains(&edata.combo));
 
 			for (Move* move : edata.blocking) {
 				assert(!queue.contains(move));
@@ -1737,7 +1846,7 @@ namespace cartocrow::simplification {
 						Single* single = static_cast<Single*>(move);
 						assert(single->waiting_index < 0);
 						// NB: single move can also be blocked because it was checked as a compensating move, but not be actually contractable itself
-						if (single->contractable()) 
+						if (single->contractable())
 							queue.push(move);
 
 						// but it's movable in any case (otherwise, it would not have been blocked)
@@ -1794,13 +1903,18 @@ namespace cartocrow::simplification {
 		edgeset.clear();
 
 		std::cout << "--- reached " << graph.number_of_edges() << " edges -------------------------" << std::endl;
-		assert(validate_state());
 	}
 
 	template <detail::EMTraits EMT>
 	bool EdgeMoves<EMT>::run(std::optional<std::function<bool(int, Number<Kernel>)>> stop) {
 
 		assert(graph.can_perform_operation());
+
+		//if (!validate_state()) {
+		//	std::cout << "INVALID STATE; cannot start" << std::endl;
+		//	return false;
+		//}
+		assert(validate_state());
 
 		while (true) {
 
@@ -1818,19 +1932,33 @@ namespace cartocrow::simplification {
 				}
 				performStep(*combo);
 			}
-			else {
+			else if (std::holds_alternative<PairedSingles>(op)) {
 				auto [contract, compensate] = std::get<PairedSingles>(op);
 				if (!stop.has_value() || (*stop)(graph.number_of_edges(), contract->cost)) {
 					return true;
 				}
 				performStep(*contract, *compensate);
 			}
+			else {
+				Single* contract = std::get<Single*>(op);
+				if (!stop.has_value() || (*stop)(graph.number_of_edges(), contract->cost)) {
+					return true;
+				}
+				performStep(*contract);
+			}
+
+			//if (!validate_state()) {
+			//	std::cout << "INVALID STATE; stopping" << std::endl;
+			//	return false;
+			//}
+			assert(validate_state());
 		}
 	}
 
 	template <detail::EMTraits EMT>
 	bool EdgeMoves<EMT>::step() {
 		assert(graph.can_perform_operation());
+		assert(validate_state());
 
 		std::optional<Operation> next = findNextStep();
 		if (!next) {
@@ -1843,10 +1971,16 @@ namespace cartocrow::simplification {
 			Combo* combo = std::get<Combo*>(op);
 			performStep(*combo);
 		}
-		else {
+		else if(std::holds_alternative<PairedSingles>(op)) {
 			auto [contract, compensate] = std::get<PairedSingles>(op);
 			performStep(*contract, *compensate);
 		}
+		else {
+			Single* contract = std::get<Single*>(op);
+			performStep(*contract);
+		}
+
+		assert(validate_state());
 		return true;
 	}
 

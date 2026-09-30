@@ -30,6 +30,8 @@ public:
 	}
 
 	std::shared_ptr<InputGraph> resultToGraph() override;
+
+	std::vector<std::pair<std::shared_ptr<GeometryPainting>, std::string>> getDebugPaintings() override;
 };
 
 class BMRSInexactSimplifier : public SimplificationAlgorithm {
@@ -57,4 +59,6 @@ public:
 	}
 
 	std::shared_ptr<InputGraph> resultToGraph() override;
+
+	std::vector<std::pair<std::shared_ptr<GeometryPainting>, std::string>> getDebugPaintings() override;
 };
