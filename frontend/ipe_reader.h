@@ -10,8 +10,6 @@
 #include "library/vertex_quad_tree.h"
 #include "library/utils.h"
 
-#include <cartocrow/core/stopwatch.h>
-
 using namespace cartocrow;
 using namespace cartocrow::simplification;
 
@@ -98,9 +96,9 @@ VertexQuadTree<Graph>* readIpeFile(Graph& graph, const std::filesystem::path& fi
 		return nullptr;
 	}
 
-	Rectangle<Kernel> box = utils::boxOf<Kernel>(lines[0]);
+	Rectangle<Kernel> box = simplification::utils::boxOf<Kernel>(lines[0]);
 	for (int i = 1; i < lines.size(); ++i) {
-		box = utils::boxOf(box, utils::boxOf<Kernel>(lines[i]));
+		box = simplification::utils::boxOf(box, simplification::utils::boxOf<Kernel>(lines[i]));
 	}
 
 	// construct the graph

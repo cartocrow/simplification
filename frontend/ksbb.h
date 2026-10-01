@@ -11,7 +11,7 @@ private:
 public:
 	static KSBBSimplifier& getInstance();
 
-	void initialize(InputGraph* graph, const int depth) override;
+	void initialize(std::shared_ptr<InputGraph> graph, const int depth) override;
 	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
 		std::optional<std::function<bool()>> cancelled = std::nullopt)  override;
 	int getComplexity() override;
@@ -29,7 +29,7 @@ public:
 		return "Kronenfeld et al.";
 	}
 
-	InputGraph* resultToGraph() override;
+	std::shared_ptr<InputGraph> resultToGraph() override;
 };
 
 class KSBBInexactSimplifier : public SimplificationAlgorithm {
@@ -38,7 +38,7 @@ private:
 public:
 	static KSBBInexactSimplifier& getInstance();
 
-	void initialize(InputGraph* graph, const int depth) override;
+	void initialize(std::shared_ptr<InputGraph> graph, const int depth) override;
 	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
 		std::optional<std::function<bool()>> cancelled = std::nullopt)  override;
 	int getComplexity() override;
@@ -56,7 +56,7 @@ public:
 		return "Kronenfeld et al. (inexact)";
 	}
 
-	InputGraph* resultToGraph() override;
+	std::shared_ptr<InputGraph> resultToGraph() override;
 };
 
 class KSBBSemiExactSimplifier : public SimplificationAlgorithm {
@@ -65,7 +65,7 @@ private:
 public:
 	static KSBBSemiExactSimplifier& getInstance();
 
-	void initialize(InputGraph* graph, const int depth) override;
+	void initialize(std::shared_ptr<InputGraph> graph, const int depth) override;
 	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
 		std::optional<std::function<bool()>> cancelled = std::nullopt)  override;
 	int getComplexity() override;
@@ -83,5 +83,5 @@ public:
 		return "Kronenfeld et al. (semi-exact)";
 	}
 
-	InputGraph* resultToGraph() override;
+	std::shared_ptr<InputGraph> resultToGraph() override;
 };

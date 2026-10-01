@@ -1,7 +1,7 @@
 #include "commandline.h"
 
 #include <numbers>
-#include <cartocrow/core/stopwatch.h>
+#include <cartocrow/utils/stopwatch.h>
 
 #include "ipe_reader.h"
 #include "library/vertex_removal.h"
@@ -10,6 +10,7 @@
 #include "library/edge_moves.h"
 
 using namespace cartocrow;
+using namespace cartocrow::utils;
 using namespace cartocrow::simplification;
 using namespace std;
 

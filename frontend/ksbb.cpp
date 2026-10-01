@@ -15,23 +15,23 @@ struct KSBBBaseSimplifier {
 	using KSBBSQT = EdgeQuadTree<KSBBGraph>;
 	using KSBB = EdgeCollapse<KronenfeldEtAlTraits<KSBBGraph, A>>;
 
-	KSBBGraph* m_graph = nullptr;
+	std::shared_ptr<KSBBGraph> m_graph = nullptr;
 	KSBBPQT* m_pqt = nullptr;
 	KSBBSQT* m_sqt = nullptr;
 	KSBB* m_alg = nullptr;
-	SmoothGraph* m_smooth = nullptr;
+	std::shared_ptr<SmoothGraph> m_smooth = nullptr;
 	int m_init_complexity = -1;
 	Color m_color, m_smooth_color;
 
 	KSBBBaseSimplifier(Color color, Color smooth_color) : m_color(color), m_smooth_color(smooth_color) {}
 
-	void initialize(InputGraph* graph, const int depth) {
+	void initialize(std::shared_ptr<InputGraph> graph, const int depth) {
 
 		if (hasResult()) {
 			clear();
 		}
 
-		m_graph = new KSBBGraph();
+		m_graph = std::make_shared<KSBBGraph>();
 
 		graph_2_copy(*graph, *m_graph);
 
@@ -99,7 +99,7 @@ struct KSBBBaseSimplifier {
 
 	std::shared_ptr<GeometryPainting> getPainting(const VertexMode vmode) {
 		if (hasResult()) {
-			return std::make_shared<GraphPainting<KSBBGraph>>(*m_graph, m_color, 2, vmode);
+			return std::make_shared<GraphPainting<KSBBGraph>>(m_graph, m_color, 2, vmode);
 		}
 		else {
 			return nullptr;
@@ -115,7 +115,6 @@ struct KSBBBaseSimplifier {
 			delete m_pqt;
 			m_pqt = nullptr;
 
-			delete m_graph;
 			m_graph = nullptr;
 		}
 
@@ -133,27 +132,24 @@ struct KSBBBaseSimplifier {
 	}
 
 	std::shared_ptr<GeometryPainting> getSmoothPainting() {
-		return std::make_shared<GraphPainting<SmoothGraph>>(*m_smooth, m_smooth_color, 2, VertexMode::DEG0_ONLY);
+		return std::make_shared<GraphPainting<SmoothGraph>>(m_smooth, m_smooth_color, 2, VertexMode::DEG0_ONLY);
 	}
 
 	void clearSmoothResult() {
-		if (m_smooth != nullptr) {
-			delete m_smooth;
-			m_smooth = nullptr;
-		}
+		m_smooth = nullptr;
 	}
 
-	InputGraph* resultToGraph() {
+	std::shared_ptr<InputGraph> resultToGraph() {
 		if (m_graph == nullptr) {
 			return nullptr;
 		}
 		else if (m_smooth == nullptr) {
-			InputGraph* res = new InputGraph();
+			std::shared_ptr<InputGraph> res = std::make_shared<InputGraph>();
 			graph_2_copy(*m_graph, *res);
 			return res;
 		}
 		else {
-			InputGraph* res = new InputGraph();
+			std::shared_ptr<InputGraph> res = std::make_shared<InputGraph>();
 			graph_2_copy(*m_smooth, *res);
 			return res;
 		}
@@ -173,7 +169,7 @@ KSBBSimplifier& KSBBSimplifier::getInstance() {
 	return *exact_instance;
 }
 
-void KSBBSimplifier::initialize(InputGraph* graph, const int depth) {
+void KSBBSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int depth) {
 	exact_base->initialize(graph, depth);
 }
 
@@ -218,7 +214,7 @@ void KSBBSimplifier::clearSmoothResult() {
 	exact_base->clearSmoothResult();
 }
 
-InputGraph* KSBBSimplifier::resultToGraph() {
+std::shared_ptr<InputGraph> KSBBSimplifier::resultToGraph() {
 	return exact_base->resultToGraph();
 }
 
@@ -235,7 +231,7 @@ KSBBInexactSimplifier& KSBBInexactSimplifier::getInstance() {
 	return *inexact_instance;
 }
 
-void KSBBInexactSimplifier::initialize(InputGraph* graph, const int depth) {
+void KSBBInexactSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int depth) {
 	inexact_base->initialize(graph, depth);
 }
 
@@ -280,7 +276,7 @@ void KSBBInexactSimplifier::clearSmoothResult() {
 	inexact_base->clearSmoothResult();
 }
 
-InputGraph* KSBBInexactSimplifier::resultToGraph() {
+std::shared_ptr<InputGraph> KSBBInexactSimplifier::resultToGraph() {
 	return inexact_base->resultToGraph();
 }
 
@@ -297,7 +293,7 @@ KSBBSemiExactSimplifier& KSBBSemiExactSimplifier::getInstance() {
 	return *semiexact_instance;
 }
 
-void KSBBSemiExactSimplifier::initialize(InputGraph* graph, const int depth) {
+void KSBBSemiExactSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int depth) {
 	semiexact_base->initialize(graph, depth);
 }
 
@@ -342,6 +338,6 @@ void KSBBSemiExactSimplifier::clearSmoothResult() {
 	semiexact_base->clearSmoothResult();
 }
 
-InputGraph* KSBBSemiExactSimplifier::resultToGraph() {
+std::shared_ptr<InputGraph> KSBBSemiExactSimplifier::resultToGraph() {
 	return semiexact_base->resultToGraph();
 }

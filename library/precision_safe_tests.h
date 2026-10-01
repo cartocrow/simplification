@@ -57,8 +57,42 @@ namespace cartocrow::safe_test {
 		return !p.has_on_unbounded_side(a);
 	}
 	inline bool convex_contains(const Point<Inexact> a, const Polygon<Inexact> p) {
-		// TODO: use M_EPSILON test for safety
-		return !p.has_on_unbounded_side(a);
+		const size_t n = p.size();
+
+		Vector<Inexact> dirPrev = p[n - 1] - a;
+		Vector<Inexact> dirCurr = p[0] - a;
+
+		Number<Inexact> cp = CGAL::determinant(dirPrev, dirCurr);
+		auto sig = CGAL::sign(cp);
+
+		if (close(cp, 0)) {
+			// either vertex is on line segment (inside) or in parallel with it (outside)
+			// inside == dotproduct <= 0
+			return leq(CGAL::scalar_product(dirPrev, dirCurr), 0);
+		}
+		else {
+			for (size_t i = 1; i < n; i++) {
+				dirPrev = dirCurr;
+				dirCurr = p[i] -a;
+
+				cp = CGAL::determinant(dirPrev, dirCurr);
+				auto s = CGAL::sign(cp);
+				if (close(cp, 0)) {
+					// either vertex is on line segment (inside) or in parallel with it (outside)
+					// inside == dotproduct <= 0
+					return leq(CGAL::scalar_product(dirPrev, dirCurr), 0);
+				}
+				else if (sig == s) {
+					// continue, same sign
+				}
+				else {
+					// opposite signs
+					return false;
+				}
+			}
+
+			return true;
+		}
 	}
 
 }
