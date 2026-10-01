@@ -11,13 +11,14 @@
 #include <ogrsf_frmts.h>
 
 #include <cartocrow/renderer/geometry_widget.h>
+#include <cartocrow/utils/persistent_settings.h>
 
 #include "region_set.h"
 #include "simplification_algorithm.h"
-#include "persistent_settings.h"
 
 using namespace cartocrow;
 using namespace cartocrow::renderer;
+using namespace cartocrow::utils;
 
 void launchGUI(int argc, char* argv[]);
 

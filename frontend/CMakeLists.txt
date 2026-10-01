@@ -2,8 +2,6 @@ set(SOURCES
     gui.cpp
     main.cpp
     commandline.cpp
-    cmd_arguments.cpp
-    persistent_settings.cpp
     read_graph_gdal.cpp
     region_set.cpp
     simplification_algorithm.cpp
@@ -21,6 +19,7 @@ target_link_libraries(
     cartocrow::data_structures
     cartocrow::reader
     cartocrow::renderer
+    cartocrow::utils
     CGAL::CGAL
     Qt5::Widgets
     GDAL::GDAL

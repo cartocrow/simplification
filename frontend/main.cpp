@@ -1,6 +1,5 @@
 #include "gui.h"
 #include "commandline.h"
-#include "cmd_arguments.h"
 
 int main(int argc, char* argv[]) {
 	CommandLineArguments cla(argc, argv);
