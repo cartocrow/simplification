@@ -70,7 +70,7 @@ namespace cartocrow::simplification {
 		EdgeTree& sqt;
 		VertexTree& pqt;
 		Queue queue;
-		detail::EdgeSet<Graph> edgeset;
+		Graph_edge_set<Graph> edgeset;
 
 		bool validate_state();
 

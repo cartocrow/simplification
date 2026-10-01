@@ -10,13 +10,12 @@
 
 using namespace cartocrow::simplification;
 
-template<typename Kernel>
+template<typename G>
 struct BMRSDebugPainting : public GeometryPainting {
-	using BMRSGraph = EdgeMovesGraph<Kernel, true>;
-	using Single = simplification::detail::SingleMove<BMRSGraph>;
+	using Single = simplification::detail::SingleMove<G>;
 
 public:
-	BMRSDebugPainting(std::shared_ptr<BMRSGraph> graph)
+	BMRSDebugPainting(std::shared_ptr<G> graph)
 		: m_graph(std::move(graph)) {
 	}
 
@@ -44,11 +43,10 @@ protected:
 
 	void paint(GeometryRenderer& renderer) const override {
 
-
 		renderer.setMode(GeometryRenderer::fill);
 		renderer.setFillOpacity(100);
 
-		for (typename BMRSGraph::Edge_const_handle e : m_graph->edges()) {
+		for (typename G::Edge_const_handle e : m_graph->edges()) {
 			auto& edata = e->data();
 			render(edata.left, renderer);
 			render(edata.right, renderer);
@@ -56,7 +54,7 @@ protected:
 	}
 
 private:
-	std::shared_ptr<BMRSGraph> m_graph;
+	std::shared_ptr<G> m_graph;
 };
 
 template<typename Kernel>
@@ -208,8 +206,8 @@ struct BMRSBaseSimplifier {
 	std::vector<std::pair<std::shared_ptr<GeometryPainting>, std::string>> getDebugPaintings() {
 		std::vector< std::pair<std::shared_ptr<GeometryPainting>, std::string>> paintings;
 
-		std::shared_ptr<BMRSDebugPainting<Kernel>> single_painting = std::make_shared<BMRSDebugPainting<Kernel>>(m_graph);
-		paintings.push_back({ single_painting, "STATE: Single moves" });
+		paintings.push_back({ std::make_shared<BMRSDebugPainting<BMRSGraph>>(m_graph), "STATE: Single moves" });
+		paintings.push_back({ std::make_shared<GraphIndexPainting<BMRSGraph>>(m_graph, true, true), "STATE: Edge indices" });
 
 		return paintings;
 	}
