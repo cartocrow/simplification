@@ -1,12 +1,13 @@
 #include "ksbb.h"
 
 #include <cartocrow/data_structures/graph_map_2.h>
+#include <cartocrow/renderer/graph_painting.h>
 
 #include "library/edge_collapse.h"
-#include "graph_painter.h"
 #include "smoother.h"
 
 using namespace cartocrow::simplification;
+using namespace cartocrow::renderer;
 
 template<typename Kernel, bool A>
 struct KSBBBaseSimplifier {
@@ -97,9 +98,9 @@ struct KSBBBaseSimplifier {
 		return m_init_complexity;
 	}
 
-	std::shared_ptr<GeometryPainting> getPainting(const VertexMode vmode) {
+	std::shared_ptr<GeometryPainting> getPainting(const VertexSelection vmode) {
 		if (hasResult()) {
-			return std::make_shared<CustomGraphPainting<KSBBGraph>>(m_graph, m_color, 2, vmode);
+			return std::make_shared<GraphPainting<KSBBGraph>>(m_graph, VertexStyle{ m_color }, EdgeStyle{ m_color, 2 }, vmode);
 		}
 		else {
 			return nullptr;
@@ -132,7 +133,7 @@ struct KSBBBaseSimplifier {
 	}
 
 	std::shared_ptr<GeometryPainting> getSmoothPainting() {
-		return std::make_shared<CustomGraphPainting<SmoothGraph>>(m_smooth, m_smooth_color, 2, VertexMode::DEG0_ONLY);
+		return std::make_shared<GraphPainting<SmoothGraph>>(m_smooth, VertexStyle{ m_smooth_color }, EdgeStyle{ m_smooth_color, 2 }, VertexSelection::DEG0_ONLY);
 	}
 
 	void clearSmoothResult() {
@@ -190,7 +191,7 @@ int KSBBSimplifier::getMaximumComplexity() {
 	return exact_base->getMaximumComplexity();
 }
 
-std::shared_ptr<GeometryPainting> KSBBSimplifier::getPainting(const VertexMode vmode) {
+std::shared_ptr<GeometryPainting> KSBBSimplifier::getPainting(const VertexSelection vmode) {
 	return exact_base->getPainting(vmode);
 }
 
@@ -252,7 +253,7 @@ int KSBBInexactSimplifier::getMaximumComplexity() {
 	return inexact_base->getMaximumComplexity();
 }
 
-std::shared_ptr<GeometryPainting> KSBBInexactSimplifier::getPainting(const VertexMode vmode) {
+std::shared_ptr<GeometryPainting> KSBBInexactSimplifier::getPainting(const VertexSelection vmode) {
 	return inexact_base->getPainting(vmode);
 }
 
@@ -314,7 +315,7 @@ int KSBBSemiExactSimplifier::getMaximumComplexity() {
 	return semiexact_base->getMaximumComplexity();
 }
 
-std::shared_ptr<GeometryPainting> KSBBSemiExactSimplifier::getPainting(const VertexMode vmode) {
+std::shared_ptr<GeometryPainting> KSBBSemiExactSimplifier::getPainting(const VertexSelection vmode) {
 	return semiexact_base->getPainting(vmode);
 }
 

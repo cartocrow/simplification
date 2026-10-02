@@ -8,12 +8,13 @@
 #include <QVBoxLayout>
 #include <QMessageBox>
 
+#include <cartocrow/renderer/graph_painting.h>
+
 #include "library/utils.h"
 
 #include "vw.h"
 #include "ksbb.h"
 #include "bmrs.h"
-#include "graph_painter.h"
 #include "ipe_reader.h"
 #include "read_graph_gdal.h"
 #include "restrictor.h"
@@ -31,15 +32,15 @@ void launchGUI(int argc, char* argv[]) {
 void SimplificationGUI::updatePaintings() {
 	m_renderer->clear();
 
-	VertexMode vmode = static_cast<VertexMode>(vertexMode->currentIndex());
+	VertexSelection vmode = static_cast<VertexSelection>(vertexMode->currentIndex());
 
 	if (input != nullptr) {
-		auto paint = std::make_shared<CustomGraphPainting<InputGraph>>(input, m_input_color, 1, vmode);
+		auto paint = std::make_shared<GraphPainting<InputGraph>>(input, VertexStyle{ m_input_color }, EdgeStyle{ m_input_color, 1 }, vmode);
 		m_renderer->addPainting(paint, "Input");
 	}
 
 	if (preprocessed != nullptr) {
-		auto paint = std::make_shared<CustomGraphPainting<InputGraph>>(preprocessed, m_preprocessed_color, 2, vmode);
+		auto paint = std::make_shared<GraphPainting<InputGraph>>(preprocessed, VertexStyle{ m_preprocessed_color }, EdgeStyle{ m_preprocessed_color, 2 }, vmode);
 		m_renderer->addPainting(paint, "Preprocessed");
 	}
 

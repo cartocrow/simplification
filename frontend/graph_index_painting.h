@@ -1,43 +1,10 @@
 #pragma once
 
 #include <memory>
-#include <cartocrow/renderer/graph_painting.h>
+#include <cartocrow/renderer/geometry_painting.h>
 
 using namespace cartocrow;
 using namespace cartocrow::renderer;
-
-enum VertexMode {
-	DEG0_ONLY = 0,
-	NO_DEG2 = 1,
-	ALL = 2
-};
-
-template<class Graph>
-class CustomGraphPainting : public GraphPainting<Graph> {
-public:
-	CustomGraphPainting(std::shared_ptr<Graph> graph, const Color color, const double linewidth, const VertexMode vmode)
-		: GraphPainting<Graph>(graph, VertexStyle(color, 6), EdgeStyle(color, linewidth)), m_vmode(vmode) {
-	}
-
-private:
-	const VertexMode m_vmode;
-
-protected:
-	void drawVertex(GeometryRenderer& renderer, typename Graph::Vertex_const_handle vertex) const override {
-		switch (m_vmode) {
-		case DEG0_ONLY:
-			if (vertex->degree() != 0) {
-				return;
-			}
-		case NO_DEG2:
-			if (vertex->degree() == 2) {
-				return;
-			}
-		}
-
-		renderer.draw(vertex->point());
-	}
-};
 
 template<class Graph>
 class GraphIndexPainting : public GeometryPainting {

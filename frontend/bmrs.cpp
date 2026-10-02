@@ -3,12 +3,14 @@
 #include <memory>
 
 #include <cartocrow/data_structures/graph_map_2.h>
+#include <cartocrow/renderer/graph_painting.h>
 
 #include "library/edge_moves.h"
-#include "graph_painter.h"
+#include "graph_index_painting.h"
 #include "smoother.h"
 
 using namespace cartocrow::simplification;
+using namespace cartocrow::renderer;
 
 template<typename G>
 struct BMRSDebugPainting : public GeometryPainting {
@@ -146,9 +148,9 @@ struct BMRSBaseSimplifier {
 		return m_init_complexity;
 	}
 
-	std::shared_ptr<GeometryPainting> getPainting(const VertexMode vmode) {
+	std::shared_ptr<GeometryPainting> getPainting(const VertexSelection vmode) {
 		if (hasResult()) {
-			return std::make_shared<CustomGraphPainting<BMRSGraph>>(m_graph, m_color, 2, vmode);
+			return std::make_shared<GraphPainting<BMRSGraph>>(m_graph, VertexStyle{ m_color }, EdgeStyle{ m_color, 2 }, vmode);
 		}
 		else {
 			return nullptr;
@@ -180,7 +182,7 @@ struct BMRSBaseSimplifier {
 	}
 
 	std::shared_ptr<GeometryPainting> getSmoothPainting() {
-		return std::make_shared<CustomGraphPainting<SmoothGraph>>(m_smooth, m_smooth_color, 2, VertexMode::DEG0_ONLY);
+		return std::make_shared<GraphPainting<SmoothGraph>>(m_smooth, VertexStyle{ m_smooth_color }, EdgeStyle{ m_smooth_color, 2 }, VertexSelection::DEG0_ONLY);
 	}
 
 	void clearSmoothResult() {
@@ -247,7 +249,7 @@ int BMRSSimplifier::getMaximumComplexity() {
 	return exact_base->getMaximumComplexity();
 }
 
-std::shared_ptr<GeometryPainting> BMRSSimplifier::getPainting(const VertexMode vmode) {
+std::shared_ptr<GeometryPainting> BMRSSimplifier::getPainting(const VertexSelection vmode) {
 	return exact_base->getPainting(vmode);
 }
 
@@ -313,7 +315,7 @@ int BMRSInexactSimplifier::getMaximumComplexity() {
 	return inexact_base->getMaximumComplexity();
 }
 
-std::shared_ptr<GeometryPainting> BMRSInexactSimplifier::getPainting(const VertexMode vmode) {
+std::shared_ptr<GeometryPainting> BMRSInexactSimplifier::getPainting(const VertexSelection vmode) {
 	return inexact_base->getPainting(vmode);
 }
 
