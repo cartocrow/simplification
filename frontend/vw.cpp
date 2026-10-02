@@ -96,7 +96,7 @@ struct VWBaseSimplifier {
 
 	std::shared_ptr<GeometryPainting> getPainting(const VertexMode vmode) {
 		if (hasResult()) {
-			return std::make_shared<GraphPainting<VWGraph>>(m_graph, m_color, 2, vmode);
+			return std::make_shared<CustomGraphPainting<VWGraph>>(m_graph, m_color, 2, vmode);
 		}
 		else {
 			return nullptr;
@@ -129,7 +129,7 @@ struct VWBaseSimplifier {
 	}
 
 	std::shared_ptr<GeometryPainting> getSmoothPainting() {
-		return std::make_shared<GraphPainting<SmoothGraph>>(m_smooth, m_smooth_color, 2, VertexMode::DEG0_ONLY);
+		return std::make_shared<CustomGraphPainting<SmoothGraph>>(m_smooth, m_smooth_color, 2, VertexMode::DEG0_ONLY);
 	}
 
 	void clearSmoothResult() {

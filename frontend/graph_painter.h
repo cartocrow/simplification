@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-#include <cartocrow/renderer/geometry_painting.h>
+#include <cartocrow/renderer/graph_painting.h>
 
 using namespace cartocrow;
 using namespace cartocrow::renderer;
@@ -13,47 +13,30 @@ enum VertexMode {
 };
 
 template<class Graph>
-class GraphPainting : public GeometryPainting {
+class CustomGraphPainting : public GraphPainting<Graph> {
 public:
-	GraphPainting(std::shared_ptr<Graph> graph, const Color color, const double linewidth, const VertexMode vmode)
-		: m_graph(std::move(graph)), m_color(color), m_linewidth(linewidth), m_vmode(vmode) {
-	}
-
-protected:
-	void paint(GeometryRenderer& renderer) const override {
-		renderer.setMode(GeometryRenderer::stroke);
-
-		renderer.setStroke(m_color, m_linewidth);
-
-		for (typename Graph::Edge_const_handle e : m_graph->edges()) {
-			renderer.draw(e->curve());
-		}
-
-		for (typename Graph::Vertex_const_handle v : m_graph->vertices()) {
-			bool render = false;
-			switch (m_vmode) {
-			case DEG0_ONLY:
-				render = v->degree() == 0;
-				break;
-			case NO_DEG2:
-				render = v->degree() != 2;
-				break;
-			case ALL:
-				render = true;
-				break;
-			}
-
-			if (render) {
-				renderer.draw(v->point());
-			}
-		}
+	CustomGraphPainting(std::shared_ptr<Graph> graph, const Color color, const double linewidth, const VertexMode vmode)
+		: GraphPainting<Graph>(graph, VertexStyle(color, 6), EdgeStyle(color, linewidth)), m_vmode(vmode) {
 	}
 
 private:
-	std::shared_ptr<Graph> m_graph;
-	const Color m_color;
-	const double m_linewidth;
 	const VertexMode m_vmode;
+
+protected:
+	void drawVertex(GeometryRenderer& renderer, typename Graph::Vertex_const_handle vertex) const override {
+		switch (m_vmode) {
+		case DEG0_ONLY:
+			if (vertex->degree() != 0) {
+				return;
+			}
+		case NO_DEG2:
+			if (vertex->degree() == 2) {
+				return;
+			}
+		}
+
+		renderer.draw(vertex->point());
+	}
 };
 
 template<class Graph>
@@ -66,7 +49,7 @@ public:
 protected:
 	void paint(GeometryRenderer& renderer) const override {
 		renderer.setMode(GeometryRenderer::stroke);
-		renderer.setStroke({0, 0, 0}, 1);
+		renderer.setStroke({ 0, 0, 0 }, 1);
 		renderer.setHorizontalTextAlignment(cartocrow::renderer::GeometryRenderer::HorizontalTextAlignment::AlignHCenter);
 		renderer.setVerticalTextAlignment(cartocrow::renderer::GeometryRenderer::VerticalTextAlignment::AlignVCenter);
 

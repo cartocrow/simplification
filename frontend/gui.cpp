@@ -34,12 +34,12 @@ void SimplificationGUI::updatePaintings() {
 	VertexMode vmode = static_cast<VertexMode>(vertexMode->currentIndex());
 
 	if (input != nullptr) {
-		auto paint = std::make_shared<GraphPainting<InputGraph>>(input, m_input_color, 1, vmode);
+		auto paint = std::make_shared<CustomGraphPainting<InputGraph>>(input, m_input_color, 1, vmode);
 		m_renderer->addPainting(paint, "Input");
 	}
 
 	if (preprocessed != nullptr) {
-		auto paint = std::make_shared<GraphPainting<InputGraph>>(preprocessed, m_preprocessed_color, 2, vmode);
+		auto paint = std::make_shared<CustomGraphPainting<InputGraph>>(preprocessed, m_preprocessed_color, 2, vmode);
 		m_renderer->addPainting(paint, "Preprocessed");
 	}
 
