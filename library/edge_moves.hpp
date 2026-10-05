@@ -1866,10 +1866,10 @@ namespace cartocrow::simplification {
 
 		assert(graph.can_perform_operation());
 
-		if (!validate_state()) {
-			std::cout << "INVALID STATE; cannot start" << std::endl;
-			return false;
-		}
+		//if (!validate_state()) {
+		//	std::cout << "INVALID STATE; cannot start" << std::endl;
+		//	return false;
+		//}
 		assert(validate_state());
 
 		while (true) {
@@ -1903,10 +1903,10 @@ namespace cartocrow::simplification {
 				performStep(*contract);
 			}
 
-			if (!validate_state()) {
-				std::cout << "INVALID STATE; stopping" << std::endl;
-				return false;
-			}
+			//if (!validate_state()) {
+			//	std::cout << "INVALID STATE; stopping" << std::endl;
+			//	return false;
+			//}
 			assert(validate_state());
 		}
 	}

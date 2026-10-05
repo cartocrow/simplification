@@ -16,7 +16,7 @@ namespace cartocrow::simplification {
 			return utils::boxOf({ seg.start(), seg.end() });
 		}
 
-		static bool element_overlaps_rectangle(Element elt, Rectangle<Kernel>& rect) {
+		static bool element_overlaps_rectangle(Element elt, const Rectangle<Kernel>& rect) {
 			Segment<Kernel> seg = elt->curve();
 			return utils::overlaps(rect, seg);
 		}

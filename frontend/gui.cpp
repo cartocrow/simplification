@@ -193,44 +193,50 @@ void SimplificationGUI::addPreprocessTab() {
 	auto* buttonClear = new QPushButton("Clear preprocessed");
 	layout->addWidget(buttonClear);
 
-	connect(buttonRect, &QPushButton::clicked, [this]() {
+	auto runRestriction = [this](int count, Number<Inexact> initial_angle) {
+
 		if (input == nullptr) {
 			return;
 		}
+
+		QProgressDialog progress("Restricting orientations", "Stop", 0, 1000, this);
+		progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowCloseButtonHint);
+		progress.setWindowModality(Qt::WindowModal);
+		progress.setMinimumDuration(1000);
+		progress.setValue(0);
+
 		preprocessed = std::make_shared<InputGraph>();
 		graph_2_copy(*input, *preprocessed);
-		restrict(preprocessed, 2, 0);
+		restrict(preprocessed, count, initial_angle, [&progress](std::string label, int c, int max) {
+			progress.setLabelText(QString::fromStdString(label));
+			if (max > progress.maximum()) {
+				progress.setMaximum(max);
+				progress.setValue(c);
+			}
+			else {
+				progress.setValue(c);
+				progress.setMaximum(max);
+			}
+			});
 		updatePaintings();
+
+		progress.setValue(progress.maximum());
+		};
+
+	connect(buttonRect, &QPushButton::clicked, [this, runRestriction]() {
+		runRestriction(2, 0);
 		});
 
-	connect(buttonHexHorz, &QPushButton::clicked, [this]() {
-		if (input == nullptr) {
-			return;
-		}
-		preprocessed = std::make_shared<InputGraph>();
-		graph_2_copy(*input, *preprocessed);
-		restrict(preprocessed, 3, 0);
-		updatePaintings();
+	connect(buttonHexHorz, &QPushButton::clicked, [this, runRestriction]() {
+		runRestriction(3, 0);
 		});
 
-	connect(buttonHexVert, &QPushButton::clicked, [this]() {
-		if (input == nullptr) {
-			return;
-		}
-		preprocessed = std::make_shared<InputGraph>();
-		graph_2_copy(*input, *preprocessed);
-		restrict(preprocessed, 3, std::numbers::pi / 6.0);
-		updatePaintings();
+	connect(buttonHexVert, &QPushButton::clicked, [this, runRestriction]() {
+		runRestriction(3, std::numbers::pi / 6.0);
 		});
 
-	connect(buttonOct, &QPushButton::clicked, [this]() {
-		if (input == nullptr) {
-			return;
-		}
-		preprocessed = std::make_shared<InputGraph>();
-		graph_2_copy(*input, *preprocessed);
-		restrict(preprocessed, 4, 0);
-		updatePaintings();
+	connect(buttonOct, &QPushButton::clicked, [this, runRestriction]() {
+		runRestriction(4, 0);
 		});
 
 	connect(buttonClear, &QPushButton::clicked, [this]() {

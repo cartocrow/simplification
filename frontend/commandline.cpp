@@ -104,6 +104,7 @@ void runKSBB(const CommandLineArguments& cla) {
 	cout << "  Done, " << graph.number_of_edges() << " edges" << endl;
 
 	Rectangle box = pqt.root_box();
+	pqt.clear();
 	SQT sqt(box, depth, fuzz);
 	Alg alg(graph, sqt, pqt);
 	cout << "Initializing" << endl;
@@ -166,6 +167,7 @@ void runBMRS(const CommandLineArguments& cla) {
 	}
 
 	Rectangle box = pqt.root_box();
+	pqt.clear();
 	SQT sqt(box, depth, fuzz);
 	Alg alg(graph, sqt, pqt);
 	cout << "Initializing" << endl;
