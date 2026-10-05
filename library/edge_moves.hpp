@@ -532,7 +532,7 @@ namespace cartocrow::simplification {
 				// precision, be sure we dont want to remove self...  
 				if (!remove_self && safe_test::same_point(source_destination(), target_destination())) {
 					remove_self = true;
-					swept.erase(swept.vertices_end()--);
+					swept.erase(--swept.vertices_end());
 				}
 
 				if (remove_self && b->degree() != 2 && c->degree() != 2) {
@@ -1269,13 +1269,12 @@ namespace cartocrow::simplification {
 	}
 
 	template <detail::EMTraits EMT>
-	void EdgeMoves<EMT>::move(Single& move, Number<Kernel> area) {
+	void EdgeMoves<EMT>::move(Single& move, const bool contract, const Number<Kernel> area) {
 
-		assert(area >= 0);
+		assert(contract || area > 0);
 
 		using namespace detail;
 
-		const bool contract = safe_test::leq(move.swept_area(), area);
 		//if (contract) {
 		//	std::cout << "Contracting " << *move.edge << (move.left ? " left" : " right") << " for area " << move.swept_area() << std::endl;
 		//}
@@ -1484,14 +1483,15 @@ namespace cartocrow::simplification {
 		//std::cout << "Paired move" << std::endl;
 
 		Number<Kernel> area = contract.swept_area();
+		const bool contract_compensate = safe_test::leq(compensate.swept_area(), area);
 
 		determineCheckout(contract, true);
-		determineCheckout(compensate, compensate.swept_area() <= area);
+		determineCheckout(compensate, contract_compensate);
 		checkOut();
 
 		graph.start_operation_group();
-		move(contract, area);
-		move(compensate, area);
+		move(contract, true, area);
+		move(compensate, contract_compensate, area);
 		graph.end_operation_group();
 
 		postProcess();
@@ -1504,13 +1504,11 @@ namespace cartocrow::simplification {
 
 		//std::cout << "Tiny move" << std::endl;
 
-		Number<Kernel> area = contract.swept_area();
-
 		determineCheckout(contract, true);
 		checkOut();
 
 		graph.start_operation_group();
-		move(contract, area);
+		move(contract, true, 0); // NB: area not used when contract=true
 		graph.end_operation_group();
 
 		postProcess();
@@ -1538,8 +1536,8 @@ namespace cartocrow::simplification {
 		}
 		assert(combo.prev_partial || combo.next_partial || !combo.prev_move->remove_next || !combo.next_move->remove_previous); // cannot contract both ends and both remove the common edge?
 
-		move(*combo.prev_move, area);
-		move(*combo.next_move, area);
+		move(*combo.prev_move, !combo.prev_partial, area);
+		move(*combo.next_move, !combo.next_partial, area);
 		assert(graph.edge(combo.edge->graph_index()) == combo.edge); // if violated, something goes wrong with degeneracy handling above?
 
 		if (combo.remove_self) {
@@ -1722,7 +1720,7 @@ namespace cartocrow::simplification {
 	}
 
 	template <detail::EMTraits EMT>
-	void EdgeMoves<EMT>::determineCheckout(Single& move, bool contract) {
+	void EdgeMoves<EMT>::determineCheckout(Single& move, const bool contract) {
 
 		// TODO: refine what actually changes around high-degree vertices? (is that possible...?)
 		edgeset.addAll(move.edge->source()->incident_edges());
@@ -1868,10 +1866,10 @@ namespace cartocrow::simplification {
 
 		assert(graph.can_perform_operation());
 
-		//if (!validate_state()) {
-		//	std::cout << "INVALID STATE; cannot start" << std::endl;
-		//	return false;
-		//}
+		if (!validate_state()) {
+			std::cout << "INVALID STATE; cannot start" << std::endl;
+			return false;
+		}
 		assert(validate_state());
 
 		while (true) {
@@ -1905,10 +1903,10 @@ namespace cartocrow::simplification {
 				performStep(*contract);
 			}
 
-			//if (!validate_state()) {
-			//	std::cout << "INVALID STATE; stopping" << std::endl;
-			//	return false;
-			//}
+			if (!validate_state()) {
+				std::cout << "INVALID STATE; stopping" << std::endl;
+				return false;
+			}
 			assert(validate_state());
 		}
 	}
