@@ -1528,6 +1528,19 @@ namespace cartocrow::simplification {
 		// perform
 
 		Number<Kernel> area = combo.swept_area();
+
+		//if (area <= 0) {
+		//	std::cout << std::setprecision(12);
+		//	std::cout << "self: " << *combo.edge << std::endl;
+		//	std::cout << "prev: " << *combo.prev_move->edge << std::endl;
+		//	std::cout << "      " << *combo.prev_move->edge->prev()->source() << std::endl;
+		//	std::cout << "      " << combo.prev_move->swept_area() << std::endl;
+		//	std::cout << "next: " << *combo.next_move->edge << std::endl;
+		//	std::cout << "      " << *combo.next_move->edge->next()->target() << std::endl;
+		//	std::cout << "      " << combo.next_move->swept_area() << std::endl;
+		//}
+		assert(area > 0);
+
 		graph.start_operation_group();
 		if (combo.remove_self) {
 			// degeneracy handling

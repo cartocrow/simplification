@@ -29,14 +29,18 @@ namespace cartocrow::safe_test {
 		return a.direction() == b.direction();
 	}
 	inline bool aligned_vectors(const Vector<Inexact> a, const Vector<Inexact> b) {
-		return close(CGAL::determinant(a, b), 0) && CGAL::scalar_product(a,b) > 0;
+		Vector<Inexact> a_norm = a / std::sqrt(a.squared_length());
+		Vector<Inexact> b_norm = b / std::sqrt(b.squared_length());
+		return close(CGAL::determinant(a_norm, b_norm), 0) && CGAL::scalar_product(a, b) > 0;
 	}
 
 	inline bool aligned_or_opposite_vectors(const Vector<Exact> a, const Vector<Exact> b) {
 		return a.direction() == b.direction() || a.direction() == -b.direction();
 	}
 	inline bool aligned_or_opposite_vectors(const Vector<Inexact> a, const Vector<Inexact> b) {
-		return close(CGAL::determinant(a, b), 0);
+		Vector<Inexact> a_norm = a / std::sqrt(a.squared_length());
+		Vector<Inexact> b_norm = b / std::sqrt(b.squared_length());
+		return close(CGAL::determinant(a_norm, b_norm), 0);
 	}
 
 	inline bool collinear(const Point<Exact> a, const Point<Exact> b, const Point<Exact> c) {
@@ -60,7 +64,9 @@ namespace cartocrow::safe_test {
 		const size_t n = p.size();
 
 		Vector<Inexact> dirPrev = p[n - 1] - a;
+		dirPrev = dirPrev / std::sqrt(dirPrev.squared_length());
 		Vector<Inexact> dirCurr = p[0] - a;
+		dirCurr = dirCurr / std::sqrt(dirCurr.squared_length());
 
 		Number<Inexact> cp = CGAL::determinant(dirPrev, dirCurr);
 		auto sig = CGAL::sign(cp);
@@ -73,7 +79,8 @@ namespace cartocrow::safe_test {
 		else {
 			for (size_t i = 1; i < n; i++) {
 				dirPrev = dirCurr;
-				dirCurr = p[i] -a;
+				dirCurr = p[i] - a;
+				dirCurr = dirCurr / std::sqrt(dirCurr.squared_length());
 
 				cp = CGAL::determinant(dirPrev, dirCurr);
 				auto s = CGAL::sign(cp);
