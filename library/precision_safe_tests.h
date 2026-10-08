@@ -47,7 +47,7 @@ namespace cartocrow::safe_test {
 		return CGAL::collinear(a, b, c);
 	}
 	inline bool collinear(const Point<Inexact> a, const Point<Inexact> b, const Point<Inexact> c) {
-		return CGAL::squared_distance(Line<Inexact>(a, c), b) < M_EPSILON;
+		return aligned_or_opposite_vectors(b - a, c - a);
 	}
 
 	inline bool point_on_line(const Point<Exact> p, const Line<Exact> l) {

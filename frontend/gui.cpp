@@ -207,15 +207,18 @@ void SimplificationGUI::addPreprocessTab() {
 
 		preprocessed = std::make_shared<InputGraph>();
 		graph_2_copy(*input, *preprocessed);
-		restrict(preprocessed, count, initial_angle, [&progress](std::string label, int c, int max) {
-			progress.setLabelText(QString::fromStdString(label));
-			if (max > progress.maximum()) {
-				progress.setMaximum(max);
-				progress.setValue(c);
+		int update = 0;
+		restrict(preprocessed, count, initial_angle, [&progress,&update](std::string label, int c, int max) {
+			if (label.size() > 0) {
+				progress.setLabelText(QString::fromStdString(label));
 			}
-			else {
-				progress.setValue(c);
+			if (max > 0) {
+				progress.setValue(0);
 				progress.setMaximum(max);
+				update = max / 100;
+			}
+			else if (c % update == 0) {
+				progress.setValue(c);
 			}
 			});
 		updatePaintings();
@@ -313,9 +316,11 @@ void SimplificationGUI::addSimplifyTab() {
 
 		alg->runToComplexity(target,
 			[&progress, &target, &start](int c) {
-				std::string lbl = "Complexity " + std::to_string(c);
-				progress.setLabelText(QString::fromStdString(lbl));
-				progress.setValue(target < start ? start - c : target - c);
+				if (c % 100 == 0) {
+					std::string lbl = "Complexity " + std::to_string(c);
+					progress.setLabelText(QString::fromStdString(lbl));
+					progress.setValue(target < start ? start - c : target - c);
+				}
 			},
 			[&progress]() {
 				return progress.wasCanceled();
@@ -587,8 +592,8 @@ SimplificationGUI::SimplificationGUI() {
 	m_renderer->setDrawAxes(false);
 	setCentralWidget(m_renderer);
 
-	m_renderer->setMinZoom(0.00001);
-	m_renderer->setMaxZoom(10000.0);
+	m_renderer->setMinZoom(0.0000001);
+	m_renderer->setMaxZoom(1000000.0);
 
 	updatePaintings();
 }

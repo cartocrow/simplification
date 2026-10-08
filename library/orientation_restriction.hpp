@@ -138,11 +138,15 @@ namespace cartocrow::simplification {
 			}
 
 			void determine_significant_vertices() {
+
+				if (progress) {
+					(*progress)("1/7: Significant vertices", 0, graph.number_of_vertices());
+				}
 				
 				for (Vertex_handle v : graph.vertices()) {
 
 					if (progress) {
-						(*progress)("1/7: Significant vertices", v->graph_index(), graph.number_of_vertices());
+						(*progress)("", v->graph_index(), 0);
 					}
 
 					size_t d = v->degree();
@@ -169,6 +173,10 @@ namespace cartocrow::simplification {
 
 			void subdivide_edges(Num lambda) {
 
+				if (progress) {
+					(*progress)("2/7: Subdividing edges", 0, graph.number_of_edges());
+				}
+
 				Num max_sqr_len = 0;
 				for (Edge_handle e : graph.edges()) {
 					Num sqr_len = approxSquaredLength(e);
@@ -184,7 +192,7 @@ namespace cartocrow::simplification {
 					Edge_handle e = graph.edge(i);
 
 					if (progress) {
-						(*progress)("2/7: Subdividing edges", i, cnt);
+						(*progress)("", i, 0);
 					}
 
 					Num sqr_len = approxSquaredLength(e);
@@ -255,8 +263,8 @@ namespace cartocrow::simplification {
 
 			void assign_directions() {
 
-				size_t e_cnt = graph.number_of_edges();
 
+				size_t e_cnt = graph.number_of_edges();
 				edge_data.resize(e_cnt);
 				for (Edge_handle e : graph.edges()) {
 					edge_data[e].edge = e;
@@ -265,10 +273,15 @@ namespace cartocrow::simplification {
 				// NB: subdivide may have increased vertex count
 				// but the new vertices are insignificant by construction
 				size_t v_cnt = significant_vertices.size();
+
+				if (progress) {
+					(*progress)("3/7: Assigning directions", 0, v_cnt);
+				}
+
 				for (int i = 0; i < v_cnt; i++) {
 
 					if (progress) {
-						(*progress)("3/7: Assigning directions", i, v_cnt);
+						(*progress)("", i, 0);
 					}
 
 					Vertex_handle v = graph.vertex(i);
@@ -332,6 +345,11 @@ namespace cartocrow::simplification {
 
 			void assign_double_insignificant() {
 
+
+				if (progress) {
+					(*progress)("4/7: Completing directions", 0, graph.number_of_edges());
+				}
+
 				for (Edge_handle e : graph.edges()) {
 
 					EdgeData& edata = edge_data[e];
@@ -340,7 +358,7 @@ namespace cartocrow::simplification {
 					}
 
 					if (progress) {
-						(*progress)("4/7: Completing directions", e->graph_index(), graph.number_of_edges());
+						(*progress)("", e->graph_index(), 0);
 					}
 
 					edata.significant = e->source();
@@ -412,12 +430,16 @@ namespace cartocrow::simplification {
 
 			void determine_interference_regions(Num eps) {
 
+				if (progress) {
+					(*progress)("5/7: Interference regions", 0, graph.number_of_edges());
+				}
+
 				for (Edge_handle e: graph.edges()) {
 
 					EdgeData& edata = edge_data[e];
 
 					if (progress) {
-						(*progress)("5/7: Interference regions", e->graph_index(), graph.number_of_edges());
+						(*progress)("", e->graph_index(), 0);
 					}
 
 					switch (edata.type) {
@@ -691,6 +713,10 @@ namespace cartocrow::simplification {
 
 				int handled = 0;
 
+				if (progress) {
+					(*progress)("6/7: Step counts", 0, e_cnt);
+				}
+
 				// first we do deviating edges
 				for (size_t i = 0; i < e_cnt; i++) {
 					
@@ -709,7 +735,7 @@ namespace cartocrow::simplification {
 					}
 					case EdgeType::DEV_UNALIGN: {
 						if (progress) {
-							(*progress)("6/7: Step counts", handled++, e_cnt);
+							(*progress)("", handled++, 0);
 						}
 
 						Num min_dist_sqr = std::numeric_limits<Num>::infinity();
@@ -797,7 +823,7 @@ namespace cartocrow::simplification {
 					}
 					case EdgeType::DEV_ALIGN: {
 						if (progress) {
-							(*progress)("6/7: Step counts", handled++, e_cnt);
+							(*progress)("", handled++, 0);
 						}
 						Num min_dist_sqr = std::numeric_limits<Num>::infinity();
 						Segment<Inexact> seg = directed_segment(e, edata);
@@ -868,13 +894,13 @@ namespace cartocrow::simplification {
 					case EdgeType::ALIGN: {
 						// nothing to do
 						if (progress) {
-							(*progress)("6/7: Step counts", handled++, e_cnt);
+							(*progress)("", handled++, 0);
 						}
 						break;
 					}
 					case EdgeType::UNALIGN: {
 						if (progress) {
-							(*progress)("6/7: Step counts", handled++, e_cnt);
+							(*progress)("", handled++, 0);
 						}
 						Num min_dist_sqr = std::numeric_limits<Num>::infinity();
 						Segment<Inexact> seg = approximate(e->curve());
@@ -949,7 +975,7 @@ namespace cartocrow::simplification {
 					}
 					case EdgeType::EVADING: {
 						if (progress) {
-							(*progress)("6/7: Step counts", handled++, e_cnt);
+							(*progress)("", handled++, 0);
 						}
 						Num min_dist_sqr = std::numeric_limits<Num>::infinity();
 						Segment<Inexact> seg = directed_segment(e, edata);
@@ -1042,11 +1068,14 @@ namespace cartocrow::simplification {
 			void create_staircases(Num eps) {
 
 				size_t e_cnt = graph.number_of_edges();
+				if (progress) {
+					(*progress)("7/7: Making staircases", 0, e_cnt);
+				}
 
 				for (size_t i = 0; i < e_cnt; i++) {
 
 					if (progress) {
-						(*progress)("7/7: Making staircases", i, e_cnt);
+						(*progress)("", i, 0);
 					}
 
 					Edge_handle e = graph.edge(i);
