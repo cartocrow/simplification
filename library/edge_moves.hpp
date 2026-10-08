@@ -6,6 +6,9 @@
 #include "utils.h"
 #include "precision_safe_tests.h"
 
+//#define EDGEMOVE_OUTPUT(line) std::cout << line << std::endl
+#define EDGEMOVE_OUTPUT(line) //
+
 namespace cartocrow::simplification {
 
 	namespace detail {
@@ -632,7 +635,27 @@ namespace cartocrow::simplification {
 					|| next_move->is_blocked_by(candidate, next_swept, !next_partial);
 			}
 
+			Point<K> prev_source_destination() {
+				return prev_swept[0];
+			}
+
+			Point<K> prev_target_destination() {
+				return prev_swept[prev_swept.size() == 3 ? 0 : 3];
+			}
+
+			Point<K> next_source_destination() {
+				return next_swept[0];
+			}
+
+			Point<K> next_target_destination() {
+				return next_swept[next_swept.size() == 3 ? 0 : 3];
+			}
+
+
+
 			void update() {
+
+				size_t edgeindex = this->edge->graph_index();
 
 				prev_swept.clear();
 				next_swept.clear();
@@ -653,7 +676,6 @@ namespace cartocrow::simplification {
 					executable = false;
 					return;
 				}
-				//std::cout << "making combo?" << std::endl;
 
 				// TODO: use traits
 				if (left_at_source) {
@@ -811,7 +833,7 @@ namespace cartocrow::simplification {
 					//std::cout << " meeting point " << merge_point << std::endl;
 					prev_partial = !safe_test::same_point(merge_point, prev_swept[prev_swept.size() == 3 ? 0 : 3])
 						&& !safe_test::same_point(merge_point, prev_other_end)
-						&& !safe_test::same_point(prev_other_end, prev_move->swept[0]);
+						&& !safe_test::same_point(prev_other_end, prev_move->source_destination());
 					if (prev_partial) {
 						prev_swept[0] = prev_other_end;
 						if (prev_swept.size() < 4) {
@@ -831,7 +853,7 @@ namespace cartocrow::simplification {
 
 					next_partial = !safe_test::same_point(merge_point, next_swept[0])
 						&& !safe_test::same_point(merge_point, next_other_end)
-						&& !safe_test::same_point(next_other_end, next_move->swept[next_move->swept.size() == 3 ? 0 : 3]);
+						&& !safe_test::same_point(next_other_end, next_move->target_destination());
 					if (next_partial) {
 
 						next_swept[0] = merge_point;
@@ -1014,6 +1036,8 @@ namespace cartocrow::simplification {
 
 	template <detail::EMTraits EMT>
 	void EdgeMoves<EMT>::update_singles(Edge_handle e) {
+
+		assert(graph.edge(e->graph_index()) == e);
 
 		Data& data = EMT::data(e);
 		update_single<true>(e, data.left);
@@ -1269,18 +1293,8 @@ namespace cartocrow::simplification {
 	}
 
 	template <detail::EMTraits EMT>
-	void EdgeMoves<EMT>::move(Single& move, const bool contract, const Number<Kernel> area) {
-
-		assert(contract || area > 0);
-
+	void EdgeMoves<EMT>::start_move(Single& move) {
 		using namespace detail;
-
-		//if (contract) {
-		//	std::cout << "Contracting " << *move.edge << (move.left ? " left" : " right") << " for area " << move.swept_area() << std::endl;
-		//}
-		//else {
-		//	std::cout << "Moving " << *move.edge << (move.left ? " left" : " right") << " with area " << area << std::endl;
-		//}
 
 		switch (move.src_type) {
 		case DEG_TWO_SUPPORT:
@@ -1343,136 +1357,155 @@ namespace cartocrow::simplification {
 		default:
 			assert(false); // unsupported vertex-moving type
 		}
+	}
+
+	template <detail::EMTraits EMT>
+	void EdgeMoves<EMT>::contract(Single& move) {
+
+		EDGEMOVE_OUTPUT("Contracting " << *move.edge << (move.left ? " left" : " right") << " for area " << move.swept_area());
+
+		start_move(move);
 
 		Edge_handle prev = move.edge->prev(move.left);
 		Edge_handle next = move.edge->next(!move.left);
 
-		if (contract) {
-			if (move.remove_self) {
-				//std::cout << "  remove self" << std::endl;
-				Vertex_handle v;
-				if (move.edge->source()->degree() != 2) {
-					// target must be degree-2
-					v = move.edge->source();
-					graph.merge_with_next(move.edge);
-				}
-				else {
-					// source is degree-2
-					v = move.edge->target();
-					graph.merge_with_prev(move.edge);
-				}
-				graph.move_vertex(v, move.source_destination());
-
-				assert(!move.remove_previous || !move.remove_next);
-
-				if (move.remove_previous) {
-					if (v->degree() == 2) {
-						//std::cout << "  remove prev" << std::endl;
-						graph.merge_with_next(prev);
-
-						if (move.merge_previous) {
-							//std::cout << "  merge prev" << std::endl;
-							graph.merge_with_next(next->prev());
-						}
-					}
-					else {
-						//std::cout << "  remove prev, deg != 2" << std::endl;
-						Vertex_handle pv = prev->other(v);
-						assert(!move.merge_previous);
-						assert(pv->degree() == 2);
-						Edge_handle pe = graph.merge_vertex(pv, pv->outgoing() == prev); // make sure to erase prev. NB: combined with the move, the other edge at pv does not change
-						graph.move_vertex(v, move.source_destination());
-						//edgeset.add(pe);
-					}
-					//edgeset.add(next);
-				}
-				else if (move.remove_next) {
-					if (v->degree() == 2) {
-						//std::cout << "  remove next" << std::endl;
-						graph.merge_with_prev(next);
-
-						if (move.merge_next) {
-							//std::cout << "  merge next" << std::endl;
-							graph.merge_with_prev(prev->next());
-						}
-					}
-					else {
-						//std::cout << "  remove next, deg != 2" << std::endl;
-						Vertex_handle nv = next->other(v);
-						assert(!move.merge_next);
-						assert(nv->degree() == 2);
-						Edge_handle ne = graph.merge_vertex(nv, nv->outgoing() == next); // make sure to erase next. NB: combined with the move, the other edge at nv does not change
-						graph.move_vertex(v, move.target_destination());
-						//edgeset.add(ne);
-					}
-					//edgeset.add(prev);
-				}
-				else {
-					//edgeset.addAll(v->incident_edges());
-				}
+		if (move.remove_self) {
+			EDGEMOVE_OUTPUT("  remove self");
+			Vertex_handle v;
+			if (move.edge->source()->degree() != 2) {
+				// target must be degree-2
+				v = move.edge->source();
+				graph.merge_with_next(move.edge);
 			}
 			else {
-				//edgeset.add(move.edge);
+				// source is degree-2
+				v = move.edge->target();
+				graph.merge_with_prev(move.edge);
+			}
+			graph.move_vertex(v, move.source_destination());
 
-				if (move.remove_previous) {
-					Vertex_handle v = move.edge->source();
-					if (v->degree() == 2) {
-						//std::cout << "  remove prev" << std::endl;
-						graph.merge_with_next(prev);
-						if (move.merge_previous) {
-							//std::cout << "  merge prev" << std::endl;
-							graph.merge_with_next(move.edge->prev());
-						}
-					}
-					else {
-						//std::cout << "  remove prev, deg != 2" << std::endl;
-						Vertex_handle pv = prev->other(v);
-						assert(!move.merge_previous);
-						assert(pv->degree() == 2);
-						Edge_handle pe = graph.merge_vertex(pv, pv->outgoing() == prev); // make sure to erase prev. NB: combined with the move, the other edge at pv does not change
-						graph.move_vertex(v, move.source_destination());
-						//edgeset.add(pe);
+			assert(!move.remove_previous || !move.remove_next);
+
+			if (move.remove_previous) {
+				if (v->degree() == 2) {
+					EDGEMOVE_OUTPUT("  remove prev");
+					graph.merge_with_next(prev);
+
+					if (move.merge_previous) {
+						EDGEMOVE_OUTPUT("  merge prev");
+						graph.merge_with_next(next->prev());
 					}
 				}
 				else {
-					graph.move_vertex(move.edge->source(), move.source_destination());
-					//edgeset.add(prev);
+					EDGEMOVE_OUTPUT("  remove prev, deg != 2");
+					Vertex_handle pv = prev->other(v);
+					assert(!move.merge_previous);
+					assert(pv->degree() == 2);
+					Edge_handle pe = graph.merge_vertex(pv, pv->outgoing() == prev); // make sure to erase prev. NB: combined with the move, the other edge at pv does not change
+					graph.move_vertex(v, move.source_destination());
+					//edgeset.add(pe);
 				}
+				//edgeset.add(next);
+			}
+			else if (move.remove_next) {
+				if (v->degree() == 2) {
+					EDGEMOVE_OUTPUT("  remove next");
+					graph.merge_with_prev(next);
 
-				if (move.remove_next) {
-					Vertex_handle v = move.edge->target();
-					if (v->degree() == 2) {
-						//std::cout << "  remove next" << std::endl;
-						graph.merge_with_prev(next);
-						if (move.merge_next) {
-							//std::cout << "  merge next" << std::endl;
-							graph.merge_with_prev(move.edge->next());
-						}
-					}
-					else {
-						//std::cout << "  remove next, deg != 2" << std::endl;
-						Vertex_handle nv = next->other(v);
-						assert(!move.merge_next);
-						assert(nv->degree() == 2);
-						Edge_handle ne = graph.merge_vertex(nv, nv->outgoing() == next); // make sure to erase next. NB: combined with the move, the other edge at nv does not change
-						graph.move_vertex(v, move.target_destination());
-						//edgeset.add(ne);
+					if (move.merge_next) {
+						EDGEMOVE_OUTPUT("  merge next");
+						graph.merge_with_prev(prev->next());
 					}
 				}
 				else {
-					graph.move_vertex(move.edge->target(), move.target_destination());
-					//edgeset.add(next);
+					EDGEMOVE_OUTPUT("  remove next, deg != 2");
+					Vertex_handle nv = next->other(v);
+					assert(!move.merge_next);
+					assert(nv->degree() == 2);
+					Edge_handle ne = graph.merge_vertex(nv, nv->outgoing() == next); // make sure to erase next. NB: combined with the move, the other edge at nv does not change
+					graph.move_vertex(v, move.target_destination());
+					//edgeset.add(ne);
 				}
+				//edgeset.add(prev);
+			}
+			else {
+				//edgeset.addAll(v->incident_edges());
 			}
 		}
 		else {
-			auto [s, t] = move.end_positions_for(area).value();
-			graph.move_vertex(move.edge->source(), s);
-			graph.move_vertex(move.edge->target(), t);
-			//edgeset.add(prev);
 			//edgeset.add(move.edge);
-			//edgeset.add(next);
+
+			if (move.remove_previous) {
+				Vertex_handle v = move.edge->source();
+				if (v->degree() == 2) {
+					EDGEMOVE_OUTPUT("  remove prev");
+					graph.merge_with_next(prev);
+					if (move.merge_previous) {
+						EDGEMOVE_OUTPUT("  merge prev");
+						graph.merge_with_next(move.edge->prev());
+					}
+				}
+				else {
+					EDGEMOVE_OUTPUT("  remove prev, deg != 2");
+					Vertex_handle pv = prev->other(v);
+					assert(!move.merge_previous);
+					assert(pv->degree() == 2);
+					Edge_handle pe = graph.merge_vertex(pv, pv->outgoing() == prev); // make sure to erase prev. NB: combined with the move, the other edge at pv does not change
+					graph.move_vertex(v, move.source_destination());
+					//edgeset.add(pe);
+				}
+			}
+			else {
+				graph.move_vertex(move.edge->source(), move.source_destination());
+				//edgeset.add(prev);
+			}
+
+			if (move.remove_next) {
+				Vertex_handle v = move.edge->target();
+				if (v->degree() == 2) {
+					EDGEMOVE_OUTPUT("  remove next");
+					graph.merge_with_prev(next);
+					if (move.merge_next) {
+						EDGEMOVE_OUTPUT("  merge next");
+						graph.merge_with_prev(move.edge->next());
+					}
+				}
+				else {
+					EDGEMOVE_OUTPUT("  remove next, deg != 2");
+					Vertex_handle nv = next->other(v);
+					assert(!move.merge_next);
+					assert(nv->degree() == 2);
+					Edge_handle ne = graph.merge_vertex(nv, nv->outgoing() == next); // make sure to erase next. NB: combined with the move, the other edge at nv does not change
+					graph.move_vertex(v, move.target_destination());
+					//edgeset.add(ne);
+				}
+			}
+			else {
+				graph.move_vertex(move.edge->target(), move.target_destination());
+				//edgeset.add(next);
+			}
 		}
+	}
+
+	template <detail::EMTraits EMT>
+	void EdgeMoves<EMT>::move(Single& move, const Number<Kernel> area) {
+		assert(area > 0);
+		auto [s, t] = move.end_positions_for(area).value();
+		this->move(move, s, t);
+	}
+
+	template <detail::EMTraits EMT>
+	void EdgeMoves<EMT>::move(Single& move, const Point<Kernel> source_dest, const Point<Kernel> target_dest) {
+
+		EDGEMOVE_OUTPUT("Moving " << *move.edge << (move.left ? " left" : " right"));
+
+		start_move(move);
+
+		graph.move_vertex(move.edge->source(), source_dest);
+		graph.move_vertex(move.edge->target(), target_dest);
+		//edgeset.add(prev);
+		//edgeset.add(move.edge);
+		//edgeset.add(next);
 	}
 
 	template <detail::EMTraits EMT>
@@ -1480,7 +1513,7 @@ namespace cartocrow::simplification {
 
 		assert(graph.can_perform_operation());
 
-		//std::cout << "Paired move" << std::endl;
+		EDGEMOVE_OUTPUT("Paired move");
 
 		Number<Kernel> area = contract.swept_area();
 		const bool contract_compensate = safe_test::leq(compensate.swept_area(), area);
@@ -1490,8 +1523,13 @@ namespace cartocrow::simplification {
 		checkOut();
 
 		graph.start_operation_group();
-		move(contract, true, area);
-		move(compensate, contract_compensate, area);
+		this->contract(contract);
+		if (contract_compensate) {
+			this->contract(compensate);
+		}
+		else {
+			this->move(compensate, area);
+		}
 		graph.end_operation_group();
 
 		postProcess();
@@ -1502,13 +1540,13 @@ namespace cartocrow::simplification {
 
 		assert(graph.can_perform_operation());
 
-		//std::cout << "Tiny move" << std::endl;
+		EDGEMOVE_OUTPUT("Tiny move");
 
 		determineCheckout(contract, true);
 		checkOut();
 
 		graph.start_operation_group();
-		move(contract, true, 0); // NB: area not used when contract=true
+		this->contract(contract);
 		graph.end_operation_group();
 
 		postProcess();
@@ -1519,27 +1557,13 @@ namespace cartocrow::simplification {
 
 		assert(graph.can_perform_operation());
 
-		//std::cout << "Combo move" << std::endl;
+		EDGEMOVE_OUTPUT("Combo move " << *combo.edge << " for area " << combo.swept_area());
 
 		determineCheckout(*combo.prev_move, !combo.prev_partial);
 		determineCheckout(*combo.next_move, !combo.next_partial);
 		checkOut();
 
 		// perform
-
-		Number<Kernel> area = combo.swept_area();
-
-		//if (area <= 0) {
-		//	std::cout << std::setprecision(12);
-		//	std::cout << "self: " << *combo.edge << std::endl;
-		//	std::cout << "prev: " << *combo.prev_move->edge << std::endl;
-		//	std::cout << "      " << *combo.prev_move->edge->prev()->source() << std::endl;
-		//	std::cout << "      " << combo.prev_move->swept_area() << std::endl;
-		//	std::cout << "next: " << *combo.next_move->edge << std::endl;
-		//	std::cout << "      " << *combo.next_move->edge->next()->target() << std::endl;
-		//	std::cout << "      " << combo.next_move->swept_area() << std::endl;
-		//}
-		assert(area > 0);
 
 		graph.start_operation_group();
 		if (combo.remove_self) {
@@ -1549,19 +1573,29 @@ namespace cartocrow::simplification {
 		}
 		assert(combo.prev_partial || combo.next_partial || !combo.prev_move->remove_next || !combo.next_move->remove_previous); // cannot contract both ends and both remove the common edge?
 
-		move(*combo.prev_move, !combo.prev_partial, area);
-		move(*combo.next_move, !combo.next_partial, area);
+		if (combo.prev_partial) {
+			move(*combo.prev_move, combo.prev_source_destination(), combo.prev_target_destination());
+		}
+		else {
+			contract(*combo.prev_move);
+		}
+		if (combo.next_partial) {
+			move(*combo.next_move, combo.next_source_destination(), combo.next_target_destination());
+		}
+		else {
+			contract(*combo.next_move);
+		}
 		assert(graph.edge(combo.edge->graph_index()) == combo.edge); // if violated, something goes wrong with degeneracy handling above?
 
 		if (combo.remove_self) {
-			//std::cout << "  combo: remove self" << std::endl;
+			EDGEMOVE_OUTPUT("  combo: remove self");
 			// NB: the two points should already be on top of eachother by the two moves
 			Vertex_handle src = combo.edge->source();
 			Vertex_handle tar = combo.edge->target();
 			edgeset.remove(combo.edge);
 			graph.merge_vertex(src, true); // removes combo.edge
 			if (combo.merge_across) {
-				//std::cout << "  combo: merge across" << std::endl;
+				EDGEMOVE_OUTPUT("  combo: merge across");
 				edgeset.remove(tar->outgoing());
 				graph.merge_vertex(tar, true); // removes tar.outgoing
 			}
@@ -1871,18 +1905,13 @@ namespace cartocrow::simplification {
 
 		edgeset.removeAll();
 
-		//std::cout << "--- reached " << graph.number_of_edges() << " edges -------------------------" << std::endl;
+		EDGEMOVE_OUTPUT("--- reached " << graph.number_of_edges() << " edges -------------------------");
 	}
 
 	template <detail::EMTraits EMT>
 	bool EdgeMoves<EMT>::run(std::optional<std::function<bool(int, Number<Kernel>)>> stop) {
 
 		assert(graph.can_perform_operation());
-
-		//if (!validate_state()) {
-		//	std::cout << "INVALID STATE; cannot start" << std::endl;
-		//	return false;
-		//}
 		assert(validate_state());
 
 		while (true) {
@@ -1916,10 +1945,6 @@ namespace cartocrow::simplification {
 				performStep(*contract);
 			}
 
-			//if (!validate_state()) {
-			//	std::cout << "INVALID STATE; stopping" << std::endl;
-			//	return false;
-			//}
 			assert(validate_state());
 		}
 	}
