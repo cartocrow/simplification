@@ -88,13 +88,13 @@ namespace cartocrow::simplification {
 
 			Graph& graph;
 			std::vector<Vec> directions;
-			Graph_static_vertex_map<Graph, bool> significant_vertices;			
+			Graph_static_vertex_map<Graph, bool> significant_vertices;
 			Graph_static_edge_map<Graph, EdgeData> edge_data;
 			InterferenceTree interference_tree;
 
 			std::optional<std::function<void(std::string, int, int)>> progress;
 
-			AngleRestriction(Graph& graph, std::vector<Vec> dirs, std::optional<std::function<void(std::string, int, int)>> progress = std::nullopt) : 
+			AngleRestriction(Graph& graph, std::vector<Vec> dirs, std::optional<std::function<void(std::string, int, int)>> progress = std::nullopt) :
 				graph(graph), directions(dirs), significant_vertices(graph, false), edge_data(graph), progress(progress), interference_tree(approximate(graph.bounding_rectangle()), 10, 0.05) {
 			};
 
@@ -142,7 +142,7 @@ namespace cartocrow::simplification {
 				if (progress) {
 					(*progress)("1/7: Significant vertices", 0, graph.number_of_vertices());
 				}
-				
+
 				for (Vertex_handle v : graph.vertices()) {
 
 					if (progress) {
@@ -434,7 +434,7 @@ namespace cartocrow::simplification {
 					(*progress)("5/7: Interference regions", 0, graph.number_of_edges());
 				}
 
-				for (Edge_handle e: graph.edges()) {
+				for (Edge_handle e : graph.edges()) {
 
 					EdgeData& edata = edge_data[e];
 
@@ -719,7 +719,7 @@ namespace cartocrow::simplification {
 
 				// first we do deviating edges
 				for (size_t i = 0; i < e_cnt; i++) {
-					
+
 					Edge_handle e = graph.edge(i);
 					EdgeData& edata = edge_data[e];
 
@@ -1356,6 +1356,29 @@ namespace cartocrow::simplification {
 			Transform t(CGAL::ROTATION, std::sin(i * a), std::cos(i * a));
 			dirs.push_back(dir.transform(t));
 			i++;
+		}
+
+		detail::restrict_directions(graph, dirs, lambda, eps, progress);
+	}
+
+	template<class Graph> requires Graph::Graph_traits::sorted&& Graph::Graph_traits::oriented
+		void restrict_orientations(Graph& graph, std::vector<Number<Inexact>> angles, Number<Inexact> lambda, Number<Inexact> eps, std::optional<std::function<void(std::string, int, int)>> progress) {
+
+		using Vec = Vector<Inexact>;
+		using Transform = CGAL::Aff_transformation_2<Inexact>;
+
+		// right
+		Vec dir(1, 0);
+
+		std::vector<Vec> dirs;
+
+		for (Number<Inexact> a : angles) {
+			Transform t(CGAL::ROTATION, std::sin(a), std::cos(a));
+			dirs.push_back(dir.transform(t));
+		}
+
+		for (int i = 0; i < angles.size(); i++) {
+			dirs.push_back(-1 * dirs[i]);
 		}
 
 		detail::restrict_directions(graph, dirs, lambda, eps, progress);

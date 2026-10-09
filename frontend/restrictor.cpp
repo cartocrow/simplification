@@ -4,6 +4,10 @@
 
 using namespace cartocrow::simplification;
 
+void restrict(std::shared_ptr<InputGraph> graph, std::vector<Number<Inexact>> angles, std::optional<std::function<void(std::string, int, int)>> progress){
+	restrict_orientations(*graph, angles, 1, 0.1, progress);
+}
+
 void restrict(std::shared_ptr<InputGraph> graph, std::initializer_list<Number<Inexact>> angles, std::optional<std::function<void(std::string, int, int)>> progress){
 	restrict_orientations(*graph, angles, 1, 0.1, progress);
 }

@@ -7,6 +7,8 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QMessageBox>
+#include <QFrame>
+#include <QLineEdit>
 
 #include <cartocrow/renderer/graph_painting.h>
 
@@ -176,76 +178,169 @@ void SimplificationGUI::addPreprocessTab() {
 	auto* layout = new QVBoxLayout(tab);
 	layout->setAlignment(Qt::AlignTop);
 
-	layout->addWidget(new QLabel("<h3>Preprocessing</h3>"));
+	{
+		layout->addWidget(new QLabel("<h3>Regular restriction</h3>"));
 
-	auto* buttonRect = new QPushButton("Rectilinear");
-	layout->addWidget(buttonRect);
-
-	auto* buttonHexHorz = new QPushButton("Hexilinear (horizontal)");
-	layout->addWidget(buttonHexHorz);
-
-	auto* buttonHexVert = new QPushButton("Hexilinear (vertical)");
-	layout->addWidget(buttonHexVert);
-
-	auto* buttonOct = new QPushButton("Octilinear");
-	layout->addWidget(buttonOct);
-
-	auto* buttonClear = new QPushButton("Clear preprocessed");
-	layout->addWidget(buttonClear);
-
-	auto runRestriction = [this](int count, Number<Inexact> initial_angle) {
-
-		if (input == nullptr) {
-			return;
+		auto* orientSpin = new QSpinBox();
+		{
+			QHBoxLayout* row = new QHBoxLayout();
+			row->addWidget(new QLabel("Number of orientations:"));
+			orientSpin->setMinimum(2);
+			orientSpin->setMaximum(20);
+			orientSpin->setValue(m_settings.getInteger("num_orientations", 2));
+			row->addWidget(orientSpin);
+			connect(orientSpin, &QSpinBox::textChanged, [this, orientSpin]() {
+				m_settings.setInteger("num_orientations", orientSpin->value());
+				});
+			layout->addLayout(row);
 		}
 
-		QProgressDialog progress("Restricting orientations", "Stop", 0, 1000, this);
-		progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowCloseButtonHint);
-		progress.setWindowModality(Qt::WindowModal);
-		progress.setMinimumDuration(1000);
-		progress.setValue(0);
+		auto* initAngleSpin = new QSpinBox();
+		{
+			initAngleSpin->setMinimum(0);
+			initAngleSpin->setMaximum(180);
+			initAngleSpin->setValue(m_settings.getInteger("init_angle", 0));
+			connect(initAngleSpin, &QSpinBox::textChanged, [this, initAngleSpin]() {
+				m_settings.setInteger("init_angle", initAngleSpin->value());
+				});
+			auto* btnZero = new QPushButton("0");
+			connect(btnZero, &QPushButton::clicked, [initAngleSpin]() {
+				initAngleSpin->setValue(0);
+				});
+			auto* btnHalf = new QPushButton("50%");
+			connect(btnHalf, &QPushButton::clicked, [initAngleSpin, orientSpin]() {
+				int a = static_cast<int>(std::round(90.0 / orientSpin->value()));
+				initAngleSpin->setValue(a);
+				});
+			QHBoxLayout* row = new QHBoxLayout();
+			row->addWidget(new QLabel("First angle (degrees):"));
+			row->addWidget(initAngleSpin);
+			layout->addLayout(row);
+			QHBoxLayout* row2 = new QHBoxLayout();
+			row2->addWidget(new QLabel(""));
+			row2->addWidget(btnZero);
+			row2->addWidget(btnHalf);
+			layout->addLayout(row2);
+		}
 
-		preprocessed = std::make_shared<InputGraph>();
-		graph_2_copy(*input, *preprocessed);
-		int update = 0;
-		restrict(preprocessed, count, initial_angle, [&progress,&update](std::string label, int c, int max) {
-			if (label.size() > 0) {
-				progress.setLabelText(QString::fromStdString(label));
+		auto* buttonRegular = new QPushButton("Restrict");
+		layout->addWidget(buttonRegular);
+
+		connect(buttonRegular, &QPushButton::clicked, [this, initAngleSpin, orientSpin]() {
+			int count = orientSpin->value();
+			Number<Inexact> initial_angle = initAngleSpin->value() * std::numbers::pi / 180.0;
+
+			if (input == nullptr) {
+				return;
 			}
-			if (max > 0) {
-				progress.setValue(0);
-				progress.setMaximum(max);
-				update = max / 100;
-			}
-			else if (c % update == 0) {
-				progress.setValue(c);
-			}
+
+			QProgressDialog progress("Restricting orientations", "Stop", 0, 1000, this);
+			progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowCloseButtonHint);
+			progress.setWindowModality(Qt::WindowModal);
+			progress.setMinimumDuration(1000);
+			progress.setValue(0);
+
+			preprocessed = std::make_shared<InputGraph>();
+			graph_2_copy(*input, *preprocessed);
+			int update = 0;
+			restrict(preprocessed, count, initial_angle, [&progress, &update](std::string label, int c, int max) {
+				if (label.size() > 0) {
+					progress.setLabelText(QString::fromStdString(label));
+				}
+				if (max > 0) {
+					progress.setValue(0);
+					progress.setMaximum(max);
+					update = max / 100;
+				}
+				else if (c % update == 0) {
+					progress.setValue(c);
+				}
+				});
+			updatePaintings();
+
+			progress.setValue(progress.maximum());
 			});
-		updatePaintings();
+	}
 
-		progress.setValue(progress.maximum());
-		};
+	{
+		QFrame* line = new QFrame(this);
+		line->setFrameShape(QFrame::HLine);
+		layout->addWidget(line);
+	}
 
-	connect(buttonRect, &QPushButton::clicked, [this, runRestriction]() {
-		runRestriction(2, 0);
-		});
+	{
+		layout->addWidget(new QLabel("<h3>Irregular restriction</h3>"));
 
-	connect(buttonHexHorz, &QPushButton::clicked, [this, runRestriction]() {
-		runRestriction(3, 0);
-		});
+		layout->addWidget(new QLabel("Space-separated angles (degrees), at least two:"));
 
-	connect(buttonHexVert, &QPushButton::clicked, [this, runRestriction]() {
-		runRestriction(3, std::numbers::pi / 6.0);
-		});
+		QLineEdit* textField = new QLineEdit(this);
+		textField->setText(QString::fromStdString(m_settings.getString("custom_angles", "0 45 90")));
+		connect(textField, &QLineEdit::textChanged, [this, textField]() {
+			m_settings.setString("init_angle", textField->text().toStdString());
+			});
+		layout->addWidget(textField);
 
-	connect(buttonOct, &QPushButton::clicked, [this, runRestriction]() {
-		runRestriction(4, 0);
-		});
+		auto* buttonIrregular = new QPushButton("Restrict");
+		layout->addWidget(buttonIrregular);
 
-	connect(buttonClear, &QPushButton::clicked, [this]() {
-		preprocessed = nullptr;
-		updatePaintings();
-		});
+		connect(buttonIrregular, &QPushButton::clicked, [this, textField]() {
+			if (input == nullptr) {
+				return;
+			}
+
+			std::stringstream ss(textField->text().toStdString());
+			std::vector<std::string> string_angles(
+				(std::istream_iterator<std::string>(ss)),
+				std::istream_iterator<std::string>()
+			);
+
+			std::vector<Number<Inexact>> number_angles;
+			for (const auto& deg : string_angles) {
+				number_angles.push_back(std::stod(deg) * std::numbers::pi / 180.0);
+			}
+
+			QProgressDialog progress("Restricting orientations", "Stop", 0, 1000, this);
+			progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowCloseButtonHint);
+			progress.setWindowModality(Qt::WindowModal);
+			progress.setMinimumDuration(1000);
+			progress.setValue(0);
+
+			preprocessed = std::make_shared<InputGraph>();
+			graph_2_copy(*input, *preprocessed);
+			int update = 0;
+			restrict(preprocessed, number_angles, [&progress, &update](std::string label, int c, int max) {
+				if (label.size() > 0) {
+					progress.setLabelText(QString::fromStdString(label));
+				}
+				if (max > 0) {
+					progress.setValue(0);
+					progress.setMaximum(max);
+					update = max / 100;
+				}
+				else if (c % update == 0) {
+					progress.setValue(c);
+				}
+				});
+			updatePaintings();
+
+			progress.setValue(progress.maximum());
+			});
+	}
+
+	{
+		QFrame* line = new QFrame(this);
+		line->setFrameShape(QFrame::HLine);
+		layout->addWidget(line);
+	}
+
+	{
+		auto* buttonClear = new QPushButton("Clear preprocessed");
+		layout->addWidget(buttonClear);
+		connect(buttonClear, &QPushButton::clicked, [this]() {
+			preprocessed = nullptr;
+			updatePaintings();
+			});
+	}
 }
 
 void SimplificationGUI::addSimplifyTab() {
