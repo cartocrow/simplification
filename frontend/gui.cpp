@@ -20,6 +20,7 @@
 #include "ipe_reader.h"
 #include "read_graph_gdal.h"
 #include "restrictor.h"
+#include "orientation_widget.h"
 
 using namespace cartocrow;
 using namespace cartocrow::simplification;
@@ -80,7 +81,8 @@ void SimplificationGUI::addIOTab() {
 	layout->addWidget(outToInButton);
 
 	connect(loadFileButton, &QPushButton::clicked, [this]() {
-		std::filesystem::path filePath = QFileDialog::getOpenFileName(this, tr("Select map"), curr_dir, tr("Accepted formats (*.shp *.geojson *.ipe);;Shapefiles (*.shp);;Geojson (*.geojson);;IPE files(*.ipe)")).toStdString();
+		std::filesystem::path filePath = QFileDialog::getOpenFileName(this, tr("Select map"), curr_dir, 
+			tr("Accepted formats (*.shp *.geojson *.ipe *.gpkg);;Shapefiles (*.shp);;Geojson (*.geojson);;GeoPackage (*.gpkg);;IPE files (*.ipe)")).toStdString();
 		if (filePath == "") return;
 		curr_dir = QString::fromStdU16String(filePath.parent_path().u16string());
 		m_settings.setString("dir", curr_dir.toStdString());
@@ -182,6 +184,12 @@ void SimplificationGUI::addPreprocessTab() {
 		layout->addWidget(new QLabel("<h3>Regular restriction</h3>"));
 
 		auto* orientSpin = new QSpinBox();
+		auto* initAngleSpin = new QSpinBox();
+		auto* preview = new OrientationWidget(this);
+		auto updatePreview = [preview, initAngleSpin, orientSpin]() {
+			preview->setOrientationsDegrees(orientSpin->value(), initAngleSpin->value());
+			};
+
 		{
 			QHBoxLayout* row = new QHBoxLayout();
 			row->addWidget(new QLabel("Number of orientations:"));
@@ -189,28 +197,31 @@ void SimplificationGUI::addPreprocessTab() {
 			orientSpin->setMaximum(20);
 			orientSpin->setValue(m_settings.getInteger("num_orientations", 2));
 			row->addWidget(orientSpin);
-			connect(orientSpin, &QSpinBox::textChanged, [this, orientSpin]() {
+			connect(orientSpin, &QSpinBox::textChanged, [this, orientSpin, updatePreview]() {
 				m_settings.setInteger("num_orientations", orientSpin->value());
+				updatePreview();
 				});
 			layout->addLayout(row);
 		}
 
-		auto* initAngleSpin = new QSpinBox();
 		{
 			initAngleSpin->setMinimum(0);
 			initAngleSpin->setMaximum(180);
 			initAngleSpin->setValue(m_settings.getInteger("init_angle", 0));
-			connect(initAngleSpin, &QSpinBox::textChanged, [this, initAngleSpin]() {
+			connect(initAngleSpin, &QSpinBox::textChanged, [this, initAngleSpin, updatePreview]() {
 				m_settings.setInteger("init_angle", initAngleSpin->value());
+				updatePreview();
 				});
 			auto* btnZero = new QPushButton("0");
-			connect(btnZero, &QPushButton::clicked, [initAngleSpin]() {
+			connect(btnZero, &QPushButton::clicked, [initAngleSpin, updatePreview]() {
 				initAngleSpin->setValue(0);
+				updatePreview();
 				});
 			auto* btnHalf = new QPushButton("50%");
-			connect(btnHalf, &QPushButton::clicked, [initAngleSpin, orientSpin]() {
+			connect(btnHalf, &QPushButton::clicked, [initAngleSpin, orientSpin, updatePreview]() {
 				int a = static_cast<int>(std::round(90.0 / orientSpin->value()));
 				initAngleSpin->setValue(a);
+				updatePreview();
 				});
 			QHBoxLayout* row = new QHBoxLayout();
 			row->addWidget(new QLabel("First angle (degrees):"));
@@ -260,6 +271,9 @@ void SimplificationGUI::addPreprocessTab() {
 
 			progress.setValue(progress.maximum());
 			});
+
+		updatePreview();
+		layout->addWidget(preview);
 	}
 
 	{
@@ -275,28 +289,38 @@ void SimplificationGUI::addPreprocessTab() {
 
 		QLineEdit* textField = new QLineEdit(this);
 		textField->setText(QString::fromStdString(m_settings.getString("custom_angles", "0 45 90")));
-		connect(textField, &QLineEdit::textChanged, [this, textField]() {
-			m_settings.setString("init_angle", textField->text().toStdString());
-			});
 		layout->addWidget(textField);
 
 		auto* buttonIrregular = new QPushButton("Restrict");
 		layout->addWidget(buttonIrregular);
 
-		connect(buttonIrregular, &QPushButton::clicked, [this, textField]() {
-			if (input == nullptr) {
-				return;
-			}
-
+		auto textToAngles = [textField]() {
 			std::stringstream ss(textField->text().toStdString());
 			std::vector<std::string> string_angles(
 				(std::istream_iterator<std::string>(ss)),
 				std::istream_iterator<std::string>()
 			);
+			std::vector<Number<Inexact>> angles;
+			for (const auto& s : string_angles) {
+				try {
+					angles.push_back(std::stod(s) * std::numbers::pi / 180.0);
+				}
+				catch (const std::invalid_argument& e) {
+				}
+			}
+			std::sort(angles.begin(), angles.end());
+			return angles;
+			};
 
-			std::vector<Number<Inexact>> number_angles;
-			for (const auto& deg : string_angles) {
-				number_angles.push_back(std::stod(deg) * std::numbers::pi / 180.0);
+		connect(buttonIrregular, &QPushButton::clicked, [this, textToAngles]() {
+			if (input == nullptr) {
+				return;
+			}
+
+			std::vector<Number<Inexact>> angles = textToAngles();
+			if (angles.size() < 2) {
+				std::cout << "Enter at least two, distinct orientations" << std::endl;
+				return;
 			}
 
 			QProgressDialog progress("Restricting orientations", "Stop", 0, 1000, this);
@@ -308,7 +332,7 @@ void SimplificationGUI::addPreprocessTab() {
 			preprocessed = std::make_shared<InputGraph>();
 			graph_2_copy(*input, *preprocessed);
 			int update = 0;
-			restrict(preprocessed, number_angles, [&progress, &update](std::string label, int c, int max) {
+			restrict(preprocessed, angles, [&progress, &update](std::string label, int c, int max) {
 				if (label.size() > 0) {
 					progress.setLabelText(QString::fromStdString(label));
 				}
@@ -324,6 +348,15 @@ void SimplificationGUI::addPreprocessTab() {
 			updatePaintings();
 
 			progress.setValue(progress.maximum());
+			});
+
+		auto* preview = new OrientationWidget(this);
+		preview->setOrientationsRadians(textToAngles());
+		layout->addWidget(preview);
+
+		connect(textField, &QLineEdit::textChanged, [this, textField, textToAngles, preview]() {
+			m_settings.setString("custom_angles", textField->text().toStdString());
+			preview->setOrientationsRadians(textToAngles());
 			});
 	}
 
@@ -754,7 +787,7 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path, const int d
 		curr_file->setText(QString::fromStdString(path.filename().string()));
 		curr_srs->setText(QString::fromStdString("<i>No spatial reference</i>"));
 	}
-	else if (path.extension() == ".shp" || path.extension() == ".geojson") {
+	else if (path.extension() == ".shp" || path.extension() == ".geojson" || path.extension() == ".gpkg") {
 		auto [rs, sr] = readRegionSetUsingGDAL(path);
 		m_regions = rs;
 		m_spatialRef = sr;

@@ -10,6 +10,8 @@ set(SOURCES
     ksbb.cpp
     restrictor.cpp
     bmrs.cpp
+    orientation_widget.cpp
+    orientation_widget.h
 )
 add_executable(simplification ${SOURCES})
 target_link_libraries(
