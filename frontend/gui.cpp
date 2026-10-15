@@ -72,7 +72,7 @@ void SimplificationGUI::addIOTab() {
 	auto* loadFileButton = new QPushButton("Load file");
 	layout->addWidget(loadFileButton);
 
-	auto* txt = new QLabel("<p>Currently supported file formats:</p><ul><li>Shapefiles (*.shp) containing (multi)polygons with holes.</li><li>Geojson files (*.geojson) containing (multi)polygons with holes.</li><li>IPE files (*.ipe) containing polygons, polylines and points. Note that these cannot be saved to a Shapefile currently.</li></ul>");
+	auto* txt = new QLabel("<p>Currently supported file formats:</p><ul><li>Shapefiles (*.shp) containing (multi)polygons with holes.</li><li>Geojson files (*.geojson) containing (multi)polygons with holes.</li><li>GeoPackage files (*.gpkg) containing (multi)polygons with holes.</li><li>IPE files (*.ipe) containing polygons, polylines and points. Note that these cannot be saved to a Shapefile currently.</li></ul>");
 	txt->setWordWrap(true);
 	layout->addWidget(txt);
 
@@ -128,7 +128,7 @@ void SimplificationGUI::addIOTab() {
 
 	layout->addWidget(new QLabel("<h3>Output</h3>"));
 
-	auto* txt2 = new QLabel("<p>This only works if a Shp/Geojson file was loaded. It saves the result of the currently selected algorithm in the Simplify tab; its postprocessed variant, if available, and its unprocessed result otherwise.</p>");
+	auto* txt2 = new QLabel("<p>This only works if a shp/geojson/gpkg file was loaded. It saves the result of the currently selected algorithm in the Simplify tab; its postprocessed variant, if available, and its unprocessed result otherwise.</p>");
 	txt2->setWordWrap(true);
 	layout->addWidget(txt2);
 
