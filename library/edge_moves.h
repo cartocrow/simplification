@@ -83,12 +83,15 @@ namespace cartocrow::simplification {
 		Single* find_compensate_move(Single& contract, Number<Kernel> area);
 
 		std::optional<Operation> findNextStep();
-		void move(Single& move, Number<Kernel> area);
+		void start_move(Single& move);
+		void contract(Single& move);
+		void move(Single& move, const Number<Kernel> area);
+		void move(Single& move, const Point<Kernel> source_dest, const Point<Kernel> target_dest);
 		void performStep(Single& contract, Single& compensate);
 		void performStep(Combo& combo);
 		void performStep(Single& contact);
 
-		void determineCheckout(Single& move, bool contract);
+		void determineCheckout(Single& move, const bool contract);
 		void checkOut();
 		void postProcess();
 

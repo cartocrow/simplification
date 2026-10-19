@@ -7,16 +7,20 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QMessageBox>
+#include <QFrame>
+#include <QLineEdit>
+
+#include <cartocrow/renderer/graph_painting.h>
 
 #include "library/utils.h"
 
 #include "vw.h"
 #include "ksbb.h"
 #include "bmrs.h"
-#include "graph_painter.h"
 #include "ipe_reader.h"
 #include "read_graph_gdal.h"
 #include "restrictor.h"
+#include "orientation_widget.h"
 
 using namespace cartocrow;
 using namespace cartocrow::simplification;
@@ -31,15 +35,15 @@ void launchGUI(int argc, char* argv[]) {
 void SimplificationGUI::updatePaintings() {
 	m_renderer->clear();
 
-	VertexMode vmode = static_cast<VertexMode>(vertexMode->currentIndex());
+	VertexSelection vmode = static_cast<VertexSelection>(vertexMode->currentIndex());
 
 	if (input != nullptr) {
-		auto paint = std::make_shared<GraphPainting<InputGraph>>(input, m_input_color, 1, vmode);
+		auto paint = std::make_shared<GraphPainting<InputGraph>>(input, VertexStyle{ m_input_color }, EdgeStyle{ m_input_color, 1 }, vmode);
 		m_renderer->addPainting(paint, "Input");
 	}
 
 	if (preprocessed != nullptr) {
-		auto paint = std::make_shared<GraphPainting<InputGraph>>(preprocessed, m_preprocessed_color, 2, vmode);
+		auto paint = std::make_shared<GraphPainting<InputGraph>>(preprocessed, VertexStyle{ m_preprocessed_color }, EdgeStyle{ m_preprocessed_color, 2 }, vmode);
 		m_renderer->addPainting(paint, "Preprocessed");
 	}
 
@@ -68,7 +72,7 @@ void SimplificationGUI::addIOTab() {
 	auto* loadFileButton = new QPushButton("Load file");
 	layout->addWidget(loadFileButton);
 
-	auto* txt = new QLabel("<p>Currently supported file formats:</p><ul><li>Shapefiles (*.shp) containing (multi)polygons with holes.</li><li>Geojson files (*.geojson) containing (multi)polygons with holes.</li><li>IPE files (*.ipe) containing polygons, polylines and points. Note that these cannot be saved to a Shapefile currently.</li></ul>");
+	auto* txt = new QLabel("<p>Currently supported file formats:</p><ul><li>Shapefiles (*.shp) containing (multi)polygons with holes.</li><li>Geojson files (*.geojson) containing (multi)polygons with holes.</li><li>GeoPackage files (*.gpkg) containing (multi)polygons with holes.</li><li>IPE files (*.ipe) containing polygons, polylines and points. Note that these cannot be saved to a Shapefile currently.</li></ul>");
 	txt->setWordWrap(true);
 	layout->addWidget(txt);
 
@@ -77,7 +81,8 @@ void SimplificationGUI::addIOTab() {
 	layout->addWidget(outToInButton);
 
 	connect(loadFileButton, &QPushButton::clicked, [this]() {
-		std::filesystem::path filePath = QFileDialog::getOpenFileName(this, tr("Select map"), curr_dir, tr("Accepted formats (*.shp *.geojson *.ipe);;Shapefiles (*.shp);;Geojson (*.geojson);;IPE files(*.ipe)")).toStdString();
+		std::filesystem::path filePath = QFileDialog::getOpenFileName(this, tr("Select map"), curr_dir, 
+			tr("Accepted formats (*.shp *.geojson *.ipe *.gpkg);;Shapefiles (*.shp);;Geojson (*.geojson);;GeoPackage (*.gpkg);;IPE files (*.ipe)")).toStdString();
 		if (filePath == "") return;
 		curr_dir = QString::fromStdU16String(filePath.parent_path().u16string());
 		m_settings.setString("dir", curr_dir.toStdString());
@@ -123,7 +128,7 @@ void SimplificationGUI::addIOTab() {
 
 	layout->addWidget(new QLabel("<h3>Output</h3>"));
 
-	auto* txt2 = new QLabel("<p>This only works if a Shp/Geojson file was loaded. It saves the result of the currently selected algorithm in the Simplify tab; its postprocessed variant, if available, and its unprocessed result otherwise.</p>");
+	auto* txt2 = new QLabel("<p>This only works if a shp/geojson/gpkg file was loaded. It saves the result of the currently selected algorithm in the Simplify tab; its postprocessed variant, if available, and its unprocessed result otherwise.</p>");
 	txt2->setWordWrap(true);
 	layout->addWidget(txt2);
 
@@ -175,67 +180,200 @@ void SimplificationGUI::addPreprocessTab() {
 	auto* layout = new QVBoxLayout(tab);
 	layout->setAlignment(Qt::AlignTop);
 
-	layout->addWidget(new QLabel("<h3>Preprocessing</h3>"));
+	{
+		layout->addWidget(new QLabel("<h3>Regular restriction</h3>"));
 
-	auto* buttonRect = new QPushButton("Rectilinear");
-	layout->addWidget(buttonRect);
+		auto* orientSpin = new QSpinBox();
+		auto* initAngleSpin = new QSpinBox();
+		auto* preview = new OrientationWidget(this);
+		auto updatePreview = [preview, initAngleSpin, orientSpin]() {
+			preview->setOrientationsDegrees(orientSpin->value(), initAngleSpin->value());
+			};
 
-	auto* buttonHexHorz = new QPushButton("Hexilinear (horizontal)");
-	layout->addWidget(buttonHexHorz);
-
-	auto* buttonHexVert = new QPushButton("Hexilinear (vertical)");
-	layout->addWidget(buttonHexVert);
-
-	auto* buttonOct = new QPushButton("Octilinear");
-	layout->addWidget(buttonOct);
-
-	auto* buttonClear = new QPushButton("Clear preprocessed");
-	layout->addWidget(buttonClear);
-
-	connect(buttonRect, &QPushButton::clicked, [this]() {
-		if (input == nullptr) {
-			return;
+		{
+			QHBoxLayout* row = new QHBoxLayout();
+			row->addWidget(new QLabel("Number of orientations:"));
+			orientSpin->setMinimum(2);
+			orientSpin->setMaximum(20);
+			orientSpin->setValue(m_settings.getInteger("num_orientations", 2));
+			row->addWidget(orientSpin);
+			connect(orientSpin, &QSpinBox::textChanged, [this, orientSpin, updatePreview]() {
+				m_settings.setInteger("num_orientations", orientSpin->value());
+				updatePreview();
+				});
+			layout->addLayout(row);
 		}
-		preprocessed = std::make_shared<InputGraph>();
-		graph_2_copy(*input, *preprocessed);
-		restrict(preprocessed, 2, 0);
-		updatePaintings();
-		});
 
-	connect(buttonHexHorz, &QPushButton::clicked, [this]() {
-		if (input == nullptr) {
-			return;
+		{
+			initAngleSpin->setMinimum(0);
+			initAngleSpin->setMaximum(180);
+			initAngleSpin->setValue(m_settings.getInteger("init_angle", 0));
+			connect(initAngleSpin, &QSpinBox::textChanged, [this, initAngleSpin, updatePreview]() {
+				m_settings.setInteger("init_angle", initAngleSpin->value());
+				updatePreview();
+				});
+			auto* btnZero = new QPushButton("0");
+			connect(btnZero, &QPushButton::clicked, [initAngleSpin, updatePreview]() {
+				initAngleSpin->setValue(0);
+				updatePreview();
+				});
+			auto* btnHalf = new QPushButton("50%");
+			connect(btnHalf, &QPushButton::clicked, [initAngleSpin, orientSpin, updatePreview]() {
+				int a = static_cast<int>(std::round(90.0 / orientSpin->value()));
+				initAngleSpin->setValue(a);
+				updatePreview();
+				});
+			QHBoxLayout* row = new QHBoxLayout();
+			row->addWidget(new QLabel("First angle (degrees):"));
+			row->addWidget(initAngleSpin);
+			layout->addLayout(row);
+			QHBoxLayout* row2 = new QHBoxLayout();
+			row2->addWidget(new QLabel(""));
+			row2->addWidget(btnZero);
+			row2->addWidget(btnHalf);
+			layout->addLayout(row2);
 		}
-		preprocessed = std::make_shared<InputGraph>();
-		graph_2_copy(*input, *preprocessed);
-		restrict(preprocessed, 3, 0);
-		updatePaintings();
-		});
 
-	connect(buttonHexVert, &QPushButton::clicked, [this]() {
-		if (input == nullptr) {
-			return;
-		}
-		preprocessed = std::make_shared<InputGraph>();
-		graph_2_copy(*input, *preprocessed);
-		restrict(preprocessed, 3, std::numbers::pi / 6.0);
-		updatePaintings();
-		});
+		auto* buttonRegular = new QPushButton("Restrict");
+		layout->addWidget(buttonRegular);
 
-	connect(buttonOct, &QPushButton::clicked, [this]() {
-		if (input == nullptr) {
-			return;
-		}
-		preprocessed = std::make_shared<InputGraph>();
-		graph_2_copy(*input, *preprocessed);
-		restrict(preprocessed, 4, 0);
-		updatePaintings();
-		});
+		connect(buttonRegular, &QPushButton::clicked, [this, initAngleSpin, orientSpin]() {
+			int count = orientSpin->value();
+			Number<Inexact> initial_angle = initAngleSpin->value() * std::numbers::pi / 180.0;
 
-	connect(buttonClear, &QPushButton::clicked, [this]() {
-		preprocessed = nullptr;
-		updatePaintings();
-		});
+			if (input == nullptr) {
+				return;
+			}
+
+			QProgressDialog progress("Restricting orientations", "Stop", 0, 1000, this);
+			progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowCloseButtonHint);
+			progress.setWindowModality(Qt::WindowModal);
+			progress.setMinimumDuration(1000);
+			progress.setValue(0);
+
+			preprocessed = std::make_shared<InputGraph>();
+			graph_2_copy(*input, *preprocessed);
+			int update = 0;
+			restrict(preprocessed, count, initial_angle, [&progress, &update](std::string label, int c, int max) {
+				if (label.size() > 0) {
+					progress.setLabelText(QString::fromStdString(label));
+				}
+				if (max > 0) {
+					progress.setValue(0);
+					progress.setMaximum(max);
+					update = max / 100;
+				}
+				else if (c % update == 0) {
+					progress.setValue(c);
+				}
+				});
+			updatePaintings();
+
+			progress.setValue(progress.maximum());
+			});
+
+		updatePreview();
+		layout->addWidget(preview);
+	}
+
+	{
+		QFrame* line = new QFrame(this);
+		line->setFrameShape(QFrame::HLine);
+		layout->addWidget(line);
+	}
+
+	{
+		layout->addWidget(new QLabel("<h3>Irregular restriction</h3>"));
+
+		layout->addWidget(new QLabel("Space-separated angles (degrees), at least two:"));
+
+		QLineEdit* textField = new QLineEdit(this);
+		textField->setText(QString::fromStdString(m_settings.getString("custom_angles", "0 45 90")));
+		layout->addWidget(textField);
+
+		auto* buttonIrregular = new QPushButton("Restrict");
+		layout->addWidget(buttonIrregular);
+
+		auto textToAngles = [textField]() {
+			std::stringstream ss(textField->text().toStdString());
+			std::vector<std::string> string_angles(
+				(std::istream_iterator<std::string>(ss)),
+				std::istream_iterator<std::string>()
+			);
+			std::vector<Number<Inexact>> angles;
+			for (const auto& s : string_angles) {
+				try {
+					angles.push_back(std::stod(s) * std::numbers::pi / 180.0);
+				}
+				catch (const std::invalid_argument& e) {
+				}
+			}
+			std::sort(angles.begin(), angles.end());
+			return angles;
+			};
+
+		connect(buttonIrregular, &QPushButton::clicked, [this, textToAngles]() {
+			if (input == nullptr) {
+				return;
+			}
+
+			std::vector<Number<Inexact>> angles = textToAngles();
+			if (angles.size() < 2) {
+				std::cout << "Enter at least two, distinct orientations" << std::endl;
+				return;
+			}
+
+			QProgressDialog progress("Restricting orientations", "Stop", 0, 1000, this);
+			progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowCloseButtonHint);
+			progress.setWindowModality(Qt::WindowModal);
+			progress.setMinimumDuration(1000);
+			progress.setValue(0);
+
+			preprocessed = std::make_shared<InputGraph>();
+			graph_2_copy(*input, *preprocessed);
+			int update = 0;
+			restrict(preprocessed, angles, [&progress, &update](std::string label, int c, int max) {
+				if (label.size() > 0) {
+					progress.setLabelText(QString::fromStdString(label));
+				}
+				if (max > 0) {
+					progress.setValue(0);
+					progress.setMaximum(max);
+					update = max / 100;
+				}
+				else if (c % update == 0) {
+					progress.setValue(c);
+				}
+				});
+			updatePaintings();
+
+			progress.setValue(progress.maximum());
+			});
+
+		auto* preview = new OrientationWidget(this);
+		preview->setOrientationsRadians(textToAngles());
+		layout->addWidget(preview);
+
+		connect(textField, &QLineEdit::textChanged, [this, textField, textToAngles, preview]() {
+			m_settings.setString("custom_angles", textField->text().toStdString());
+			preview->setOrientationsRadians(textToAngles());
+			});
+	}
+
+	{
+		QFrame* line = new QFrame(this);
+		line->setFrameShape(QFrame::HLine);
+		layout->addWidget(line);
+	}
+
+	{
+		auto* buttonClear = new QPushButton("Clear preprocessed");
+		layout->addWidget(buttonClear);
+		connect(buttonClear, &QPushButton::clicked, [this]() {
+			preprocessed = nullptr;
+			updatePaintings();
+			});
+	}
 }
 
 void SimplificationGUI::addSimplifyTab() {
@@ -291,9 +429,6 @@ void SimplificationGUI::addSimplifyTab() {
 	complexitySlider->setMinimum(0);
 	layout->addWidget(complexitySlider);
 
-	//auto* debugButton = new QPushButton("Draw current state");
-	//layout->addWidget(debugButton);
-
 	auto runAlg = [this](SimplificationAlgorithm* alg, int target) {
 
 		int start = alg->getComplexity();
@@ -309,9 +444,11 @@ void SimplificationGUI::addSimplifyTab() {
 
 		alg->runToComplexity(target,
 			[&progress, &target, &start](int c) {
-				std::string lbl = "Complexity " + std::to_string(c);
-				progress.setLabelText(QString::fromStdString(lbl));
-				progress.setValue(target < start ? start - c : target - c);
+				if (c % 100 == 0) {
+					std::string lbl = "Complexity " + std::to_string(c);
+					progress.setLabelText(QString::fromStdString(lbl));
+					progress.setValue(target < start ? start - c : target - c);
+				}
 			},
 			[&progress]() {
 				return progress.wasCanceled();
@@ -435,6 +572,9 @@ void SimplificationGUI::addSimplifyTab() {
 		complexitySlider->setValue(c);
 		});
 
+
+	//auto* debugButton = new QPushButton("Draw current state");
+	//layout->addWidget(debugButton);
 	//connect(debugButton, &QPushButton::clicked, [this]() {
 	//	SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
 	//	for (std::pair<std::shared_ptr<GeometryPainting>,std::string> p : alg->getDebugPaintings()) {
@@ -580,8 +720,8 @@ SimplificationGUI::SimplificationGUI() {
 	m_renderer->setDrawAxes(false);
 	setCentralWidget(m_renderer);
 
-	m_renderer->setMinZoom(0.00001);
-	m_renderer->setMaxZoom(10000.0);
+	m_renderer->setMinZoom(0.0000001);
+	m_renderer->setMaxZoom(1000000.0);
 
 	updatePaintings();
 }
@@ -647,7 +787,7 @@ void SimplificationGUI::loadInput(const std::filesystem::path& path, const int d
 		curr_file->setText(QString::fromStdString(path.filename().string()));
 		curr_srs->setText(QString::fromStdString("<i>No spatial reference</i>"));
 	}
-	else if (path.extension() == ".shp" || path.extension() == ".geojson") {
+	else if (path.extension() == ".shp" || path.extension() == ".geojson" || path.extension() == ".gpkg") {
 		auto [rs, sr] = readRegionSetUsingGDAL(path);
 		m_regions = rs;
 		m_spatialRef = sr;

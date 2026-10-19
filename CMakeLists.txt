@@ -10,6 +10,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(CartoCrow REQUIRED)
 
+set(CMAKE_AUTOMOC ON)
+
 # All source files should use include paths relative to the source root
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 

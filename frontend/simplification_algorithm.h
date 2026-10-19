@@ -1,10 +1,8 @@
 #pragma once
 
 #include <memory>
-#include <cartocrow/renderer/geometry_painting.h>
+#include <cartocrow/renderer/graph_painting.h>
 #include <cartocrow/data_structures/straight_graph_2.h>
-
-#include "graph_painter.h"
 
 using namespace cartocrow;
 using namespace cartocrow::renderer;
@@ -19,7 +17,7 @@ public:
 		std::optional<std::function<bool()>> cancelled = std::nullopt) = 0;
 	virtual int getComplexity() = 0;
 	virtual int getMaximumComplexity() = 0;
-	virtual std::shared_ptr<GeometryPainting> getPainting(const VertexMode vmode) = 0;
+	virtual std::shared_ptr<GeometryPainting> getPainting(const VertexSelection vmode) = 0;
 	virtual void clear() = 0;
 	virtual bool hasResult() = 0;
 
