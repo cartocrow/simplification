@@ -1,3 +1,5 @@
+#pragma once
+
 #include "../library/edge_moves.h"
 #include "straight_simplification_algorithm.h"
 

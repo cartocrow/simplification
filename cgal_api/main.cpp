@@ -24,7 +24,7 @@ int main() {
 	vw.simplify(10);
 	auto simplified = vw.get_collection();
 
-	auto simplifiedP = CGAL::Simplification_VW<>::simplify(p, 20);
+	auto simplifiedP = CGAL::simplify_VW(p, 20);
 
 	cartocrow::renderer::IpeRenderer r;
 	r.addPainting([&](auto& r) {
