@@ -24,10 +24,6 @@ public:
 		m_vw.initialize(false);
 	}
 
-	VW_algorithm(Graph& graph, const CGAL::Iso_rectangle_2<Kernel>& box) : m_vt(std::make_unique<VertexTree>(box, DEPTH)), m_vw(graph, *m_vt) {
-		m_vw.initialize(true); 
-	}
-
 	bool run(std::optional<std::function<bool(int, typename Kernel::FT)>> stop = std::nullopt) {
 		return m_vw.run(stop);
 	}
@@ -53,36 +49,36 @@ Simplification_VW(const cartocrow::StraightGeometryCollection<K, Data, PolygonCo
     -> Simplification_VW<false, K, Data, PolygonContainer>;
 
 template<class K, class Data, class PolygonContainer>
-Simplification_VW(const cartocrow::StraightGeometryCollection<K, Data, PolygonContainer>&, typename K::FT)
+Simplification_VW(const cartocrow::StraightGeometryCollection<K, Data, PolygonContainer>&, const Simplification_options<K>&)
     -> Simplification_VW<false, K, Data, PolygonContainer>;
 
 // ---- Simplifying a single geometry ---- //
 template<class K, class PolygonContainer>
-CGAL::Polygon_2<K, PolygonContainer> simplify_VW(const CGAL::Polygon_2<K, PolygonContainer>& polygon, size_t complexity) {
-	return internal::simplify_geometry<Simplification_VW<false, K, std::monostate, PolygonContainer>>(polygon, complexity);
+CGAL::Polygon_2<K, PolygonContainer> simplify_VW(const CGAL::Polygon_2<K, PolygonContainer>& polygon, size_t complexity, const Simplification_options<K>& options = {}) {
+	return internal::simplify_geometry<Simplification_VW<false, K, std::monostate, PolygonContainer>>(polygon, complexity, options);
 }
 
 template<class K, class PolygonContainer>
-CGAL::Polygon_with_holes_2<K, PolygonContainer> simplify_VW(const CGAL::Polygon_with_holes_2<K, PolygonContainer>& polygon, size_t complexity) {
-	return internal::simplify_geometry<Simplification_VW<false, K, std::monostate, PolygonContainer>>(polygon, complexity);
+CGAL::Polygon_with_holes_2<K, PolygonContainer> simplify_VW(const CGAL::Polygon_with_holes_2<K, PolygonContainer>& polygon, size_t complexity, const Simplification_options<K>& options = {}) {
+	return internal::simplify_geometry<Simplification_VW<false, K, std::monostate, PolygonContainer>>(polygon, complexity, options);
 }
 
 template<class K, class PolygonContainer>
-CGAL::Multipolygon_with_holes_2<K, PolygonContainer> simplify_VW(const CGAL::Multipolygon_with_holes_2<K, PolygonContainer>& multiPolygon, size_t complexity) {
+CGAL::Multipolygon_with_holes_2<K, PolygonContainer> simplify_VW(const CGAL::Multipolygon_with_holes_2<K, PolygonContainer>& multiPolygon, size_t complexity, const Simplification_options<K>& options = {}) {
 	cartocrow::MultipolygonWithHoles<K, PolygonContainer> input;
 	for (const auto& polygon : multiPolygon.polygons_with_holes()) {
 		input.add_polygon_with_holes(polygon);
 	}
-	return internal::simplify_geometry<Simplification_VW<false, K, std::monostate, PolygonContainer>>(input, complexity);
+	return internal::simplify_geometry<Simplification_VW<false, K, std::monostate, PolygonContainer>>(input, complexity, options);
 }
 
 template<class K>
-cartocrow::Polyline<K> simplify_VW(const cartocrow::Polyline<K>& polyline, size_t complexity) {
-	return internal::simplify_geometry<Simplification_VW<false, K>>(polyline, complexity);
+cartocrow::Polyline<K> simplify_VW(const cartocrow::Polyline<K>& polyline, size_t complexity, const Simplification_options<K>& options = {}) {
+	return internal::simplify_geometry<Simplification_VW<false, K>>(polyline, complexity, options);
 }
 
 template<class K>
-cartocrow::MultiPolyline<K> simplify_VW(const cartocrow::MultiPolyline<K>& multiPolyline, size_t complexity) {
-	return internal::simplify_geometry<Simplification_VW<false, K>>(multiPolyline, complexity);
+cartocrow::MultiPolyline<K> simplify_VW(const cartocrow::MultiPolyline<K>& multiPolyline, size_t complexity, const Simplification_options<K>& options = {}) {
+	return internal::simplify_geometry<Simplification_VW<false, K>>(multiPolyline, complexity, options);
 }
 }

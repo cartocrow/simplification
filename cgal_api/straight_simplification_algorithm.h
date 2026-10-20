@@ -4,9 +4,17 @@
 
 #include <cartocrow/core/straight_geometry_collection.h>
 
+#include <functional>
 #include <iostream>
 
 namespace CGAL {
+/// Options for the simplification algorithms.
+template <class K>
+struct Simplification_options {
+	/// Points of different geometries within L-infinity distance prec are merged into one vertex.
+	typename K::FT prec = 0;
+};
+
 namespace internal {
 /// Common base class for algorithms that work on straight-edge geometries and have a graph as underlying subdivision representation.
 ///
@@ -379,10 +387,12 @@ class Straight_simplification_algorithm {
 		return multiPoint;
 	}
 
-  public:
-	/// Inserts the geometries of the collection and prepares the simplification.
-	/// Points of different geometries within L-infinity distance prec are merged into one vertex.
-	Straight_simplification_algorithm(const Collection& collection, typename K::FT prec = 0) : m_prec(prec), m_vqt(std::make_unique<VertexTree>(collection.bbox(), m_qtDepth)) {
+  protected:
+	/// Like the public constructor, but preprocesses the graph after it is initialized but before the simplification algorithm is initialized.
+	/// The result of the preprocessing is the input of the simplification, so it cannot be undone.
+	/// The preprocessing must keep the paths of the graph intact.
+	Straight_simplification_algorithm(const Collection& collection, typename K::FT prec, const std::function<void(Graph&)>& preprocess)
+	    : m_prec(prec), m_vqt(std::make_unique<VertexTree>(collection.bbox(), m_qtDepth)) {
 		// insert geometries into graph
 		for (const auto& geometry : collection.geometries()) {
 			std::visit([this](const auto& geom) { add(geom); }, geometry);
@@ -398,8 +408,22 @@ class Straight_simplification_algorithm {
 		for (const auto& geometry : collection.geometries()) {
 			m_paths.push_back(std::visit([this](const auto& geom) -> GeometryPaths { return computePaths(geom); }, geometry));
 		}
+
+		if (preprocess) {
+			preprocess(m_graph);
+			if constexpr (Graph::Graph_traits::historic) {
+				m_graph.history().clear();
+			}
+		}
+
+		// Note that the vertex quad tree does not track changes in the graph during preprocessing.
 		m_alg = std::make_unique<GraphSimplificationAlgorithm>(m_graph, std::move(m_vqt));
 	};
+
+  public:
+	/// Inserts the geometries of the collection and prepares the simplification.
+	Straight_simplification_algorithm(const Collection& collection, const Simplification_options<K>& options = {})
+	    : Straight_simplification_algorithm(collection, options.prec, {}) {}
 
 	/// Returns the simplified geometries, in the same order as the input, so handles of the input collection remain valid.
 	Collection get_collection() const {
@@ -464,11 +488,11 @@ class Straight_simplification_algorithm {
 };
 
 /// Simplifies a single geometry with the given algorithm until the number of edges is at most the target number.
-template <class Algorithm, class Geometry>
-Geometry simplify_geometry(const Geometry& geometry, size_t complexity) {
+template <class Algorithm, class Geometry, class Options>
+Geometry simplify_geometry(const Geometry& geometry, size_t complexity, const Options& options) {
 	typename Algorithm::Collection collection;
 	auto handle = collection.insert(geometry);
-	Algorithm algorithm(collection);
+	Algorithm algorithm(collection, options);
 	algorithm.simplify(complexity);
 	auto simplified = algorithm.get_collection();
 	return simplified.get_geometry(handle);

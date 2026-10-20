@@ -2,6 +2,8 @@
 
 #include <cartocrow/core/core.h>
 #include <cartocrow/data_structures/indexed_priority_queue.h>
+#include <cartocrow/data_structures/straight_graph_2.h>
+#include <cartocrow/data_structures/graph_traits_2.h>
 
 #include "vertex_quad_tree.h"
 #include "edge_quad_tree.h"

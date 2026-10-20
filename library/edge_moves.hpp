@@ -1630,7 +1630,11 @@ namespace cartocrow::simplification {
 
 		Graph_static_edge_map<Graph, int> emap(graph, 0);
 
+		// Edges may lie outside the root box of the tree (boundary nodes extend to infinity), so the query must cover all edges too.
 		Rectangle<Kernel> rect = sqt.root_box();
+		for (Edge_handle e : graph.edges()) {
+			rect = utils::boxOf(rect, EdgeQuadTreeTraits<Graph>::get_bounding_box(e));
+		}
 		sqt.findOverlapped(rect, [this, &emap](Edge_handle e) {
 			if (this->graph.edge(e->graph_index()) != e) {
 				std::cout << "! edge in SQT that is not in graph: " << *e << std::endl;
