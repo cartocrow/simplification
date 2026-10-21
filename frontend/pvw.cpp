@@ -11,8 +11,12 @@ using namespace cartocrow::renderer;
 
 template<typename Kernel>
 struct PVWBaseSimplifier {
-	using PVWGraph = PreservingVertexRemovalGraph<Kernel, true>;
-	using PVW = PreservingVisvalingamWhyatt<PVWGraph>;
+	// use dedicated graph: declare algorithm and get graph type
+	using PVW = PreservingVisvalingamWhyatt_Dedicated<Kernel, true>;
+	using PVWGraph = PVW::Graph;
+	// use generic graph: declare graph and give it to algorithm
+	//using PVWGraph = Straight_graph_2<std::monostate, std::monostate, Kernel, DecomposedGraph<true, std::monostate>>;
+	//using PVW = PreservingVisvalingamWhyatt_Generic<PVWGraph>;
 	using PQT = PVW::VertexTree;
 	using Traits = PVW::Traits;
 

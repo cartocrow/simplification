@@ -10,10 +10,10 @@ namespace cartocrow::simplification {
 
 	namespace detail {
 
-		template<class G>
+		template<class PVRT>
 		struct PVRData {
 
-			using Graph = G;
+			using Graph = PVRT::Graph;
 			using Kernel = Graph::Kernel;
 			using Vertex_handle = Graph::Vertex_handle;
 
@@ -60,35 +60,35 @@ namespace cartocrow::simplification {
 			Map* m_map = nullptr;
 		};
 
-		template<class G>
+		template<class PVRT>
 		class PVRVertexQueueTraits : public std::conditional<
-			PVRGraph<G>,
-			GraphQueueTraits<typename G::Vertex_handle>,
-			PVRQueueTraits<G, typename G::Vertex_handle, Graph_vertex_map<G, PVRData<G>>>
+			PVRT::use_graph_data,
+			GraphQueueTraits<typename PVRT::Graph::Vertex_handle>,
+			PVRQueueTraits<typename PVRT::Graph, typename PVRT::Graph::Vertex_handle, Graph_vertex_map<typename PVRT::Graph, PVRData<PVRT>>>
 		>::type
 		{
 		};
 
-		template<class G>
+		template<class PVRT>
 		class PVRPathQueueTraits : public std::conditional<
-			PVRGraph<G>,
-			GraphQueueTraits<typename G::Path_handle>,
-			PVRQueueTraits<G, typename G::Path_handle, Graph_path_map<G, PVRPathData<G>>>
+			PVRT::use_graph_data,
+			GraphQueueTraits<typename PVRT::Graph::Path_handle>,
+			PVRQueueTraits<typename PVRT::Graph, typename PVRT::Graph::Path_handle, Graph_path_map<typename PVRT::Graph, PVRPathData<PVRT>>>
 		>::type
 		{
 		};
 
-		template<class G>
+		template<class PVRT>
 		struct PVRPathData {
 
-			using Graph = G;
+			using Graph = PVRT::Graph;
 			using Kernel = Graph::Kernel;
 			using Vertex_handle = Graph::Vertex_handle;
-			using VertexData = PVRData<Graph>;
-			using QueueTraits = PVRVertexQueueTraits<Graph>;
-			using Queue = cartocrow::data_structures::IndexedPriorityQueue<PVRVertexQueueTraits<Graph>>;
+			using VertexData = PVRData<PVRT>;
+			using QueueTraits = PVRVertexQueueTraits<PVRT>;
+			using Queue = cartocrow::data_structures::IndexedPriorityQueue<PVRVertexQueueTraits<PVRT>>;
 
-			void resetQueues(Graph_vertex_map<G, VertexData>* map) requires !PVRGraph<G> {
+			void resetQueues(Graph_vertex_map<Graph, VertexData>* map) requires !PVRT::use_graph_data {
 				left_queue = Queue(QueueTraits(map));
 				right_queue = Queue(QueueTraits(map));
 			}
@@ -100,14 +100,16 @@ namespace cartocrow::simplification {
 			int queue_index = -1;
 		};
 
-		template<class G>
-		class PVRTraitsDataBase {
+		template<class PVRT, class K, bool Historic>
+		class PVRTraits_DedicatedBase {
 		public:
-			using Graph = G;
+			using Kernel = K;
+			using Graph = Straight_graph_2<detail::PVRData<PVRT>, std::monostate, Kernel, DecomposedGraph<Historic, detail::PVRPathData<PVRT>>>;
 			using Vertex_handle = Graph::Vertex_handle;
 			using Path_handle = Graph::Path_handle;
-			using VertexData = PVRData<G>;
-			using PathData = PVRPathData<G>;
+			using VertexData = PVRData<PVRT>;
+			using PathData = PVRPathData<PVRT>;
+			static constexpr const bool use_graph_data = true;
 
 			virtual void initialize(Graph& graph) {
 				// skip
@@ -122,24 +124,25 @@ namespace cartocrow::simplification {
 			}
 		};
 
-		template<class G>
-		class PVRTraitsGenericBase {
-
+		template<class PVRT, class G>
+		class PVRTraits_GenericBase {
 		public:
 			using Graph = G;
+			using Kernel = Graph::Kernel;
 			using Vertex_handle = Graph::Vertex_handle;
 			using Path_handle = Graph::Path_handle;
-			using VertexData = PVRData<G>;
-			using PathData = PVRPathData<G>;
+			using VertexData = PVRData<PVRT>;
+			using PathData = PVRPathData<PVRT>;
+			static constexpr const bool use_graph_data = false;
 
 			virtual void initialize(Graph& graph) {
 				delete m_vertex_data;
 				delete m_path_data;
-				m_vertex_data = new Graph_vertex_map<G, VertexData>(graph, VertexData());
-				m_path_data = new Graph_path_map<G, PathData>(graph, PathData());
+				m_vertex_data = new Graph_vertex_map<Graph, VertexData>(graph, VertexData());
+				m_path_data = new Graph_path_map<Graph, PathData>(graph, PathData());
 			}
 
-			~PVRTraitsGenericBase() {
+			~PVRTraits_GenericBase() {
 				delete m_vertex_data;
 				delete m_path_data;
 			}
@@ -152,8 +155,8 @@ namespace cartocrow::simplification {
 				return (*m_path_data)[p];
 			}
 			//private:
-			Graph_vertex_map<G, VertexData>* m_vertex_data = nullptr;
-			Graph_path_map<G, PathData>* m_path_data = nullptr;
+			Graph_vertex_map<Graph, VertexData>* m_vertex_data = nullptr;
+			Graph_path_map<Graph, PathData>* m_path_data = nullptr;
 		};
 	}
 
@@ -169,8 +172,8 @@ namespace cartocrow::simplification {
 	void PreservingVertexRemoval<PVRT>::initialize(bool initQuadTree) {
 
 		traits.initialize(graph);
-		if constexpr (!detail::PVRGraph<Graph>) {
-			queue = Queue(detail::PVRPathQueueTraits<Graph>(traits.m_path_data));
+		if constexpr (!PVRT::use_graph_data) {
+			queue = Queue(detail::PVRPathQueueTraits<PVRT>(traits.m_path_data));
 			for (Path_handle p : graph.paths()) {
 				traits.data(p).resetQueues(traits.m_vertex_data);
 			}

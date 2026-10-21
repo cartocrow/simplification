@@ -12,19 +12,29 @@ namespace cartocrow::simplification {
 
 	namespace detail {
 
-		template<class G>
+		enum DataStorageType {
+			DEDICATED, GENERIC
+		};
+
+		template<class PVRT>
 		struct PVRData;
 
-		template<class G>
+		template<class PVRT>
 		struct PVRPathData;
 
-		template<class G> 
-		struct PVRTraitsDataBase;
+		template<class PVRT, class K, bool Historic>
+		struct PVRTraits_DedicatedBase;
 
-		template<class G>
-		struct PVRTraitsGenericBase;
+		template<class PVRT, class G>
+		struct PVRTraits_GenericBase;
 
-		template<class G>
+		template<class Self, DataStorageType type, class GraphOrKernel, bool Historic>
+		using PVRTraits_Base = std::conditional<type == DEDICATED,
+			detail::PVRTraits_DedicatedBase<Self, GraphOrKernel, Historic>,
+			detail::PVRTraits_GenericBase<Self, GraphOrKernel>
+		>::type;
+
+		template<class PVRT>
 		class PVRPathQueueTraits;
 
 		template<class PVRT>
@@ -35,20 +45,19 @@ namespace cartocrow::simplification {
 
 			typename PVRT::Graph;
 
-			{ traits.initialize(graph) };
-			{ traits.data(v) } -> std::same_as<PVRData<typename PVRT::Graph>&>;
-			{ traits.compute_cost(v) } -> std::same_as<Number<typename PVRT::Graph::Kernel>>;
-			{ traits.data(p) } -> std::same_as<PVRPathData<typename PVRT::Graph>&>;
-			{ traits.compute_cost(p, v) } -> std::same_as<Number<typename PVRT::Graph::Kernel>>;
-		};		
+			PVRT::use_graph_data;
+				requires std::is_same_v<bool const, decltype(PVRT::use_graph_data)>;
 
-		template<class G>
-		concept PVRGraph = std::same_as<typename G::Vertex_data, PVRData<G>>
-			&& std::same_as<typename G::Graph_traits::PathData, PVRPathData<G>>;
+			{ traits.initialize(graph) };
+			{ traits.data(v) } -> std::same_as<PVRData<PVRT>&>;
+			{ traits.data(p) } -> std::same_as<PVRPathData<PVRT>&>;
+			{ traits.compute_cost(v) } -> std::same_as<Number<typename PVRT::Graph::Kernel>>;
+			{ traits.compute_cost(p, v) } -> std::same_as<Number<typename PVRT::Graph::Kernel>>;
+		};
 	}
 
-	template<typename K, bool H>
-	struct PreservingVertexRemovalGraph : public Straight_graph_2<detail::PVRData<PreservingVertexRemovalGraph<K, H>>, std::monostate, K, DecomposedGraph<H, detail::PVRPathData<PreservingVertexRemovalGraph<K,H>>>> {};
+	//template<typename K, bool H>
+	//struct PreservingVertexRemovalGraph : public Straight_graph_2<detail::PVRData<PreservingVertexRemovalGraph<K, H>>, std::monostate, K, DecomposedGraph<H, detail::PVRPathData<PreservingVertexRemovalGraph<K, H>>>> {};
 
 	/// <summary>
 	/// The Preserving Vertex Removal algorithm. It is topologically safe, ensuring that vertices are only erased if they have degree 2 and the triangle spanned with its neighbors is empty. Can be configured with custom cost function, via the VertexRemovalTraits.
@@ -66,7 +75,7 @@ namespace cartocrow::simplification {
 		using VertexTree = VertexQuadTree<Graph>;
 
 	private:
-		using Queue = cartocrow::data_structures::IndexedPriorityQueue<detail::PVRPathQueueTraits<Graph>>;
+		using Queue = cartocrow::data_structures::IndexedPriorityQueue<detail::PVRPathQueueTraits<PVRT>>;
 
 		Graph& graph;
 		VertexTree& pqt;
@@ -86,35 +95,33 @@ namespace cartocrow::simplification {
 		bool run(std::optional<std::function<bool(int, Number<Kernel>)>> stop = std::nullopt);
 		bool step();
 	};
-
-
-	/// <summary>
-	/// Traits for running VisvalingamWhyatt vertex-removal algorithms. The cost is equal to the area of the spanned triangle.
-	/// </summary>
-	/// <typeparam name="G">The graph type for the algorithm</typeparam>
-	template <class G>
-	class PreservingVisvalingamWhyattTraits : public std::conditional<detail::PVRGraph<G>, detail::PVRTraitsDataBase<G>, detail::PVRTraitsGenericBase<G>>::type {
+		
+	template<detail::DataStorageType type, class GraphOrKernel, bool Historic = false>
+	class PreservingVisvalingamWhyattTraits : public detail::PVRTraits_Base<PreservingVisvalingamWhyattTraits<type, GraphOrKernel, Historic>, type, GraphOrKernel, Historic> {
 
 	public:
-		using Kernel = G::Kernel;
+		using Self = PreservingVisvalingamWhyattTraits<type, GraphOrKernel, Historic>;
+		using Base = detail::PVRTraits_Base<Self, type, GraphOrKernel, Historic>;
+		using Graph = Base::Graph;
+		using Kernel = Base::Kernel;
 
 		PreservingVisvalingamWhyattTraits() : m_weight(1) {
 		}
 		PreservingVisvalingamWhyattTraits(Number<Kernel> weight) : m_weight(weight) {
 		}
 
-		Number<Kernel> compute_cost(typename G::Vertex_handle v) {
+		Number<Kernel> compute_cost(typename Graph::Vertex_handle v) {
 			return CGAL::abs(
 				CGAL::area(v->point(), v->prev()->point(), v->next()->point()));
 		}
 
-		Number<Kernel> compute_cost(typename G::Path_handle p, typename G::Vertex_handle v) {
+		Number<Kernel> compute_cost(typename Graph::Path_handle p, typename Graph::Vertex_handle v) {
 			auto& vd = this->data(v);
 			auto& pd = this->data(p);
 			return vd.cost + (vd.left ? -m_weight : m_weight) * pd.left_area_increased;
-		}
+		};
 	private:
-		const Number<Kernel> m_weight;
+		Number<Kernel> m_weight;
 	};
 
 	/// <summary>
@@ -122,7 +129,10 @@ namespace cartocrow::simplification {
 	/// </summary>
 	/// <typeparam name="G">The graph type for the algorithm</typeparam>
 	template <class G>
-	using PreservingVisvalingamWhyatt = PreservingVertexRemoval<PreservingVisvalingamWhyattTraits<G>>;
+	using PreservingVisvalingamWhyatt_Generic = PreservingVertexRemoval<PreservingVisvalingamWhyattTraits<detail::GENERIC, G>>;
+
+	template<class Kernel, bool Historic>
+	using PreservingVisvalingamWhyatt_Dedicated = PreservingVertexRemoval<PreservingVisvalingamWhyattTraits<detail::DEDICATED, Kernel, Historic>>;
 
 } // namespace cartocrow::simplification
 
