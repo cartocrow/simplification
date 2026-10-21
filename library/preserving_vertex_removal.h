@@ -56,14 +56,6 @@ namespace cartocrow::simplification {
 		};
 	}
 
-	//template<typename K, bool H>
-	//struct PreservingVertexRemovalGraph : public Straight_graph_2<detail::PVRData<PreservingVertexRemovalGraph<K, H>>, std::monostate, K, DecomposedGraph<H, detail::PVRPathData<PreservingVertexRemovalGraph<K, H>>>> {};
-
-	/// <summary>
-	/// The Preserving Vertex Removal algorithm. It is topologically safe, ensuring that vertices are only erased if they have degree 2 and the triangle spanned with its neighbors is empty. Can be configured with custom cost function, via the VertexRemovalTraits.
-	/// It does not give exact area preservation, but steers to operations that keep change in area small.
-	/// </summary>
-	/// <typeparam name="VRT">VertexRemovalTraits, specifying the desired cost function</typeparam>
 	template <detail::PVRTraits PVRT> class PreservingVertexRemoval {
 
 	public:
@@ -124,13 +116,10 @@ namespace cartocrow::simplification {
 		Number<Kernel> m_weight;
 	};
 
-	/// <summary>
-	/// Shorthand for the VisvalingamWhyatt vertex-removal algorithm.
-	/// </summary>
-	/// <typeparam name="G">The graph type for the algorithm</typeparam>
 	template <class G>
 	using PreservingVisvalingamWhyatt_Generic = PreservingVertexRemoval<PreservingVisvalingamWhyattTraits<detail::GENERIC, G>>;
 
+	
 	template<class Kernel, bool Historic>
 	using PreservingVisvalingamWhyatt_Dedicated = PreservingVertexRemoval<PreservingVisvalingamWhyattTraits<detail::DEDICATED, Kernel, Historic>>;
 
