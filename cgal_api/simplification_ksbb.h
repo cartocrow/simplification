@@ -12,7 +12,7 @@ public:
 
 private:
 	static constexpr int DEPTH = 10;
-	/// Edges overlap quadtree cells that are this fraction of the cell size larger, so that moved edges fit more often.
+	/// Quadtree child cells overlap their siblings by this fraction of the cell size
 	static constexpr double FUZZ = 0.05;
 
 	using KSBB = cartocrow::simplification::KronenfeldEtAl<Graph>;

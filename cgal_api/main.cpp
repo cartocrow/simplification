@@ -26,7 +26,7 @@ int main() {
 
 	auto simplifiedP = CGAL::simplify_VW(p, 20);
 
-	cartocrow::renderer::IpeRenderer r;
+	cartocrow::IpeRenderer r;
 	r.addPainting([&](auto& r) {
 		r.draw(shapes.get_geometry(pH));
 		r.draw(simplified.get_geometry(pH));

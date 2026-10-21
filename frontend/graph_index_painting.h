@@ -4,7 +4,6 @@
 #include <cartocrow/renderer/geometry_painting.h>
 
 using namespace cartocrow;
-using namespace cartocrow::renderer;
 
 template<class Graph>
 class GraphIndexPainting : public GeometryPainting {
@@ -17,8 +16,8 @@ protected:
 	void paint(GeometryRenderer& renderer) const override {
 		renderer.setMode(GeometryRenderer::stroke);
 		renderer.setStroke({ 0, 0, 0 }, 1);
-		renderer.setHorizontalTextAlignment(cartocrow::renderer::GeometryRenderer::HorizontalTextAlignment::AlignHCenter);
-		renderer.setVerticalTextAlignment(cartocrow::renderer::GeometryRenderer::VerticalTextAlignment::AlignVCenter);
+		renderer.setHorizontalTextAlignment(cartocrow::GeometryRenderer::HorizontalTextAlignment::AlignHCenter);
+		renderer.setVerticalTextAlignment(cartocrow::GeometryRenderer::VerticalTextAlignment::AlignVCenter);
 
 		if (m_edges)
 			for (typename Graph::Edge_const_handle e : m_graph->edges()) {

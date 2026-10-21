@@ -84,7 +84,7 @@ namespace cartocrow::simplification {
 				return Segment<Inexact>(approximate(d.significant->point()), approximate(e->other(d.significant)->point()));
 			}
 
-			using InterferenceTree = cartocrow::data_structures::QuadTree<InterferenceQuadTreeTraits>;
+			using InterferenceTree = cartocrow::QuadTree<InterferenceQuadTreeTraits>;
 
 			Graph& graph;
 			std::vector<Vec> directions;
