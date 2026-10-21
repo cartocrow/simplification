@@ -61,7 +61,7 @@ namespace cartocrow::simplification {
 		using Move = detail::BaseMove<Graph>;
 		using Single = detail::SingleMove<Graph>;
 		using Combo = detail::ComboMove<Graph>;
-		using Queue = cartocrow::data_structures::IndexedPriorityQueue<detail::MoveQueueTraits<Graph>>;
+		using Queue = cartocrow::IndexedPriorityQueue<detail::MoveQueueTraits<Graph>>;
 		
 		using PairedSingles = std::pair<Single*, Single*>;
 		using Operation = std::variant<Combo*, PairedSingles, Single*>;

@@ -17,8 +17,6 @@
 #include "simplification_algorithm.h"
 
 using namespace cartocrow;
-using namespace cartocrow::renderer;
-using namespace cartocrow::utils;
 
 void launchGUI(int argc, char* argv[]);
 

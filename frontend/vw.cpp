@@ -7,7 +7,7 @@
 #include "smoother.h"
 
 using namespace cartocrow::simplification;
-using namespace cartocrow::renderer;
+using namespace cartocrow;
 
 template<typename Kernel>
 struct VWBaseSimplifier {

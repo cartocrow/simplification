@@ -3,7 +3,6 @@
 #include "simplification_algorithm.h"
 
 using namespace cartocrow;
-using namespace cartocrow::renderer;
 
 class VWSimplifier : public SimplificationAlgorithm {
 private:
