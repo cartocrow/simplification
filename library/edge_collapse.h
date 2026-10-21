@@ -42,7 +42,7 @@ namespace cartocrow::simplification {
 		using EdgeTree = EdgeQuadTree<Graph>;
 
 	private:
-		using Queue = cartocrow::data_structures::IndexedPriorityQueue<GraphQueueTraits<Edge_handle, Kernel>>;
+		using Queue = cartocrow::data_structures::IndexedPriorityQueue<GraphQueueTraits<Edge_handle>>;
 
 		Graph& graph;
 		EdgeTree& sqt;

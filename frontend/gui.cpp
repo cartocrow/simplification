@@ -11,10 +11,12 @@
 #include <QLineEdit>
 
 #include <cartocrow/renderer/graph_painting.h>
+#include <cartocrow/utils/stopwatch.h>
 
 #include "library/utils.h"
 
 #include "vw.h"
+#include "pvw.h"
 #include "ksbb.h"
 #include "bmrs.h"
 #include "ipe_reader.h"
@@ -490,6 +492,7 @@ void SimplificationGUI::addSimplifyTab() {
 
 	connect(initAndRunButton, &QPushButton::clicked, [this, runAlg]() {
 		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		cartocrow::utils::StopwatchPool pool("Init & run");
 		if (input != nullptr) {
 
 			QProgressDialog progress("Initializing", nullptr, 0, 2, this);
@@ -497,13 +500,15 @@ void SimplificationGUI::addSimplifyTab() {
 			progress.setMinimumDuration(1000);
 			progress.setValue(1);
 
+			auto& timer = pool.get("init");
+			timer.start();
 			if (preprocessed == nullptr) {
 				alg->initialize(input, depthSpin->value());
 			}
 			else {
 				alg->initialize(preprocessed, depthSpin->value());
 			}
-
+			timer.stop();
 
 			progress.setValue(2);
 
@@ -513,9 +518,16 @@ void SimplificationGUI::addSimplifyTab() {
 			complexitySlider->setMaximum(c);
 			complexitySlider->setValue(c);
 
+
+			auto& timer2 = pool.get("run");
+			timer2.start();
+
 			if (alg->hasResult()) {
 				runAlg(alg, 1);
 			}
+			timer2.stop();
+
+			pool.printAndClear();
 
 			updatePaintings();
 		}
@@ -699,6 +711,8 @@ SimplificationGUI::SimplificationGUI() {
 
 	algorithms.push_back(&VWSimplifier::getInstance());
 	algorithms.push_back(&VWInexactSimplifier::getInstance());
+	algorithms.push_back(&PVWSimplifier::getInstance());
+	algorithms.push_back(&PVWInexactSimplifier::getInstance());
 	algorithms.push_back(&KSBBSimplifier::getInstance());
 	algorithms.push_back(&KSBBInexactSimplifier::getInstance());
 	algorithms.push_back(&KSBBSemiExactSimplifier::getInstance());

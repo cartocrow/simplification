@@ -48,7 +48,7 @@ namespace cartocrow::simplification {
 		using VertexTree = VertexQuadTree<Graph>;
 
 	private:
-		using Queue = cartocrow::data_structures::IndexedPriorityQueue<GraphQueueTraits<Vertex_handle, Kernel>>;
+		using Queue = cartocrow::data_structures::IndexedPriorityQueue<GraphQueueTraits<Vertex_handle>>;
 
 		Graph& graph;
 		VertexTree& pqt;

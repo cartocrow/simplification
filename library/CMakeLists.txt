@@ -8,6 +8,8 @@ set(HEADERS
 	orientation_restriction.h
 	orientation_restriction.hpp
 	precision_safe_tests.h
+	preserving_vertex_removal.h	
+	preserving_vertex_removal.hpp	
 	utils.h
 	vertex_quad_tree.h
 	vertex_removal.h	

@@ -2,7 +2,7 @@
 
 namespace cartocrow::simplification {
 
-	template<class Elt, typename Kernel>
+	template<class Elt>
 	struct GraphQueueTraits {
 
 		using Element_handle = Elt;
@@ -16,8 +16,8 @@ namespace cartocrow::simplification {
 		}
 
 		static int compare(Element_handle a, Element_handle b) {
-			Number<Kernel> ac = a->data().cost;
-			Number<Kernel> bc = b->data().cost;
+			const auto ac = a->data().cost;
+			const auto bc = b->data().cost;
 			if (ac < bc) {
 				return -1;
 			}

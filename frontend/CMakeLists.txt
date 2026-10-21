@@ -7,6 +7,7 @@ set(SOURCES
     simplification_algorithm.cpp
     smoother.cpp
     vw.cpp
+    pvw.cpp
     ksbb.cpp
     restrictor.cpp
     bmrs.cpp
