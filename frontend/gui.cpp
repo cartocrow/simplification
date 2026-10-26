@@ -23,7 +23,6 @@
 #include "preprocessors/restrictor.h"
 
 #include "simplifiers/vw.h"
-#include "simplifiers/pvw2.h"
 #include "simplifiers/pvw.h"
 #include "simplifiers/ksbb.h"
 #include "simplifiers/bmrs.h"
@@ -252,10 +251,6 @@ void SimplificationGUI::addSimplifyTab() {
 	int default_alg = m_settings.getInteger("selected_algorithm", 0);
 	algorithmSelector = new QComboBox();
 	layout->addWidget(algorithmSelector);
-	for (Simplifier* alg : algorithms) {
-		algorithmSelector->addItem(QString::fromStdString(alg->name()));
-	}
-	algorithmSelector->setCurrentIndex(default_alg);
 
 	{
 		QFrame* line = new QFrame(this);
@@ -271,6 +266,7 @@ void SimplificationGUI::addSimplifyTab() {
 		algorithmSelector->addItem(QString::fromStdString(alg->name()));
 		stack->addWidget(alg->constructWidget());
 	}
+	algorithmSelector->setCurrentIndex(default_alg);
 	stack->setCurrentIndex(default_alg);
 
 	{
@@ -476,6 +472,20 @@ void SimplificationGUI::addSimplifyTab() {
 		stack->setCurrentIndex(value);
 		});
 
+	{
+		QFrame* line = new QFrame(this);
+		line->setFrameShape(QFrame::HLine);
+		layout->addWidget(line);
+	}
+
+	auto* clearButton = new QPushButton("Clear result");
+	layout->addWidget(clearButton);
+	connect(clearButton, &QPushButton::clicked, [this]() {
+		Simplifier* alg = algorithms[algorithmSelector->currentIndex()];
+		alg->clear();
+		updatePaintings();
+		});
+
 	//auto* debugButton = new QPushButton("Draw current state");
 	//layout->addWidget(debugButton);
 	//connect(debugButton, &QPushButton::clicked, [this]() {
@@ -580,7 +590,10 @@ void SimplificationGUI::addSettingsTab() {
 SimplificationGUI::SimplificationGUI() {
 	setWindowTitle("Simplification");
 
-	algorithms.push_back(new PVWSimplifier2(m_settings));
+	algorithms.push_back(new VWSimplifier(m_settings));
+	algorithms.push_back(new PVWSimplifier(m_settings));
+	algorithms.push_back(new KSBBSimplifier(m_settings));
+	algorithms.push_back(new BMRSSimplifier(m_settings));
 
 	preprocessors.push_back(new RegularRestriction(m_settings));
 	preprocessors.push_back(new IrregularRestriction(m_settings));

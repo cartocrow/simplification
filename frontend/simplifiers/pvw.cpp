@@ -1,284 +1,194 @@
 #include "pvw.h"
 
-#include <cartocrow/data_structures/graph_map_2.h>
-#include <cartocrow/renderer/graph_painting.h>
+#include <QVBoxLayout>
+#include <QCheckBox>
+#include <QLabel>
+#include <QSpinBox>
 
 #include "library/preserving_vertex_removal.h"
-#include "frontend/postprocessors/smoother.h"
 
 using namespace cartocrow::simplification;
-using namespace cartocrow::renderer;
 
-template<typename Kernel>
-struct PVWBaseSimplifier {
-	// use dedicated graph: declare algorithm and get graph type
-	using PVW = PreservingVisvalingamWhyatt_Dedicated<Kernel, true>;
-	using PVWGraph = PVW::Graph;
-	// use generic graph: declare graph and give it to algorithm
-	//using PVWGraph = Straight_graph_2<std::monostate, std::monostate, Kernel, DecomposedGraph<true, std::monostate>>;
-	//using PVW = PreservingVisvalingamWhyatt_Generic<PVWGraph>;
-	using PQT = PVW::VertexTree;
-	using Traits = PVW::Traits;
+struct PVWSimplifier::State {
 
-	std::shared_ptr<PVWGraph> m_graph = nullptr;
+	int m_init_complexity;
+
+	virtual void initialize(std::shared_ptr<InputGraph> graph, const int depth, const double weight) = 0;
+	virtual void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
+		std::optional<std::function<bool()>> cancelled = std::nullopt) = 0;
+	virtual int getComplexity() = 0;
+
+	int getMaximumComplexity() {
+		return m_init_complexity;
+	}
+
+	virtual std::shared_ptr<GeometryPainting> getPainting(Color color, const VertexSelection vmode) = 0;
+	virtual std::shared_ptr<InputGraph> simplifiedToInputGraph() = 0;
+	virtual std::shared_ptr<OutputGraph> simplifiedToOutputGraph() = 0;
+};
+
+template <class Kernel>
+struct PVWState : PVWSimplifier::State {
+	using Alg = PreservingVisvalingamWhyatt_Dedicated<Kernel, true>;
+	using Graph = Alg::Graph;
+	using PQT = Alg::VertexTree;
+	using Traits = Alg::Traits;
+
+	std::shared_ptr<Graph> m_graph = nullptr;
 	PQT* m_pqt = nullptr;
-	PVW* m_alg = nullptr;
-	std::shared_ptr<SmoothGraph> m_smooth = nullptr;
-	int m_init_complexity = -1;
-	Color m_color, m_smooth_color;
+	Alg* m_alg = nullptr;
 
-	PVWBaseSimplifier(Color color, Color smooth_color) : m_color(color), m_smooth_color(smooth_color) {}
+	~PVWState() {
+		delete m_alg;
+		delete m_pqt;
+	}
 
-	void initialize(std::shared_ptr<InputGraph> graph, const int depth) {
+	void initialize(std::shared_ptr<InputGraph> graph, const int depth, const double weight) override {
 
-		if (hasResult()) {
-			clear();
-		}
-
-		m_graph = std::make_shared<PVWGraph>();
+		m_graph = std::make_shared<Graph>();
 
 		graph_2_copy(*graph, *m_graph);
 
 		Rectangle<Kernel> box = m_graph->bounding_rectangle();
 		m_pqt = new PQT(box, depth);
 
-		m_alg = new PVW(*m_graph, *m_pqt, Traits());
+		m_alg = new Alg(*m_graph, *m_pqt, Traits(weight));
 		m_alg->initialize(true);
 
 		m_init_complexity = m_graph->number_of_edges();
 	}
 
-	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress,
-		std::optional<std::function<bool()>> cancelled) {
-		if (hasResult()) {
-			clearSmoothResult();
+	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
+		std::optional<std::function<bool()>> cancelled = std::nullopt) override {
+		auto& hist = m_graph->history();
 
-			auto& hist = m_graph->history();
-
-			if (k > m_graph->number_of_edges()) {
-				// revert
-				while (hist.can_undo() && m_graph->number_of_edges() < k) {
-					hist.undo();
-				}
+		if (k > m_graph->number_of_edges()) {
+			// revert
+			while (hist.can_undo() && m_graph->number_of_edges() < k) {
+				hist.undo();
 			}
-			else if (k < m_graph->number_of_edges()) {
-				while (hist.can_redo() && m_graph->number_of_edges() > k) {
-					hist.redo();
-				}
+		}
+		else if (k < m_graph->number_of_edges()) {
+			while (hist.can_redo() && m_graph->number_of_edges() > k) {
+				hist.redo();
+			}
 
-				if (!hist.can_redo() && k < m_graph->number_of_edges()) {
-					// already at present, run algorithm further
-					m_alg->run([&](int complexity, Number<Kernel> cost) {
-						if (progress.has_value()) {
-							(*progress)(complexity);
-						}
-						if (cancelled.has_value() && (*cancelled)()) {
-							return true;
-						}
+			if (!hist.can_redo() && k < m_graph->number_of_edges()) {
+				// already at present, run algorithm further
+				m_alg->run([&](int complexity, Number<Kernel> cost) {
+					if (progress.has_value()) {
+						(*progress)(complexity);
+					}
+					if (cancelled.has_value() && (*cancelled)()) {
+						return true;
+					}
 
-						return complexity <= k;
-						});
-				}
+					return complexity <= k;
+					});
 			}
 		}
 	}
 
-	bool hasResult() {
-		return m_graph != nullptr;
+	int getComplexity() override {
+		return m_graph->number_of_edges();
 	}
 
-	int getComplexity() {
-		if (hasResult()) {
-			return m_graph->number_of_edges();
-		}
-		else {
-			return -1;
-		}
+	std::shared_ptr<GeometryPainting> getPainting(Color color, const VertexSelection vmode) override {
+		return std::make_shared<GraphPainting<Graph>>(m_graph, VertexStyle{ color }, EdgeStyle{ color, 2 }, vmode);
 	}
 
-	int getMaximumComplexity() {
-		return m_init_complexity;
+	std::shared_ptr<InputGraph> simplifiedToInputGraph() override {
+		std::shared_ptr<InputGraph> res = std::make_shared<InputGraph>();
+		graph_2_copy(*m_graph, *res);
+		return res;
 	}
 
-	std::shared_ptr<GeometryPainting> getPainting(const VertexSelection vmode) {
-		if (hasResult()) {
-			return std::make_shared<GraphPainting<PVWGraph>>(m_graph, VertexStyle{ m_color }, EdgeStyle{ m_color, 2 }, vmode);
-		}
-		else {
-			return nullptr;
-		}
-	}
-
-	void clear() {
-		if (hasResult()) {
-
-			delete m_alg;
-			m_alg = nullptr;
-
-			delete m_pqt;
-			m_pqt = nullptr;
-
-			m_graph = nullptr;
-		}
-
-		clearSmoothResult();
-	}
-
-	void smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
-		clearSmoothResult();
-
-//		m_smooth = smoothGraph<PVWGraph>(m_graph, radius, edges_on_semicircle, progress);
-	}
-
-	bool hasSmoothResult() {
-		return m_smooth != nullptr;
-	}
-
-	std::shared_ptr<GeometryPainting> getSmoothPainting() {
-		return std::make_shared<GraphPainting<SmoothGraph>>(m_smooth, VertexStyle{ m_smooth_color }, EdgeStyle{ m_smooth_color, 2 }, VertexSelection::DEG0_ONLY);
-	}
-
-	void clearSmoothResult() {
-			m_smooth = nullptr;
-	}
-
-	std::shared_ptr<InputGraph> resultToGraph() {
-		if (m_graph == nullptr) {
-			return nullptr;
-		}
-		else if (m_smooth == nullptr) {
-			std::shared_ptr<InputGraph> res = std::make_shared<InputGraph>();
-			graph_2_copy(*m_graph, *res);
-			return res;
-		}
-		else {
-			std::shared_ptr<InputGraph> res = std::make_shared<InputGraph>();
-			graph_2_copy(*m_smooth, *res);
-			return res;
-		}
+	std::shared_ptr<OutputGraph> simplifiedToOutputGraph() override {
+		std::shared_ptr<OutputGraph> res = std::make_shared<OutputGraph>();
+		graph_2_copy(*m_graph, *res);
+		return res;
 	}
 };
 
+PVWSimplifier::PVWSimplifier(PersistentSettings& settings) : Simplifier("Preserving Visvalingam-Whyatt", settings, { 100, 100, 40 }), m_color(220, 220, 80) {
+	m_exact = settings.getBoolean("pvw_exact", false);
+	m_preservation_weight = settings.getInteger("pvw_weight", 100);
+}
 
-using PVWExactBase = PVWBaseSimplifier<Exact>;
-static PVWSimplifier* exact_instance = nullptr;
-static PVWExactBase* exact_base = nullptr;
+QWidget* PVWSimplifier::constructWidget() {
+	auto* result = new QWidget();
+	auto* layout = new QVBoxLayout(result);
+	layout->setAlignment(Qt::AlignTop);
 
-PVWSimplifier& PVWSimplifier::getInstance() {
-	if (exact_instance == nullptr) {
-		exact_instance = new PVWSimplifier();
-		exact_base = new PVWExactBase({ 80, 80, 220 }, { 40, 40, 100 });
-	}
-	return *exact_instance;
+	auto* checkExact = new QCheckBox("Exact computation");
+	checkExact->setChecked(m_exact);
+	layout->addWidget(checkExact);
+
+	layout->addWidget(new QLabel("Area-preservation weight (%)"));
+	auto* spinWeight = new QSpinBox();
+	spinWeight->setMinimum(0);
+	spinWeight->setMaximum(1000);
+	spinWeight->setValue(m_preservation_weight);
+	layout->addWidget(spinWeight);
+
+	result->connect(checkExact, &QCheckBox::stateChanged, [this](bool checked) {
+		m_settings.setBoolean("pvw_exact", checked);
+		m_exact = checked;
+		});
+
+	result->connect(spinWeight, QOverload<int>::of(&QSpinBox::valueChanged), [this](int value) {
+		m_settings.setInteger("pvw_weight", value);
+		m_preservation_weight = value;		
+		});
+
+	return result;
 }
 
 void PVWSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int depth) {
-	exact_base->initialize(graph, depth);
+	clear();
+
+	if (m_exact) {
+		m_state = std::make_unique<PVWState<Exact>>();
+	}
+	else {
+		m_state = std::make_unique<PVWState<Inexact>>();
+	}
+	m_state->initialize(graph, depth, m_preservation_weight / 100.0);
 }
 
 void PVWSimplifier::runToComplexity(const int k, std::optional<std::function<void(int)>> progress,
 	std::optional<std::function<bool()>> cancelled) {
-	exact_base->runToComplexity(k, progress, cancelled);
-}
-
-bool PVWSimplifier::hasResult() {
-	return exact_base->hasResult();
+	if (hasResult()) {
+		clearPostprocessed();
+		m_state->runToComplexity(k);
+	}
 }
 
 int PVWSimplifier::getComplexity() {
-	return exact_base->getComplexity();
+	return hasResult() ? m_state->getComplexity() : -1;
 }
 
 int PVWSimplifier::getMaximumComplexity() {
-	return exact_base->getMaximumComplexity();
+	return hasResult() ? m_state->getMaximumComplexity() : -1;
 }
 
 std::shared_ptr<GeometryPainting> PVWSimplifier::getPainting(const VertexSelection vmode) {
-	return exact_base->getPainting(vmode);
+	return hasResult() ? m_state->getPainting(m_color, vmode) : nullptr;
 }
 
 void PVWSimplifier::clear() {
-	exact_base->clear();
+	clearPostprocessed();
+	m_state = nullptr;
 }
 
-void PVWSimplifier::smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
-	exact_base->smooth(radius, edges_on_semicircle, progress);
+bool PVWSimplifier::hasResult() {
+	return m_state != nullptr;
 }
 
-bool PVWSimplifier::hasSmoothResult() {
-	return exact_base->hasSmoothResult();
+std::shared_ptr<InputGraph> PVWSimplifier::simplifiedToInputGraph() {
+	return hasResult() ? m_state->simplifiedToInputGraph() : nullptr;
 }
 
-std::shared_ptr<GeometryPainting> PVWSimplifier::getSmoothPainting() {
-	return exact_base->getSmoothPainting();
-}
-
-void PVWSimplifier::clearSmoothResult() {
-	exact_base->clearSmoothResult();
-}
-
-std::shared_ptr<InputGraph> PVWSimplifier::resultToGraph() {
-	return exact_base->resultToGraph();
-}
-
-
-using PVWInexactBase = PVWBaseSimplifier<Inexact>;
-static PVWInexactSimplifier* inexact_instance = nullptr;
-static PVWInexactBase* inexact_base = nullptr;
-
-PVWInexactSimplifier& PVWInexactSimplifier::getInstance() {
-	if (inexact_instance == nullptr) {
-		inexact_instance = new PVWInexactSimplifier();
-		inexact_base = new PVWInexactBase({ 80, 220, 220 }, { 40, 100, 100 });
-	}
-	return *inexact_instance;
-}
-
-void PVWInexactSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int depth) {
-	inexact_base->initialize(graph, depth);
-}
-
-void PVWInexactSimplifier::runToComplexity(const int k, std::optional<std::function<void(int)>> progress,
-	std::optional<std::function<bool()>> cancelled) {
-	inexact_base->runToComplexity(k, progress, cancelled);
-}
-
-bool PVWInexactSimplifier::hasResult() {
-	return inexact_base->hasResult();
-}
-
-int PVWInexactSimplifier::getComplexity() {
-	return inexact_base->getComplexity();
-}
-
-int PVWInexactSimplifier::getMaximumComplexity() {
-	return inexact_base->getMaximumComplexity();
-}
-
-std::shared_ptr<GeometryPainting> PVWInexactSimplifier::getPainting(const VertexSelection vmode) {
-	return inexact_base->getPainting(vmode);
-}
-
-void PVWInexactSimplifier::clear() {
-	inexact_base->clear();
-}
-
-void PVWInexactSimplifier::smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
-	inexact_base->smooth(radius, edges_on_semicircle, progress);
-}
-
-bool PVWInexactSimplifier::hasSmoothResult() {
-	return inexact_base->hasSmoothResult();
-}
-
-std::shared_ptr<GeometryPainting> PVWInexactSimplifier::getSmoothPainting() {
-	return inexact_base->getSmoothPainting();
-}
-
-void PVWInexactSimplifier::clearSmoothResult() {
-	inexact_base->clearSmoothResult();
-}
-
-std::shared_ptr<InputGraph> PVWInexactSimplifier::resultToGraph() {
-	return inexact_base->resultToGraph();
+std::shared_ptr<OutputGraph> PVWSimplifier::simplifiedToOutputGraph() {
+	return hasResult() ? m_state->simplifiedToOutputGraph() : nullptr;
 }

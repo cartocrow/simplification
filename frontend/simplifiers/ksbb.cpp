@@ -1,344 +1,190 @@
 #include "ksbb.h"
 
-#include <cartocrow/data_structures/graph_map_2.h>
-#include <cartocrow/renderer/graph_painting.h>
+#include <QVBoxLayout>
+#include <QLabel>
+#include <QComboBox>
 
 #include "library/edge_collapse.h"
-#include "frontend/postprocessors/smoother.h"
 
 using namespace cartocrow::simplification;
-using namespace cartocrow::renderer;
 
-template<typename Kernel, bool A>
-struct KSBBBaseSimplifier {
-	using KSBBGraph = EdgeCollapseGraph<Kernel, true>;
-	using KSBBPQT = VertexQuadTree<KSBBGraph>;
-	using KSBBSQT = EdgeQuadTree<KSBBGraph>;
-	using KSBB = EdgeCollapse<KronenfeldEtAlTraits<KSBBGraph, A>>;
+struct KSBBSimplifier::State {
 
-	std::shared_ptr<KSBBGraph> m_graph = nullptr;
-	KSBBPQT* m_pqt = nullptr;
-	KSBBSQT* m_sqt = nullptr;
-	KSBB* m_alg = nullptr;
-	std::shared_ptr<SmoothGraph> m_smooth = nullptr;
-	int m_init_complexity = -1;
-	Color m_color, m_smooth_color;
+	int m_init_complexity;
 
-	KSBBBaseSimplifier(Color color, Color smooth_color) : m_color(color), m_smooth_color(smooth_color) {}
-
-	void initialize(std::shared_ptr<InputGraph> graph, const int depth) {
-
-		if (hasResult()) {
-			clear();
-		}
-
-		m_graph = std::make_shared<KSBBGraph>();
-
-		graph_2_copy(*graph, *m_graph);
-
-		Rectangle<Kernel> box = m_graph->bounding_rectangle();
-		m_pqt = new KSBBPQT(box, depth);
-		m_sqt = new KSBBSQT(box, depth, 0.05);
-
-		m_alg = new KSBB(*m_graph, *m_sqt, *m_pqt);
-		m_alg->initialize(true, true);
-
-		m_init_complexity = m_graph->number_of_edges();
-	}
-
-	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress,
-		std::optional<std::function<bool()>> cancelled) {
-		if (hasResult()) {
-			clearSmoothResult();
-
-			auto& hist = m_graph->history();
-
-			if (k > m_graph->number_of_edges()) {
-				// revert
-				while (hist.can_undo() && m_graph->number_of_edges() < k) {
-					hist.undo();
-				}
-			}
-			else if (k < m_graph->number_of_edges()) {
-				while (hist.can_redo() && m_graph->number_of_edges() > k) {
-					hist.redo();
-				}
-
-				if (!hist.can_redo() && k < m_graph->number_of_edges()) {
-					// already at present, run algorithm further
-					m_alg->run([&](int complexity, Number<Kernel> cost) {
-						if (progress.has_value()) {
-							(*progress)(complexity);
-						}
-						if (cancelled.has_value() && (*cancelled)()) {
-							return true;
-						}
-
-						return complexity <= k;
-						});
-				}
-			}
-		}
-	}
-
-	bool hasResult() {
-		return m_graph != nullptr;
-	}
-
-	int getComplexity() {
-		if (hasResult()) {
-			return m_graph->number_of_edges();
-		}
-		else {
-			return -1;
-		}
-	}
+	virtual void initialize(std::shared_ptr<InputGraph> graph, const int depth) = 0;
+	virtual void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
+		std::optional<std::function<bool()>> cancelled = std::nullopt) = 0;
+	virtual int getComplexity() = 0;
 
 	int getMaximumComplexity() {
 		return m_init_complexity;
 	}
 
-	std::shared_ptr<GeometryPainting> getPainting(const VertexSelection vmode) {
-		if (hasResult()) {
-			return std::make_shared<GraphPainting<KSBBGraph>>(m_graph, VertexStyle{ m_color }, EdgeStyle{ m_color, 2 }, vmode);
+	virtual std::shared_ptr<GeometryPainting> getPainting(Color color, const VertexSelection vmode) = 0;
+	virtual std::shared_ptr<InputGraph> simplifiedToInputGraph() = 0;
+	virtual std::shared_ptr<OutputGraph> simplifiedToOutputGraph() = 0;
+};
+
+template <class Kernel, bool ApproxExact>
+struct KSBBState : KSBBSimplifier::State {
+	using Graph = EdgeCollapseGraph<Kernel, true>;
+	using Alg = EdgeCollapse<KronenfeldEtAlTraits<Graph, ApproxExact>>;
+	using PQT = Alg::VertexTree;
+	using SQT = Alg::EdgeTree;
+
+	std::shared_ptr<Graph> m_graph = nullptr;
+	PQT* m_pqt = nullptr;
+	SQT* m_sqt = nullptr;
+	Alg* m_alg = nullptr;
+
+	~KSBBState() {
+		delete m_alg;
+		delete m_pqt;
+		delete m_sqt;
+	}
+
+	void initialize(std::shared_ptr<InputGraph> graph, const int depth) override {
+
+		m_graph = std::make_shared<Graph>();
+
+		graph_2_copy(*graph, *m_graph);
+
+		Rectangle<Kernel> box = m_graph->bounding_rectangle();
+		m_pqt = new PQT(box, depth);
+		m_sqt = new SQT(box, depth, 0.05);
+
+		m_alg = new Alg(*m_graph, *m_sqt, *m_pqt);
+		m_alg->initialize(true, true);
+
+		m_init_complexity = m_graph->number_of_edges();
+	}
+
+	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
+		std::optional<std::function<bool()>> cancelled = std::nullopt) override {
+		auto& hist = m_graph->history();
+
+		if (k > m_graph->number_of_edges()) {
+			// revert
+			while (hist.can_undo() && m_graph->number_of_edges() < k) {
+				hist.undo();
+			}
 		}
-		else {
-			return nullptr;
+		else if (k < m_graph->number_of_edges()) {
+			while (hist.can_redo() && m_graph->number_of_edges() > k) {
+				hist.redo();
+			}
+
+			if (!hist.can_redo() && k < m_graph->number_of_edges()) {
+				// already at present, run algorithm further
+				m_alg->run([&](int complexity, Number<Kernel> cost) {
+					if (progress.has_value()) {
+						(*progress)(complexity);
+					}
+					if (cancelled.has_value() && (*cancelled)()) {
+						return true;
+					}
+
+					return complexity <= k;
+					});
+			}
 		}
 	}
 
-	void clear() {
-		if (hasResult()) {
-
-			delete m_alg;
-			m_alg = nullptr;
-
-			delete m_pqt;
-			m_pqt = nullptr;
-
-			m_graph = nullptr;
-		}
-
-		clearSmoothResult();
+	int getComplexity() override {
+		return m_graph->number_of_edges();
 	}
 
-	void smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
-		clearSmoothResult();
-
-//		m_smooth = smoothGraph<KSBBGraph>(m_graph, radius, edges_on_semicircle, progress);
+	std::shared_ptr<GeometryPainting> getPainting(Color color, const VertexSelection vmode) override {
+		return std::make_shared<GraphPainting<Graph>>(m_graph, VertexStyle{ color }, EdgeStyle{ color, 2 }, vmode);
 	}
 
-	bool hasSmoothResult() {
-		return m_smooth != nullptr;
+	std::shared_ptr<InputGraph> simplifiedToInputGraph() override {
+		std::shared_ptr<InputGraph> res = std::make_shared<InputGraph>();
+		graph_2_copy(*m_graph, *res);
+		return res;
 	}
 
-	std::shared_ptr<GeometryPainting> getSmoothPainting() {
-		return std::make_shared<GraphPainting<SmoothGraph>>(m_smooth, VertexStyle{ m_smooth_color }, EdgeStyle{ m_smooth_color, 2 }, VertexSelection::DEG0_ONLY);
-	}
-
-	void clearSmoothResult() {
-		m_smooth = nullptr;
-	}
-
-	std::shared_ptr<InputGraph> resultToGraph() {
-		if (m_graph == nullptr) {
-			return nullptr;
-		}
-		else if (m_smooth == nullptr) {
-			std::shared_ptr<InputGraph> res = std::make_shared<InputGraph>();
-			graph_2_copy(*m_graph, *res);
-			return res;
-		}
-		else {
-			std::shared_ptr<InputGraph> res = std::make_shared<InputGraph>();
-			graph_2_copy(*m_smooth, *res);
-			return res;
-		}
+	std::shared_ptr<OutputGraph> simplifiedToOutputGraph() override {
+		std::shared_ptr<OutputGraph> res = std::make_shared<OutputGraph>();
+		graph_2_copy(*m_graph, *res);
+		return res;
 	}
 };
 
+KSBBSimplifier::KSBBSimplifier(PersistentSettings& settings) : Simplifier("Kronenfeld et al.", settings, { 40, 100, 40 }), m_color(80, 220, 80) {
+	m_exact = settings.getInteger("ksbb_exact", 0);
+}
 
-using KSBBExactBase = KSBBBaseSimplifier<Exact,false>;
-static KSBBSimplifier* exact_instance = nullptr;
-static KSBBExactBase* exact_base = nullptr;
+QWidget* KSBBSimplifier::constructWidget() {
+	auto* result = new QWidget();
+	auto* layout = new QVBoxLayout(result);
+	layout->setAlignment(Qt::AlignTop);
 
-KSBBSimplifier& KSBBSimplifier::getInstance() {
-	if (exact_instance == nullptr) {
-		exact_instance = new KSBBSimplifier();
-		exact_base = new KSBBExactBase({ 80, 220, 80 }, { 40, 100, 40 });
-	}
-	return *exact_instance;
+	auto* comboExact = new QComboBox();
+	layout->addWidget(comboExact);
+	comboExact->addItem("Inexact computation");
+	comboExact->addItem("Semi-exact computation");
+	comboExact->addItem("Exact computation");
+
+	result->connect(comboExact, QOverload<int>::of(&QComboBox::currentIndexChanged), [this](int index) {
+		m_settings.setBoolean("ksbb_exact", index);
+		m_exact = index;
+		});
+
+	return result;
 }
 
 void KSBBSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int depth) {
-	exact_base->initialize(graph, depth);
+	clear();
+
+	switch (m_exact) {
+	default:
+		m_state = std::make_unique<KSBBState<Inexact, false>>();
+		break;
+	case 1:
+		m_state = std::make_unique<KSBBState<Exact, true>>();
+		break;
+	case 2:
+		m_state = std::make_unique<KSBBState<Exact, false>>();
+		break;
+	}
+	m_state->initialize(graph, depth);
 }
 
 void KSBBSimplifier::runToComplexity(const int k, std::optional<std::function<void(int)>> progress,
 	std::optional<std::function<bool()>> cancelled) {
-	exact_base->runToComplexity(k, progress, cancelled);
-}
-
-bool KSBBSimplifier::hasResult() {
-	return exact_base->hasResult();
+	if (hasResult()) {
+		clearPostprocessed();
+		m_state->runToComplexity(k);
+	}
 }
 
 int KSBBSimplifier::getComplexity() {
-	return exact_base->getComplexity();
+	return hasResult() ? m_state->getComplexity() : -1;
 }
 
 int KSBBSimplifier::getMaximumComplexity() {
-	return exact_base->getMaximumComplexity();
+	return hasResult() ? m_state->getMaximumComplexity() : -1;
 }
 
 std::shared_ptr<GeometryPainting> KSBBSimplifier::getPainting(const VertexSelection vmode) {
-	return exact_base->getPainting(vmode);
+	return hasResult() ? m_state->getPainting(m_color, vmode) : nullptr;
 }
 
 void KSBBSimplifier::clear() {
-	exact_base->clear();
+	clearPostprocessed();
+	m_state = nullptr;
 }
 
-void KSBBSimplifier::smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
-	exact_base->smooth(radius, edges_on_semicircle, progress);
+bool KSBBSimplifier::hasResult() {
+	return m_state != nullptr;
 }
 
-bool KSBBSimplifier::hasSmoothResult() {
-	return exact_base->hasSmoothResult();
+std::shared_ptr<InputGraph> KSBBSimplifier::simplifiedToInputGraph() {
+	return hasResult() ? m_state->simplifiedToInputGraph() : nullptr;
 }
 
-std::shared_ptr<GeometryPainting> KSBBSimplifier::getSmoothPainting() {
-	return exact_base->getSmoothPainting();
-}
-
-void KSBBSimplifier::clearSmoothResult() {
-	exact_base->clearSmoothResult();
-}
-
-std::shared_ptr<InputGraph> KSBBSimplifier::resultToGraph() {
-	return exact_base->resultToGraph();
-}
-
-
-using KSBBInexactBase = KSBBBaseSimplifier<Inexact,false>;
-static KSBBInexactSimplifier* inexact_instance = nullptr;
-static KSBBInexactBase* inexact_base = nullptr;
-
-KSBBInexactSimplifier& KSBBInexactSimplifier::getInstance() {
-	if (inexact_instance == nullptr) {
-		inexact_instance = new KSBBInexactSimplifier();
-		inexact_base = new KSBBInexactBase({ 220, 80, 80 }, { 100, 40, 40 });
-	}
-	return *inexact_instance;
-}
-
-void KSBBInexactSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int depth) {
-	inexact_base->initialize(graph, depth);
-}
-
-void KSBBInexactSimplifier::runToComplexity(const int k, std::optional<std::function<void(int)>> progress,
-	std::optional<std::function<bool()>> cancelled) {
-	inexact_base->runToComplexity(k, progress, cancelled);
-}
-
-bool KSBBInexactSimplifier::hasResult() {
-	return inexact_base->hasResult();
-}
-
-int KSBBInexactSimplifier::getComplexity() {
-	return inexact_base->getComplexity();
-}
-
-int KSBBInexactSimplifier::getMaximumComplexity() {
-	return inexact_base->getMaximumComplexity();
-}
-
-std::shared_ptr<GeometryPainting> KSBBInexactSimplifier::getPainting(const VertexSelection vmode) {
-	return inexact_base->getPainting(vmode);
-}
-
-void KSBBInexactSimplifier::clear() {
-	inexact_base->clear();
-}
-
-void KSBBInexactSimplifier::smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
-	inexact_base->smooth(radius, edges_on_semicircle, progress);
-}
-
-bool KSBBInexactSimplifier::hasSmoothResult() {
-	return inexact_base->hasSmoothResult();
-}
-
-std::shared_ptr<GeometryPainting> KSBBInexactSimplifier::getSmoothPainting() {
-	return inexact_base->getSmoothPainting();
-}
-
-void KSBBInexactSimplifier::clearSmoothResult() {
-	inexact_base->clearSmoothResult();
-}
-
-std::shared_ptr<InputGraph> KSBBInexactSimplifier::resultToGraph() {
-	return inexact_base->resultToGraph();
-}
-
-
-using KSBBSemiExactBase = KSBBBaseSimplifier<Exact, true>;
-static KSBBSemiExactSimplifier* semiexact_instance = nullptr;
-static KSBBSemiExactBase* semiexact_base = nullptr;
-
-KSBBSemiExactSimplifier& KSBBSemiExactSimplifier::getInstance() {
-	if (semiexact_instance == nullptr) {
-		semiexact_instance = new KSBBSemiExactSimplifier();
-		semiexact_base = new KSBBSemiExactBase({ 220, 220, 80 }, { 100, 100, 40 });
-	}
-	return *semiexact_instance;
-}
-
-void KSBBSemiExactSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int depth) {
-	semiexact_base->initialize(graph, depth);
-}
-
-void KSBBSemiExactSimplifier::runToComplexity(const int k, std::optional<std::function<void(int)>> progress,
-	std::optional<std::function<bool()>> cancelled) {
-	semiexact_base->runToComplexity(k, progress, cancelled);
-}
-
-bool KSBBSemiExactSimplifier::hasResult() {
-	return semiexact_base->hasResult();
-}
-
-int KSBBSemiExactSimplifier::getComplexity() {
-	return semiexact_base->getComplexity();
-}
-
-int KSBBSemiExactSimplifier::getMaximumComplexity() {
-	return semiexact_base->getMaximumComplexity();
-}
-
-std::shared_ptr<GeometryPainting> KSBBSemiExactSimplifier::getPainting(const VertexSelection vmode) {
-	return semiexact_base->getPainting(vmode);
-}
-
-void KSBBSemiExactSimplifier::clear() {
-	semiexact_base->clear();
-}
-
-void KSBBSemiExactSimplifier::smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
-	semiexact_base->smooth(radius, edges_on_semicircle, progress);
-}
-
-bool KSBBSemiExactSimplifier::hasSmoothResult() {
-	return semiexact_base->hasSmoothResult();
-}
-
-std::shared_ptr<GeometryPainting> KSBBSemiExactSimplifier::getSmoothPainting() {
-	return semiexact_base->getSmoothPainting();
-}
-
-void KSBBSemiExactSimplifier::clearSmoothResult() {
-	semiexact_base->clearSmoothResult();
-}
-
-std::shared_ptr<InputGraph> KSBBSemiExactSimplifier::resultToGraph() {
-	return semiexact_base->resultToGraph();
+std::shared_ptr<OutputGraph> KSBBSimplifier::simplifiedToOutputGraph() {
+	return hasResult() ? m_state->simplifiedToOutputGraph() : nullptr;
 }

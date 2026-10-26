@@ -9,7 +9,7 @@
 
 #include "frontend/widgets/progress_indicator.h"
 
-Smoother::Smoother(PersistentSettings& settings) : Postprocessor("Smoother", settings) {
+Smoother::Smoother(PersistentSettings& settings) : Postprocessor("Smooth", settings) {
 	m_radiuspct = m_settings.getInteger("smoother_radiuspercent", 50);
 	m_samples = m_settings.getInteger("smoother_samples", 45);
 }

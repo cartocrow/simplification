@@ -1,279 +1,179 @@
 #include "vw.h"
 
-#include <cartocrow/data_structures/graph_map_2.h>
-#include <cartocrow/renderer/graph_painting.h>
+#include <QVBoxLayout>
+#include <QCheckBox>
+#include <QLabel>
 
 #include "library/vertex_removal.h"
-#include "frontend/postprocessors/smoother.h"
 
 using namespace cartocrow::simplification;
-using namespace cartocrow::renderer;
 
-template<typename Kernel>
-struct VWBaseSimplifier {
-	using VWGraph = VertexRemovalGraph<Kernel, true>;
-	using VWPQT = VertexQuadTree<VWGraph>;
-	using VW = VisvalingamWhyatt<VWGraph>;
+struct VWSimplifier::State {
 
-	std::shared_ptr<VWGraph> m_graph = nullptr;
-	VWPQT* m_pqt = nullptr;
-	VW* m_alg = nullptr;
-	std::shared_ptr<SmoothGraph> m_smooth = nullptr;
-	int m_init_complexity = -1;
-	Color m_color, m_smooth_color;
+	int m_init_complexity;
 
-	VWBaseSimplifier(Color color, Color smooth_color) : m_color(color), m_smooth_color(smooth_color) {}
-
-	void initialize(std::shared_ptr<InputGraph> graph, const int depth) {
-
-		if (hasResult()) {
-			clear();
-		}
-
-		m_graph = std::make_shared<VWGraph>();
-
-		graph_2_copy(*graph, *m_graph);
-
-		Rectangle<Kernel> box = m_graph->bounding_rectangle();
-		m_pqt = new VWPQT(box, depth);
-
-		m_alg = new VW(*m_graph, *m_pqt);
-		m_alg->initialize(true);
-
-		m_init_complexity = m_graph->number_of_edges();
-	}
-
-	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress,
-		std::optional<std::function<bool()>> cancelled) {
-		if (hasResult()) {
-			clearSmoothResult();
-
-			auto& hist = m_graph->history();
-
-			if (k > m_graph->number_of_edges()) {
-				// revert
-				while (hist.can_undo() && m_graph->number_of_edges() < k) {
-					hist.undo();
-				}
-			}
-			else if (k < m_graph->number_of_edges()) {
-				while (hist.can_redo() && m_graph->number_of_edges() > k) {
-					hist.redo();
-				}
-
-				if (!hist.can_redo() && k < m_graph->number_of_edges()) {
-					// already at present, run algorithm further
-					m_alg->run([&](int complexity, Number<Kernel> cost) {
-						if (progress.has_value()) {
-							(*progress)(complexity);
-						}
-						if (cancelled.has_value() && (*cancelled)()) {
-							return true;
-						}
-
-						return complexity <= k;
-						});
-				}
-			}
-		}
-	}
-
-	bool hasResult() {
-		return m_graph != nullptr;
-	}
-
-	int getComplexity() {
-		if (hasResult()) {
-			return m_graph->number_of_edges();
-		}
-		else {
-			return -1;
-		}
-	}
+	virtual void initialize(std::shared_ptr<InputGraph> graph, const int depth) = 0;
+	virtual void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
+		std::optional<std::function<bool()>> cancelled = std::nullopt) = 0;
+	virtual int getComplexity() = 0;
 
 	int getMaximumComplexity() {
 		return m_init_complexity;
 	}
 
-	std::shared_ptr<GeometryPainting> getPainting(const VertexSelection vmode) {
-		if (hasResult()) {
-			return std::make_shared<GraphPainting<VWGraph>>(m_graph, VertexStyle{ m_color }, EdgeStyle{ m_color, 2 }, vmode);
+	virtual std::shared_ptr<GeometryPainting> getPainting(Color color, const VertexSelection vmode) = 0;
+	virtual std::shared_ptr<InputGraph> simplifiedToInputGraph() = 0;
+	virtual std::shared_ptr<OutputGraph> simplifiedToOutputGraph() = 0;
+};
+
+template <class Kernel>
+struct VWState : VWSimplifier::State {
+	using Graph = VertexRemovalGraph<Kernel, true>;
+	using Alg = VisvalingamWhyatt<Graph>;
+	using PQT = Alg::VertexTree;
+
+	std::shared_ptr<Graph> m_graph = nullptr;
+	PQT* m_pqt = nullptr;
+	Alg* m_alg = nullptr;
+
+	~VWState() {
+		delete m_alg;
+		delete m_pqt;
+	}
+
+	void initialize(std::shared_ptr<InputGraph> graph, const int depth) override {
+
+		m_graph = std::make_shared<Graph>();
+
+		graph_2_copy(*graph, *m_graph);
+
+		Rectangle<Kernel> box = m_graph->bounding_rectangle();
+		m_pqt = new PQT(box, depth);
+
+		m_alg = new Alg(*m_graph, *m_pqt);
+		m_alg->initialize(true);
+
+		m_init_complexity = m_graph->number_of_edges();
+	}
+
+	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
+		std::optional<std::function<bool()>> cancelled = std::nullopt) override {
+		auto& hist = m_graph->history();
+
+		if (k > m_graph->number_of_edges()) {
+			// revert
+			while (hist.can_undo() && m_graph->number_of_edges() < k) {
+				hist.undo();
+			}
 		}
-		else {
-			return nullptr;
+		else if (k < m_graph->number_of_edges()) {
+			while (hist.can_redo() && m_graph->number_of_edges() > k) {
+				hist.redo();
+			}
+
+			if (!hist.can_redo() && k < m_graph->number_of_edges()) {
+				// already at present, run algorithm further
+				m_alg->run([&](int complexity, Number<Kernel> cost) {
+					if (progress.has_value()) {
+						(*progress)(complexity);
+					}
+					if (cancelled.has_value() && (*cancelled)()) {
+						return true;
+					}
+
+					return complexity <= k;
+					});
+			}
 		}
 	}
 
-	void clear() {
-		if (hasResult()) {
-
-			delete m_alg;
-			m_alg = nullptr;
-
-			delete m_pqt;
-			m_pqt = nullptr;
-
-			m_graph = nullptr;
-		}
-
-		clearSmoothResult();
+	int getComplexity() override {
+		return m_graph->number_of_edges();
 	}
 
-	void smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
-		clearSmoothResult();
-
-	//	m_smooth = smoothGraph<VWGraph>(m_graph, radius, edges_on_semicircle, progress);
+	std::shared_ptr<GeometryPainting> getPainting(Color color, const VertexSelection vmode) override {
+		return std::make_shared<GraphPainting<Graph>>(m_graph, VertexStyle{ color }, EdgeStyle{ color, 2 }, vmode);
 	}
 
-	bool hasSmoothResult() {
-		return m_smooth != nullptr;
+	std::shared_ptr<InputGraph> simplifiedToInputGraph() override {
+		std::shared_ptr<InputGraph> res = std::make_shared<InputGraph>();
+		graph_2_copy(*m_graph, *res);
+		return res;
 	}
 
-	std::shared_ptr<GeometryPainting> getSmoothPainting() {
-		return std::make_shared<GraphPainting<SmoothGraph>>(m_smooth, VertexStyle{ m_smooth_color }, EdgeStyle{ m_smooth_color, 2 }, VertexSelection::DEG0_ONLY);
-	}
-
-	void clearSmoothResult() {
-			m_smooth = nullptr;
-	}
-
-	std::shared_ptr<InputGraph> resultToGraph() {
-		if (m_graph == nullptr) {
-			return nullptr;
-		}
-		else if (m_smooth == nullptr) {
-			std::shared_ptr<InputGraph> res = std::make_shared<InputGraph>();
-			graph_2_copy(*m_graph, *res);
-			return res;
-		}
-		else {
-			std::shared_ptr<InputGraph> res = std::make_shared<InputGraph>();
-			graph_2_copy(*m_smooth, *res);
-			return res;
-		}
+	std::shared_ptr<OutputGraph> simplifiedToOutputGraph() override {
+		std::shared_ptr<OutputGraph> res = std::make_shared<OutputGraph>();
+		graph_2_copy(*m_graph, *res);
+		return res;
 	}
 };
 
+VWSimplifier::VWSimplifier(PersistentSettings& settings) : Simplifier("Visvalingam-Whyatt", settings, { 100, 40, 40 }), m_color(220, 80, 80) {
+	m_exact = settings.getBoolean("vw_exact", false);
+}
 
-using VWExactBase = VWBaseSimplifier<Exact>;
-static VWSimplifier* exact_instance = nullptr;
-static VWExactBase* exact_base = nullptr;
+QWidget* VWSimplifier::constructWidget() {
+	auto* result = new QWidget();
+	auto* layout = new QVBoxLayout(result);
+	layout->setAlignment(Qt::AlignTop);
 
-VWSimplifier& VWSimplifier::getInstance() {
-	if (exact_instance == nullptr) {
-		exact_instance = new VWSimplifier();
-		exact_base = new VWExactBase({ 80, 80, 220 }, { 40, 40, 100 });
-	}
-	return *exact_instance;
+	auto* checkExact = new QCheckBox("Exact computation");
+	checkExact->setChecked(m_exact);
+	layout->addWidget(checkExact);
+
+	result->connect(checkExact, &QCheckBox::stateChanged, [this](bool checked) {
+		m_settings.setBoolean("vw_exact", checked);
+		m_exact = checked;
+		});
+
+	return result;
 }
 
 void VWSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int depth) {
-	exact_base->initialize(graph, depth);
+	clear();
+
+	if (m_exact) {
+		m_state = std::make_unique<VWState<Exact>>();
+	}
+	else {
+		m_state = std::make_unique<VWState<Inexact>>();
+	}
+	m_state->initialize(graph, depth);
 }
 
 void VWSimplifier::runToComplexity(const int k, std::optional<std::function<void(int)>> progress,
 	std::optional<std::function<bool()>> cancelled) {
-	exact_base->runToComplexity(k, progress, cancelled);
-}
-
-bool VWSimplifier::hasResult() {
-	return exact_base->hasResult();
+	if (hasResult()) {
+		clearPostprocessed();
+		m_state->runToComplexity(k);
+	}
 }
 
 int VWSimplifier::getComplexity() {
-	return exact_base->getComplexity();
+	return hasResult() ? m_state->getComplexity() : -1;
 }
 
 int VWSimplifier::getMaximumComplexity() {
-	return exact_base->getMaximumComplexity();
+	return hasResult() ? m_state->getMaximumComplexity() : -1;
 }
 
 std::shared_ptr<GeometryPainting> VWSimplifier::getPainting(const VertexSelection vmode) {
-	return exact_base->getPainting(vmode);
+	return hasResult() ? m_state->getPainting(m_color, vmode) : nullptr;
 }
 
 void VWSimplifier::clear() {
-	exact_base->clear();
+	clearPostprocessed();
+	m_state = nullptr;
 }
 
-void VWSimplifier::smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
-	exact_base->smooth(radius, edges_on_semicircle, progress);
+bool VWSimplifier::hasResult() {
+	return m_state != nullptr;
 }
 
-bool VWSimplifier::hasSmoothResult() {
-	return exact_base->hasSmoothResult();
+std::shared_ptr<InputGraph> VWSimplifier::simplifiedToInputGraph() {
+	return hasResult() ? m_state->simplifiedToInputGraph() : nullptr;
 }
 
-std::shared_ptr<GeometryPainting> VWSimplifier::getSmoothPainting() {
-	return exact_base->getSmoothPainting();
-}
-
-void VWSimplifier::clearSmoothResult() {
-	exact_base->clearSmoothResult();
-}
-
-std::shared_ptr<InputGraph> VWSimplifier::resultToGraph() {
-	return exact_base->resultToGraph();
-}
-
-
-using VWInexactBase = VWBaseSimplifier<Inexact>;
-static VWInexactSimplifier* inexact_instance = nullptr;
-static VWInexactBase* inexact_base = nullptr;
-
-VWInexactSimplifier& VWInexactSimplifier::getInstance() {
-	if (inexact_instance == nullptr) {
-		inexact_instance = new VWInexactSimplifier();
-		inexact_base = new VWInexactBase({ 80, 220, 220 }, { 40, 100, 100 });
-	}
-	return *inexact_instance;
-}
-
-void VWInexactSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int depth) {
-	inexact_base->initialize(graph, depth);
-}
-
-void VWInexactSimplifier::runToComplexity(const int k, std::optional<std::function<void(int)>> progress,
-	std::optional<std::function<bool()>> cancelled) {
-	inexact_base->runToComplexity(k, progress, cancelled);
-}
-
-bool VWInexactSimplifier::hasResult() {
-	return inexact_base->hasResult();
-}
-
-int VWInexactSimplifier::getComplexity() {
-	return inexact_base->getComplexity();
-}
-
-int VWInexactSimplifier::getMaximumComplexity() {
-	return inexact_base->getMaximumComplexity();
-}
-
-std::shared_ptr<GeometryPainting> VWInexactSimplifier::getPainting(const VertexSelection vmode) {
-	return inexact_base->getPainting(vmode);
-}
-
-void VWInexactSimplifier::clear() {
-	inexact_base->clear();
-}
-
-void VWInexactSimplifier::smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
-	inexact_base->smooth(radius, edges_on_semicircle, progress);
-}
-
-bool VWInexactSimplifier::hasSmoothResult() {
-	return inexact_base->hasSmoothResult();
-}
-
-std::shared_ptr<GeometryPainting> VWInexactSimplifier::getSmoothPainting() {
-	return inexact_base->getSmoothPainting();
-}
-
-void VWInexactSimplifier::clearSmoothResult() {
-	inexact_base->clearSmoothResult();
-}
-
-std::shared_ptr<InputGraph> VWInexactSimplifier::resultToGraph() {
-	return inexact_base->resultToGraph();
+std::shared_ptr<OutputGraph> VWSimplifier::simplifiedToOutputGraph() {
+	return hasResult() ? m_state->simplifiedToOutputGraph() : nullptr;
 }

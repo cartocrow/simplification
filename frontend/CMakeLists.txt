@@ -2,7 +2,6 @@ set(SOURCES
     postprocessors/smoother.cpp
     preprocessors/restrictor.cpp
     simplifiers/vw.cpp
-    simplifiers/pvw2.cpp
     simplifiers/pvw.cpp
     simplifiers/ksbb.cpp
     simplifiers/bmrs.cpp

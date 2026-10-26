@@ -1,87 +1,34 @@
 #pragma once
 
-#include "frontend/simplification_algorithm.h"
+#include <memory>
+#include "frontend/simplifier.h"
 
 using namespace cartocrow;
 using namespace cartocrow::renderer;
 
-class KSBBSimplifier : public SimplificationAlgorithm {
-private:
-	KSBBSimplifier() {};
+class KSBBSimplifier : public Simplifier {
 public:
-	static KSBBSimplifier& getInstance();
+	struct State;
+
+	KSBBSimplifier(PersistentSettings& settings);
+	~KSBBSimplifier();
+
+	QWidget* constructWidget() override;
 
 	void initialize(std::shared_ptr<InputGraph> graph, const int depth) override;
 	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
-		std::optional<std::function<bool()>> cancelled = std::nullopt)  override;
+		std::optional<std::function<bool()>> cancelled = std::nullopt) override;
 	int getComplexity() override;
 	int getMaximumComplexity() override;
 	std::shared_ptr<GeometryPainting> getPainting(const VertexSelection vmode) override;
 	void clear() override;
 	bool hasResult() override;
 
-	void smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress = std::nullopt) override;
-	bool hasSmoothResult() override;
-	std::shared_ptr<GeometryPainting> getSmoothPainting() override;
-	void clearSmoothResult() override;
+	std::shared_ptr<InputGraph> simplifiedToInputGraph() override;
+	std::shared_ptr<OutputGraph> simplifiedToOutputGraph() override;
 
-	std::string getName() override {
-		return "Kronenfeld et al.";
-	}
-
-	std::shared_ptr<InputGraph> resultToGraph() override;
-};
-
-class KSBBInexactSimplifier : public SimplificationAlgorithm {
 private:
-	KSBBInexactSimplifier() {};
-public:
-	static KSBBInexactSimplifier& getInstance();
-
-	void initialize(std::shared_ptr<InputGraph> graph, const int depth) override;
-	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
-		std::optional<std::function<bool()>> cancelled = std::nullopt)  override;
-	int getComplexity() override;
-	int getMaximumComplexity() override;
-	std::shared_ptr<GeometryPainting> getPainting(const VertexSelection vmode) override;
-	void clear() override;
-	bool hasResult() override;
-
-	void smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress = std::nullopt) override;
-	bool hasSmoothResult() override;
-	std::shared_ptr<GeometryPainting> getSmoothPainting() override;
-	void clearSmoothResult() override;
-
-	std::string getName() override {
-		return "Kronenfeld et al. (inexact)";
-	}
-
-	std::shared_ptr<InputGraph> resultToGraph() override;
-};
-
-class KSBBSemiExactSimplifier : public SimplificationAlgorithm {
-private:
-	KSBBSemiExactSimplifier() {};
-public:
-	static KSBBSemiExactSimplifier& getInstance();
-
-	void initialize(std::shared_ptr<InputGraph> graph, const int depth) override;
-	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
-		std::optional<std::function<bool()>> cancelled = std::nullopt)  override;
-	int getComplexity() override;
-	int getMaximumComplexity() override;
-	std::shared_ptr<GeometryPainting> getPainting(const VertexSelection vmode) override;
-	void clear() override;
-	bool hasResult() override;
-
-	void smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress = std::nullopt) override;
-	bool hasSmoothResult() override;
-	std::shared_ptr<GeometryPainting> getSmoothPainting() override;
-	void clearSmoothResult() override;
-
-	std::string getName() override {
-		return "Kronenfeld et al. (semi-exact)";
-	}
-
-	std::shared_ptr<InputGraph> resultToGraph() override;
+	Color m_color;
+	int m_exact; // NB: GUI setting != state, necessarily. 0 = inexact, 1 = approximated exact, 2 = fully exact
+	std::unique_ptr<State> m_state;
 };
