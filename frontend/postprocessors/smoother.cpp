@@ -1,25 +1,90 @@
 #include "smoother.h"
 
+#include <QVBoxLayout>
+#include <QLabel>
+#include <QSpinBox>
+#include <QSlider>
+
 #include <cartocrow/data_structures/graph_map_2.h>
 
-void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
+#include "frontend/widgets/progress_indicator.h"
 
-	using Vertex_handle = SmoothGraph::Vertex_handle;
-	using Edge_handle = SmoothGraph::Edge_handle;
-	using Pt = Point<SmoothGraph::Kernel>;
-	using Vec = Vector<SmoothGraph::Kernel>;
-	using Num = Number<SmoothGraph::Kernel>;
+Smoother::Smoother(PersistentSettings& settings) : Postprocessor("Smoother", settings) {
+	m_radiuspct = m_settings.getInteger("smoother_radiuspercent", 50);
+	m_samples = m_settings.getInteger("smoother_samples", 45);
+}
+
+QWidget* Smoother::constructWidget(std::function<void()> autoapply) {
+
+	auto* result = new QWidget();
+	auto* layout = new QVBoxLayout(result);
+	layout->setAlignment(Qt::AlignTop);
+
+	layout->addWidget(new QLabel("Smooth radius (% of max)"));
+	auto* smoothSpin = new QSpinBox();
+	smoothSpin->setMinimum(1);
+	smoothSpin->setMaximum(100);
+	smoothSpin->setValue(m_radiuspct);
+	layout->addWidget(smoothSpin);
+	auto* smoothSlider = new QSlider();
+	smoothSlider->setFocusPolicy(Qt::StrongFocus);
+	smoothSlider->setTickPosition(QSlider::TicksBothSides);
+	smoothSlider->setTickInterval(10);
+	smoothSlider->setSingleStep(1);
+	smoothSlider->setOrientation(Qt::Horizontal);
+	smoothSlider->setMinimum(1);
+	smoothSlider->setMaximum(100);
+	smoothSlider->setValue(m_radiuspct);
+	layout->addWidget(smoothSlider);
+
+	layout->addWidget(new QLabel("Edges on semicircle"));
+	auto* samplesSpin = new QSpinBox();
+	samplesSpin->setMinimum(1);
+	samplesSpin->setMaximum(1000);
+	samplesSpin->setValue(m_samples);
+	layout->addWidget(samplesSpin);
+
+	result->connect(smoothSpin, &QSpinBox::textChanged, [this, smoothSpin, smoothSlider, autoapply] {
+		m_radiuspct = smoothSpin->value();
+		smoothSlider->setValue(m_radiuspct);
+		m_settings.setInteger("smoother_radiuspercent", m_radiuspct);
+		autoapply();
+		});
+	result->connect(smoothSlider, &QSlider::valueChanged, [this, smoothSpin, smoothSlider, autoapply] {
+		m_radiuspct = smoothSlider->value();
+		smoothSpin->setValue(m_radiuspct);
+		m_settings.setInteger("smoother_radiuspercent", m_radiuspct);
+		autoapply();
+		});
+	result->connect(samplesSpin, &QSpinBox::textChanged, [this, samplesSpin, autoapply]() {
+		m_samples = samplesSpin->value();
+		m_settings.setInteger("smoother_samples", m_samples);
+		autoapply();
+		});
+
+	return result;
+
+}
+
+void Smoother::applyTo(std::shared_ptr<OutputGraph> graph) {
+
+	using Vertex_handle = OutputGraph::Vertex_handle;
+	using Edge_handle = OutputGraph::Edge_handle;
+	using Pt = Point<OutputGraph::Kernel>;
+	using Vec = Vector<OutputGraph::Kernel>;
+	using Num = Number<OutputGraph::Kernel>;
 
 	size_t vtx_cnt = graph->number_of_vertices();
 
-	Graph_static_vertex_map<SmoothGraph, Num> rads(*graph, 0.0);
+	Graph_static_vertex_map<OutputGraph, Num> rads(*graph, 0.0);
+
+	ProgressIndicator progress("Smoothing", false);
 
 	// determine smoothing radii
 	Num max_rad = 0;
+	progress.start_phase("Determining radii", vtx_cnt);
 	for (size_t i = 0; i < vtx_cnt; ++i) {
-		if (progress.has_value()) {
-			(*progress)("Determining radii", i, vtx_cnt);
-		}
+		progress.update(i);
 
 		Vertex_handle v = graph->vertex(i);
 
@@ -38,13 +103,12 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 	}
 
 	// impose max
-	max_rad *= radiusfrac;
+	max_rad *= (m_radiuspct / 100.0);
 
 	// apply smoothing
+	progress.start_phase("Applying smoothing", vtx_cnt);
 	for (int i = 0; i < vtx_cnt; i++) {
-		if (progress.has_value()) {
-			(*progress)("Applying smoothing", i, vtx_cnt);
-		}
+			progress.update(i);
 
 		Vertex_handle v = graph->vertex(i);
 		if (v->degree() != 2) continue;
@@ -98,7 +162,7 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 		}
 		Num angle = std::acos(dotp);
 
-		int samples = (int)std::floor(edges_on_semicircle * angle / std::numbers::pi);
+		int samples = (int)std::floor(m_samples * angle / std::numbers::pi);
 
 		if (ccw) {
 			// arc is clockwise
@@ -122,12 +186,10 @@ void smooth(SmoothGraph* graph, const Number<Inexact> radiusfrac, const int edge
 		int ii = 0;
 		// invariant: all edges with index < i have sufficient length, except for indices in "revisit"
 		std::vector<int> revisit;
+
+		progress.start_phase("Cleaning up geometry", init_edge_count);
 		while (i < graph->number_of_edges()) {
-			if (progress.has_value()) {
-				(*progress)("Cleaning up geometry", ii, init_edge_count);
-				// number of edges processed
-				ii++;
-			}
+			progress.update(ii++);
 
 			int next_i;
 			if (revisit.empty()) {

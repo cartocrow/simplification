@@ -4,7 +4,7 @@
 #include <cartocrow/renderer/graph_painting.h>
 
 #include "library/vertex_removal.h"
-#include "smoother.h"
+#include "frontend/postprocessors/smoother.h"
 
 using namespace cartocrow::simplification;
 using namespace cartocrow::renderer;
@@ -122,7 +122,7 @@ struct VWBaseSimplifier {
 	void smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
 		clearSmoothResult();
 
-		m_smooth = smoothGraph<VWGraph>(m_graph, radius, edges_on_semicircle, progress);
+	//	m_smooth = smoothGraph<VWGraph>(m_graph, radius, edges_on_semicircle, progress);
 	}
 
 	bool hasSmoothResult() {

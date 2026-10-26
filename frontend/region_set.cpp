@@ -53,7 +53,7 @@ namespace cartocrow {
 			}
 		}
 
-		Rectangle<Exact> box = utils::boxOf<Exact>(points);
+		Rectangle<Exact> box = simplification::utils::boxOf<Exact>(points);
 
 		// construct the graph
 		VertexQuadTree<InputGraph> pqt(box, depth);

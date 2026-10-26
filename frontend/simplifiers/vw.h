@@ -1,6 +1,6 @@
 #pragma once
 
-#include "simplification_algorithm.h"
+#include "frontend/simplification_algorithm.h"
 
 using namespace cartocrow;
 using namespace cartocrow::renderer;

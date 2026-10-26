@@ -1,18 +1,22 @@
 set(SOURCES
+    postprocessors/smoother.cpp
+    preprocessors/restrictor.cpp
+    simplifiers/vw.cpp
+    simplifiers/pvw2.cpp
+    simplifiers/pvw.cpp
+    simplifiers/ksbb.cpp
+    simplifiers/bmrs.cpp
+    widgets/orientation_widget.cpp
+    widgets/orientation_widget.h
+    widgets/progress_indicator.cpp
+    widgets/progress_indicator.h
+    commandline.cpp
     gui.cpp
     main.cpp
-    commandline.cpp
     read_graph_gdal.cpp
     region_set.cpp
     simplification_algorithm.cpp
-    smoother.cpp
-    vw.cpp
-    pvw.cpp
-    ksbb.cpp
-    restrictor.cpp
-    bmrs.cpp
-    orientation_widget.cpp
-    orientation_widget.h
+    simplifier.cpp
 )
 add_executable(simplification ${SOURCES})
 target_link_libraries(

@@ -1,15 +1,15 @@
 #pragma once
 
-#include "simplification_algorithm.h"
+#include "frontend/simplification_algorithm.h"
 
 using namespace cartocrow;
 using namespace cartocrow::renderer;
 
-class PVWSimplifier : public SimplificationAlgorithm {
+class BMRSSimplifier : public SimplificationAlgorithm {
 private:
-	PVWSimplifier() {};
+	BMRSSimplifier() {};
 public:
-	static PVWSimplifier& getInstance();
+	static BMRSSimplifier& getInstance();
 
 	void initialize(std::shared_ptr<InputGraph> graph, const int depth) override;
 	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
@@ -26,17 +26,19 @@ public:
 	void clearSmoothResult() override;
 
 	std::string getName() override {
-		return "Preserving Visvalingam-Whyatt";
+		return "Buchin et al.";
 	}
 
 	std::shared_ptr<InputGraph> resultToGraph() override;
+
+	std::vector<std::pair<std::shared_ptr<GeometryPainting>, std::string>> getDebugPaintings() override;
 };
 
-class PVWInexactSimplifier : public SimplificationAlgorithm {
+class BMRSInexactSimplifier : public SimplificationAlgorithm {
 private:
-	PVWInexactSimplifier() {};
+	BMRSInexactSimplifier() {};
 public:
-	static PVWInexactSimplifier& getInstance();
+	static BMRSInexactSimplifier& getInstance();
 
 	void initialize(std::shared_ptr<InputGraph> graph, const int depth) override;
 	void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,
@@ -53,8 +55,10 @@ public:
 	void clearSmoothResult() override;
 
 	std::string getName() override {
-		return "Preserving Visvalingam-Whyatt (inexact)";
+		return "Buchin et al. (inexact)";
 	}
 
 	std::shared_ptr<InputGraph> resultToGraph() override;
+
+	std::vector<std::pair<std::shared_ptr<GeometryPainting>, std::string>> getDebugPaintings() override;
 };

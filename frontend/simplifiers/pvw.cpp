@@ -1,10 +1,10 @@
-#include "PVW.h"
+#include "pvw.h"
 
 #include <cartocrow/data_structures/graph_map_2.h>
 #include <cartocrow/renderer/graph_painting.h>
 
 #include "library/preserving_vertex_removal.h"
-#include "smoother.h"
+#include "frontend/postprocessors/smoother.h"
 
 using namespace cartocrow::simplification;
 using namespace cartocrow::renderer;
@@ -127,7 +127,7 @@ struct PVWBaseSimplifier {
 	void smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
 		clearSmoothResult();
 
-		m_smooth = smoothGraph<PVWGraph>(m_graph, radius, edges_on_semicircle, progress);
+//		m_smooth = smoothGraph<PVWGraph>(m_graph, radius, edges_on_semicircle, progress);
 	}
 
 	bool hasSmoothResult() {

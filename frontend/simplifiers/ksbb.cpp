@@ -4,7 +4,7 @@
 #include <cartocrow/renderer/graph_painting.h>
 
 #include "library/edge_collapse.h"
-#include "smoother.h"
+#include "frontend/postprocessors/smoother.h"
 
 using namespace cartocrow::simplification;
 using namespace cartocrow::renderer;
@@ -125,7 +125,7 @@ struct KSBBBaseSimplifier {
 	void smooth(Number<Inexact> radius, int edges_on_semicircle, std::optional<std::function<void(std::string, int, int)>> progress) {
 		clearSmoothResult();
 
-		m_smooth = smoothGraph<KSBBGraph>(m_graph, radius, edges_on_semicircle, progress);
+//		m_smooth = smoothGraph<KSBBGraph>(m_graph, radius, edges_on_semicircle, progress);
 	}
 
 	bool hasSmoothResult() {

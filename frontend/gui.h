@@ -14,7 +14,8 @@
 #include <cartocrow/utils/persistent_settings.h>
 
 #include "region_set.h"
-#include "simplification_algorithm.h"
+#include "simplifier.h"
+#include "preprocessor.h"
 
 using namespace cartocrow;
 using namespace cartocrow::renderer;
@@ -31,7 +32,9 @@ private:
 	std::optional<std::string> m_spatialRef;
 	std::shared_ptr<InputGraph> input = nullptr;
 	std::shared_ptr<InputGraph> preprocessed = nullptr;
-	std::vector<SimplificationAlgorithm*> algorithms;
+	std::vector<Simplifier*> algorithms;
+	std::vector<Preprocessor*> preprocessors;
+	std::vector<Postprocessor*> postprocessors;
 
 	PersistentSettings m_settings = PersistentSettings("settings");
 

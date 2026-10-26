@@ -1,6 +1,5 @@
 #include "gui.h"
 
-#include <QCheckBox>
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QProgressDialog>
@@ -9,20 +8,27 @@
 #include <QMessageBox>
 #include <QFrame>
 #include <QLineEdit>
+#include <QStackedWidget>
 
 #include <cartocrow/renderer/graph_painting.h>
 #include <cartocrow/utils/stopwatch.h>
 
 #include "library/utils.h"
 
-#include "vw.h"
-#include "pvw.h"
-#include "ksbb.h"
-#include "bmrs.h"
+#include "widgets/orientation_widget.h"
+
 #include "ipe_reader.h"
 #include "read_graph_gdal.h"
-#include "restrictor.h"
-#include "orientation_widget.h"
+
+#include "preprocessors/restrictor.h"
+
+#include "simplifiers/vw.h"
+#include "simplifiers/pvw2.h"
+#include "simplifiers/pvw.h"
+#include "simplifiers/ksbb.h"
+#include "simplifiers/bmrs.h"
+
+#include "postprocessors/smoother.h"
 
 using namespace cartocrow;
 using namespace cartocrow::simplification;
@@ -49,12 +55,12 @@ void SimplificationGUI::updatePaintings() {
 		m_renderer->addPainting(paint, "Preprocessed");
 	}
 
-	for (SimplificationAlgorithm* alg : algorithms) {
+	for (Simplifier* alg : algorithms) {
 		if (alg->hasResult()) {
-			m_renderer->addPainting(alg->getPainting(vmode), alg->getName());
+			m_renderer->addPainting(alg->getPainting(vmode), alg->name());
 		}
-		if (alg->hasSmoothResult()) {
-			m_renderer->addPainting(alg->getSmoothPainting(), alg->getName() + " (smooth)");
+		if (alg->hasPostprocessed()) {
+			m_renderer->addPainting(alg->getPostprocessedPainting(), alg->name() + " " + alg->postprocessedName());
 		}
 	}
 
@@ -83,7 +89,7 @@ void SimplificationGUI::addIOTab() {
 	layout->addWidget(outToInButton);
 
 	connect(loadFileButton, &QPushButton::clicked, [this]() {
-		std::filesystem::path filePath = QFileDialog::getOpenFileName(this, tr("Select map"), curr_dir, 
+		std::filesystem::path filePath = QFileDialog::getOpenFileName(this, tr("Select map"), curr_dir,
 			tr("Accepted formats (*.shp *.geojson *.ipe *.gpkg);;Shapefiles (*.shp);;Geojson (*.geojson);;GeoPackage (*.gpkg);;IPE files (*.ipe)")).toStdString();
 		if (filePath == "") return;
 		curr_dir = QString::fromStdU16String(filePath.parent_path().u16string());
@@ -103,7 +109,7 @@ void SimplificationGUI::addIOTab() {
 
 	connect(outToInButton, &QPushButton::clicked, [this]() {
 
-		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		Simplifier* alg = algorithms[algorithmSelector->currentIndex()];
 		if (!alg->hasResult()) {
 			std::cout << "No result available for current algorithm." << std::endl;
 			return;
@@ -114,7 +120,7 @@ void SimplificationGUI::addIOTab() {
 		progress.setMinimumDuration(1000);
 		progress.setValue(1);
 
-		loadInput(alg->resultToGraph(), true);
+		loadInput(alg->resultToInputGraph(), true);
 
 		progress.setValue(2);
 		});
@@ -154,7 +160,7 @@ void SimplificationGUI::addIOTab() {
 		progress.setValue(1);
 
 		std::shared_ptr<InputGraph> graph;
-		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		Simplifier* alg = algorithms[algorithmSelector->currentIndex()];
 		if (!alg->hasResult()) {
 			std::cout << "Warning: selected algorithm has no result -- exporting input / preprocessed graph instead." << std::endl;
 			if (!preprocessed) {
@@ -165,7 +171,7 @@ void SimplificationGUI::addIOTab() {
 			}
 		}
 		else {
-			graph = alg->resultToGraph();
+			graph = alg->resultToInputGraph();
 		}
 
 		exportRegionSetUsingGDAL<InputGraph>(filePath, graph.get(), *m_regions, m_spatialRef);
@@ -182,101 +188,10 @@ void SimplificationGUI::addPreprocessTab() {
 	auto* layout = new QVBoxLayout(tab);
 	layout->setAlignment(Qt::AlignTop);
 
-	{
-		layout->addWidget(new QLabel("<h3>Regular restriction</h3>"));
+	layout->addWidget(new QLabel("<h3>Preprocess</h3>"));
 
-		auto* orientSpin = new QSpinBox();
-		auto* initAngleSpin = new QSpinBox();
-		auto* preview = new OrientationWidget(this);
-		auto updatePreview = [preview, initAngleSpin, orientSpin]() {
-			preview->setOrientationsDegrees(orientSpin->value(), initAngleSpin->value());
-			};
-
-		{
-			QHBoxLayout* row = new QHBoxLayout();
-			row->addWidget(new QLabel("Number of orientations:"));
-			orientSpin->setMinimum(2);
-			orientSpin->setMaximum(20);
-			orientSpin->setValue(m_settings.getInteger("num_orientations", 2));
-			row->addWidget(orientSpin);
-			connect(orientSpin, &QSpinBox::textChanged, [this, orientSpin, updatePreview]() {
-				m_settings.setInteger("num_orientations", orientSpin->value());
-				updatePreview();
-				});
-			layout->addLayout(row);
-		}
-
-		{
-			initAngleSpin->setMinimum(0);
-			initAngleSpin->setMaximum(180);
-			initAngleSpin->setValue(m_settings.getInteger("init_angle", 0));
-			connect(initAngleSpin, &QSpinBox::textChanged, [this, initAngleSpin, updatePreview]() {
-				m_settings.setInteger("init_angle", initAngleSpin->value());
-				updatePreview();
-				});
-			auto* btnZero = new QPushButton("0");
-			connect(btnZero, &QPushButton::clicked, [initAngleSpin, updatePreview]() {
-				initAngleSpin->setValue(0);
-				updatePreview();
-				});
-			auto* btnHalf = new QPushButton("50%");
-			connect(btnHalf, &QPushButton::clicked, [initAngleSpin, orientSpin, updatePreview]() {
-				int a = static_cast<int>(std::round(90.0 / orientSpin->value()));
-				initAngleSpin->setValue(a);
-				updatePreview();
-				});
-			QHBoxLayout* row = new QHBoxLayout();
-			row->addWidget(new QLabel("First angle (degrees):"));
-			row->addWidget(initAngleSpin);
-			layout->addLayout(row);
-			QHBoxLayout* row2 = new QHBoxLayout();
-			row2->addWidget(new QLabel(""));
-			row2->addWidget(btnZero);
-			row2->addWidget(btnHalf);
-			layout->addLayout(row2);
-		}
-
-		auto* buttonRegular = new QPushButton("Restrict");
-		layout->addWidget(buttonRegular);
-
-		connect(buttonRegular, &QPushButton::clicked, [this, initAngleSpin, orientSpin]() {
-			int count = orientSpin->value();
-			Number<Inexact> initial_angle = initAngleSpin->value() * std::numbers::pi / 180.0;
-
-			if (input == nullptr) {
-				return;
-			}
-
-			QProgressDialog progress("Restricting orientations", "Stop", 0, 1000, this);
-			progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowCloseButtonHint);
-			progress.setWindowModality(Qt::WindowModal);
-			progress.setMinimumDuration(1000);
-			progress.setValue(0);
-
-			preprocessed = std::make_shared<InputGraph>();
-			graph_2_copy(*input, *preprocessed);
-			int update = 0;
-			restrict(preprocessed, count, initial_angle, [&progress, &update](std::string label, int c, int max) {
-				if (label.size() > 0) {
-					progress.setLabelText(QString::fromStdString(label));
-				}
-				if (max > 0) {
-					progress.setValue(0);
-					progress.setMaximum(max);
-					update = max / 100;
-				}
-				else if (c % update == 0) {
-					progress.setValue(c);
-				}
-				});
-			updatePaintings();
-
-			progress.setValue(progress.maximum());
-			});
-
-		updatePreview();
-		layout->addWidget(preview);
-	}
+	auto* prepSelector = new QComboBox();
+	layout->addWidget(prepSelector);
 
 	{
 		QFrame* line = new QFrame(this);
@@ -284,83 +199,22 @@ void SimplificationGUI::addPreprocessTab() {
 		layout->addWidget(line);
 	}
 
-	{
-		layout->addWidget(new QLabel("<h3>Irregular restriction</h3>"));
+	layout->addWidget(new QLabel("<b>Settings</b>"));
+	auto* stack = new QStackedWidget();
+	layout->addWidget(stack, 0, Qt::AlignTop);
 
-		layout->addWidget(new QLabel("Space-separated angles (degrees), at least two:"));
-
-		QLineEdit* textField = new QLineEdit(this);
-		textField->setText(QString::fromStdString(m_settings.getString("custom_angles", "0 45 90")));
-		layout->addWidget(textField);
-
-		auto* buttonIrregular = new QPushButton("Restrict");
-		layout->addWidget(buttonIrregular);
-
-		auto textToAngles = [textField]() {
-			std::stringstream ss(textField->text().toStdString());
-			std::vector<std::string> string_angles(
-				(std::istream_iterator<std::string>(ss)),
-				std::istream_iterator<std::string>()
-			);
-			std::vector<Number<Inexact>> angles;
-			for (const auto& s : string_angles) {
-				try {
-					angles.push_back(std::stod(s) * std::numbers::pi / 180.0);
-				}
-				catch (const std::invalid_argument& e) {
-				}
-			}
-			std::sort(angles.begin(), angles.end());
-			return angles;
-			};
-
-		connect(buttonIrregular, &QPushButton::clicked, [this, textToAngles]() {
-			if (input == nullptr) {
-				return;
-			}
-
-			std::vector<Number<Inexact>> angles = textToAngles();
-			if (angles.size() < 2) {
-				std::cout << "Enter at least two, distinct orientations" << std::endl;
-				return;
-			}
-
-			QProgressDialog progress("Restricting orientations", "Stop", 0, 1000, this);
-			progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowCloseButtonHint);
-			progress.setWindowModality(Qt::WindowModal);
-			progress.setMinimumDuration(1000);
-			progress.setValue(0);
-
-			preprocessed = std::make_shared<InputGraph>();
-			graph_2_copy(*input, *preprocessed);
-			int update = 0;
-			restrict(preprocessed, angles, [&progress, &update](std::string label, int c, int max) {
-				if (label.size() > 0) {
-					progress.setLabelText(QString::fromStdString(label));
-				}
-				if (max > 0) {
-					progress.setValue(0);
-					progress.setMaximum(max);
-					update = max / 100;
-				}
-				else if (c % update == 0) {
-					progress.setValue(c);
-				}
-				});
-			updatePaintings();
-
-			progress.setValue(progress.maximum());
-			});
-
-		auto* preview = new OrientationWidget(this);
-		preview->setOrientationsRadians(textToAngles());
-		layout->addWidget(preview);
-
-		connect(textField, &QLineEdit::textChanged, [this, textField, textToAngles, preview]() {
-			m_settings.setString("custom_angles", textField->text().toStdString());
-			preview->setOrientationsRadians(textToAngles());
-			});
+	for (Preprocessor* prep : preprocessors) {
+		prepSelector->addItem(QString::fromStdString(prep->name()));
+		stack->addWidget(prep->constructWidget());
 	}
+	int curr = m_settings.getInteger("prep_selection", 0);
+	stack->setCurrentIndex(curr);
+	prepSelector->setCurrentIndex(curr);
+
+	connect(prepSelector, QOverload<int>::of(&QComboBox::currentIndexChanged), [stack, this](int index) {
+		stack->setCurrentIndex(index);
+		m_settings.setInteger("prep_selection", index);
+		});
 
 	{
 		QFrame* line = new QFrame(this);
@@ -368,14 +222,22 @@ void SimplificationGUI::addPreprocessTab() {
 		layout->addWidget(line);
 	}
 
-	{
-		auto* buttonClear = new QPushButton("Clear preprocessed");
-		layout->addWidget(buttonClear);
-		connect(buttonClear, &QPushButton::clicked, [this]() {
-			preprocessed = nullptr;
-			updatePaintings();
-			});
-	}
+	auto* buttonApply = new QPushButton("Apply");
+	layout->addWidget(buttonApply);
+	connect(buttonApply, &QPushButton::clicked, [this, prepSelector]() {
+		Preprocessor* prep = preprocessors[prepSelector->currentIndex()];
+		preprocessed = std::make_shared<InputGraph>();
+		graph_2_copy(*input, *preprocessed);
+		prep->applyTo(preprocessed);
+		updatePaintings();
+		});
+
+	auto* buttonClear = new QPushButton("Clear preprocessed");
+	layout->addWidget(buttonClear);
+	connect(buttonClear, &QPushButton::clicked, [this]() {
+		preprocessed = nullptr;
+		updatePaintings();
+		});
 }
 
 void SimplificationGUI::addSimplifyTab() {
@@ -387,19 +249,47 @@ void SimplificationGUI::addSimplifyTab() {
 
 	layout->addWidget(new QLabel("<h3>Simplify</h3>"));
 
-	int default_alg = m_settings.getInteger("selected_algorithm",0);
+	int default_alg = m_settings.getInteger("selected_algorithm", 0);
 	algorithmSelector = new QComboBox();
 	layout->addWidget(algorithmSelector);
-	for (SimplificationAlgorithm* alg : algorithms) {
-		algorithmSelector->addItem(QString::fromStdString(alg->getName()));
+	for (Simplifier* alg : algorithms) {
+		algorithmSelector->addItem(QString::fromStdString(alg->name()));
 	}
 	algorithmSelector->setCurrentIndex(default_alg);
+
+	{
+		QFrame* line = new QFrame(this);
+		line->setFrameShape(QFrame::HLine);
+		layout->addWidget(line);
+	}
+
+	layout->addWidget(new QLabel("<b>Settings</b>"));
+	auto* stack = new QStackedWidget();
+	layout->addWidget(stack, 0, Qt::AlignTop);
+
+	for (Simplifier* alg : algorithms) {
+		algorithmSelector->addItem(QString::fromStdString(alg->name()));
+		stack->addWidget(alg->constructWidget());
+	}
+	stack->setCurrentIndex(default_alg);
+
+	{
+		QFrame* line = new QFrame(this);
+		line->setFrameShape(QFrame::HLine);
+		layout->addWidget(line);
+	}
 
 	auto* initButton = new QPushButton("Initialize");
 	layout->addWidget(initButton);
 
 	auto* initAndRunButton = new QPushButton("Initialize and run fully");
 	layout->addWidget(initAndRunButton);
+
+	{
+		QFrame* line = new QFrame(this);
+		line->setFrameShape(QFrame::HLine);
+		layout->addWidget(line);
+	}
 
 	int default_step = m_settings.getInteger("step_size", 1);
 	auto* stepSpinLabel = new QLabel("Step size");
@@ -431,7 +321,7 @@ void SimplificationGUI::addSimplifyTab() {
 	complexitySlider->setMinimum(0);
 	layout->addWidget(complexitySlider);
 
-	auto runAlg = [this](SimplificationAlgorithm* alg, int target) {
+	auto runAlg = [this](Simplifier* alg, int target) {
 
 		int start = alg->getComplexity();
 
@@ -464,7 +354,7 @@ void SimplificationGUI::addSimplifyTab() {
 		};
 
 	connect(initButton, &QPushButton::clicked, [this]() {
-		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		Simplifier* alg = algorithms[algorithmSelector->currentIndex()];
 		if (input != nullptr) {
 
 			QProgressDialog progress("Initializing", nullptr, 0, 2, this);
@@ -491,7 +381,7 @@ void SimplificationGUI::addSimplifyTab() {
 		});
 
 	connect(initAndRunButton, &QPushButton::clicked, [this, runAlg]() {
-		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		Simplifier* alg = algorithms[algorithmSelector->currentIndex()];
 		cartocrow::utils::StopwatchPool pool("Init & run");
 		if (input != nullptr) {
 
@@ -534,21 +424,21 @@ void SimplificationGUI::addSimplifyTab() {
 		});
 
 	connect(reverseButton, &QPushButton::clicked, [this, stepSpin, runAlg]() {
-		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		Simplifier* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
 			runAlg(alg, alg->getComplexity() + stepSpin->value());
 		}
 		});
 
 	connect(stepButton, &QPushButton::clicked, [this, stepSpin, runAlg]() {
-		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		Simplifier* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
 			runAlg(alg, alg->getComplexity() - stepSpin->value());
 		}
 		});
 
 	connect(runButton, &QPushButton::clicked, [this, runAlg]() {
-		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		Simplifier* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
 			runAlg(alg, desiredComplexity->value());
 		}
@@ -560,16 +450,16 @@ void SimplificationGUI::addSimplifyTab() {
 		});
 
 	connect(complexitySlider, &QSlider::valueChanged, [this, runAlg](int value) {
-		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+		Simplifier* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
 			runAlg(alg, value);
 		}
 		});
 
-	connect(algorithmSelector, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), [this](int value) {
+	connect(algorithmSelector, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), [this, stack](int value) {
 
-		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
-		m_settings.setInteger("selected_algorithm", algorithmSelector->currentIndex());
+		Simplifier* alg = algorithms[value];
+		m_settings.setInteger("selected_algorithm", value);
 		int mc, c;
 		if (alg->hasResult()) {
 			mc = alg->getMaximumComplexity();
@@ -582,8 +472,9 @@ void SimplificationGUI::addSimplifyTab() {
 		desiredComplexity->setValue(c);
 		complexitySlider->setMaximum(mc);
 		complexitySlider->setValue(c);
-		});
 
+		stack->setCurrentIndex(value);
+		});
 
 	//auto* debugButton = new QPushButton("Draw current state");
 	//layout->addWidget(debugButton);
@@ -604,77 +495,57 @@ void SimplificationGUI::addPostprocessTab() {
 
 	layout->addWidget(new QLabel("<h3>Postprocess</h3>"));
 
-	layout->addWidget(new QLabel("Smooth radius (% of max)"));
-	auto* smoothSpin = new QSpinBox();
-	smoothSpin->setMinimum(1);
-	smoothSpin->setMaximum(100);
-	smoothSpin->setValue(50);
-	layout->addWidget(smoothSpin);
-	auto* smoothSlider = new QSlider();
-	smoothSlider->setFocusPolicy(Qt::StrongFocus);
-	smoothSlider->setTickPosition(QSlider::TicksBothSides);
-	smoothSlider->setTickInterval(10);
-	smoothSlider->setSingleStep(1);
-	smoothSlider->setOrientation(Qt::Horizontal);
-	smoothSlider->setMinimum(1);
-	smoothSlider->setMaximum(100);
-	smoothSlider->setValue(50);
-	layout->addWidget(smoothSlider);
+	auto* postSelector = new QComboBox();
+	layout->addWidget(postSelector);
 
-
-	layout->addWidget(new QLabel("Edges on semicircle"));
-	auto* samplesSpin = new QSpinBox();
-	samplesSpin->setMinimum(1);
-	samplesSpin->setMaximum(1000);
-	samplesSpin->setValue(45);
-	layout->addWidget(samplesSpin);
-
-	auto* smoothButton = new QPushButton("Smooth");
-	layout->addWidget(smoothButton);
-
-	auto smoothChange = [this, smoothSpin, smoothSlider, samplesSpin]() {
-
-		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
+	auto apply = [this, postSelector]() {
+		Simplifier* alg = algorithms[algorithmSelector->currentIndex()];
 		if (alg->hasResult()) {
-
-			int c = alg->getComplexity();
-
-			QProgressDialog progress("Smoothing", nullptr, 0, c, this);
-			progress.setWindowModality(Qt::WindowModal);
-			progress.setMinimumDuration(1000);
-			progress.setValue(0);
-
-			alg->smooth(Number<Inexact>(smoothSlider->value() / (double)smoothSlider->maximum()), samplesSpin->value(),
-				[&progress](std::string phase, int index, int max) {
-					if (index % 100 == 0) { // dont perform all updates to gui...
-						progress.setLabelText(QString::fromStdString(phase));
-						progress.setMaximum(max);
-						progress.setValue(index);
-					}
-
-				});
-
-			progress.setValue(progress.maximum());
-
+			Postprocessor* post = postprocessors[postSelector->currentIndex()];
+			alg->applyPostprocessor(post);
 			updatePaintings();
 		}
 		};
-	connect(smoothSpin, &QSpinBox::textChanged, [this, smoothSpin, smoothSlider, smoothChange] {
-		smoothSlider->setValue(smoothSpin->value());
-		smoothChange(); });
-	connect(smoothSlider, &QSlider::valueChanged, [this, smoothSpin, smoothSlider, smoothChange] {
-		smoothSpin->setValue(smoothSlider->value());
-		smoothChange(); });
-	connect(samplesSpin, &QSpinBox::textChanged, smoothChange);
-	connect(smoothButton, &QPushButton::clicked, smoothChange);
 
-	auto* clearButton = new QPushButton("Clear Smooth");
+	{
+		QFrame* line = new QFrame(this);
+		line->setFrameShape(QFrame::HLine);
+		layout->addWidget(line);
+	}
+
+	layout->addWidget(new QLabel("<b>Settings</b>"));
+	auto* stack = new QStackedWidget();
+	layout->addWidget(stack, 0, Qt::AlignTop);
+
+	for (Postprocessor* post : postprocessors) {
+		postSelector->addItem(QString::fromStdString(post->name()));
+		stack->addWidget(post->constructWidget(apply));
+	}
+	int curr = m_settings.getInteger("post_selection", 0);
+	stack->setCurrentIndex(curr);
+	postSelector->setCurrentIndex(curr);
+
+	connect(postSelector, QOverload<int>::of(&QComboBox::currentIndexChanged), [stack, this](int index) {
+		stack->setCurrentIndex(index);
+		m_settings.setInteger("post_selection", index);
+		});
+
+	{
+		QFrame* line = new QFrame(this);
+		line->setFrameShape(QFrame::HLine);
+		layout->addWidget(line);
+	}
+
+	auto* buttonApply = new QPushButton("Apply");
+	layout->addWidget(buttonApply);
+	connect(buttonApply, &QPushButton::clicked, apply);
+
+	auto* clearButton = new QPushButton("Clear");
 	layout->addWidget(clearButton);
-
 	connect(clearButton, &QPushButton::clicked, [this]() {
-		SimplificationAlgorithm* alg = algorithms[algorithmSelector->currentIndex()];
-		if (alg->hasSmoothResult()) {
-			alg->clearSmoothResult();
+		Simplifier* alg = algorithms[algorithmSelector->currentIndex()];
+		if (alg->hasPostprocessed()) {
+			alg->clearPostprocessed();
 			updatePaintings();
 		}
 		});
@@ -709,15 +580,12 @@ void SimplificationGUI::addSettingsTab() {
 SimplificationGUI::SimplificationGUI() {
 	setWindowTitle("Simplification");
 
-	algorithms.push_back(&VWSimplifier::getInstance());
-	algorithms.push_back(&VWInexactSimplifier::getInstance());
-	algorithms.push_back(&PVWSimplifier::getInstance());
-	algorithms.push_back(&PVWInexactSimplifier::getInstance());
-	algorithms.push_back(&KSBBSimplifier::getInstance());
-	algorithms.push_back(&KSBBInexactSimplifier::getInstance());
-	algorithms.push_back(&KSBBSemiExactSimplifier::getInstance());
-	algorithms.push_back(&BMRSSimplifier::getInstance());
-	algorithms.push_back(&BMRSInexactSimplifier::getInstance());
+	algorithms.push_back(new PVWSimplifier2(m_settings));
+
+	preprocessors.push_back(new RegularRestriction(m_settings));
+	preprocessors.push_back(new IrregularRestriction(m_settings));
+
+	postprocessors.push_back(new Smoother(m_settings));
 
 	auto* dockWidget = new QDockWidget();
 	addDockWidget(Qt::LeftDockWidgetArea, dockWidget);
@@ -741,8 +609,12 @@ SimplificationGUI::SimplificationGUI() {
 }
 
 SimplificationGUI::~SimplificationGUI() {
-	for (SimplificationAlgorithm* alg : algorithms) {
+	for (Preprocessor* prep : preprocessors) {
+		delete prep;
+	}
+	for (Simplifier* alg : algorithms) {
 		alg->clear();
+		delete alg;
 	}
 	if (m_renderer != nullptr) {
 		delete m_renderer;
@@ -757,7 +629,7 @@ SimplificationGUI::~SimplificationGUI() {
 
 void SimplificationGUI::loadInput(std::shared_ptr<InputGraph> graph, const bool keepregions) {
 	if (input != nullptr) {
-		for (SimplificationAlgorithm* alg : algorithms) {
+		for (Simplifier* alg : algorithms) {
 			alg->clear();
 		}
 		input = nullptr;
