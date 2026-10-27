@@ -32,16 +32,10 @@ struct PVWState : PVWSimplifier::State {
 	using Alg = PreservingVisvalingamWhyatt_Dedicated<Kernel, true>;
 	using Graph = Alg::Graph;
 	using PQT = Alg::VertexTree;
-	using Traits = Alg::Traits;
+	using Traits = Alg::Score_traits;
 
 	std::shared_ptr<Graph> m_graph = nullptr;
-	PQT* m_pqt = nullptr;
-	Alg* m_alg = nullptr;
-
-	~PVWState() {
-		delete m_alg;
-		delete m_pqt;
-	}
+	std::unique_ptr<Alg> m_alg = nullptr;
 
 	void initialize(std::shared_ptr<InputGraph> graph, const int depth, const double weight) override {
 
@@ -49,10 +43,7 @@ struct PVWState : PVWSimplifier::State {
 
 		graph_2_copy(*graph, *m_graph);
 
-		Rectangle<Kernel> box = m_graph->bounding_rectangle();
-		m_pqt = new PQT(box, depth);
-
-		m_alg = new Alg(*m_graph, *m_pqt, Traits(weight));
+		m_alg = std::make_unique<Alg>(*m_graph, Traits(weight));
 		m_alg->initialize(true);
 
 		m_init_complexity = m_graph->number_of_edges();

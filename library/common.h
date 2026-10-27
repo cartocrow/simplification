@@ -29,4 +29,32 @@ namespace cartocrow::simplification {
 			}
 		}
 	};
+
+	template<class Elt>
+	struct DataQueueTraits {
+
+		using Element_handle = Elt;
+
+		static void setIndex(Element_handle elt, int index) {
+			elt->queue_index = index;
+		}
+
+		static int getIndex(Element_handle elt) {
+			return elt->queue_index;
+		}
+
+		static int compare(Element_handle a, Element_handle b) {
+			const auto ac = a->cost;
+			const auto bc = b->cost;
+			if (ac < bc) {
+				return -1;
+			}
+			else if (ac > bc) {
+				return 1;
+			}
+			else {
+				return 0;
+			}
+		}
+	};
 }
