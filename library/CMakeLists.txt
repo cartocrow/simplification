@@ -7,9 +7,10 @@ set(HEADERS
 	edge_quad_tree.h
 	orientation_restriction.h
 	orientation_restriction.hpp
+	path_vertex_removal.h	
+	path_vertex_removal.hpp	
 	precision_safe_tests.h
-	preserving_vertex_removal.h	
-	preserving_vertex_removal.hpp	
+	preserving_visvalingam_whyatt.h	
 	utils.h
 	vertex_quad_tree.h
 	vertex_removal.h	

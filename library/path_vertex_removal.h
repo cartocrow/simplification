@@ -10,20 +10,9 @@
 #include "common.h"
 #include "utils.h"
 
-namespace cartocrow::simplification {
+namespace cartocrow::simplification::pvr {
 
-	template<class K>
-	concept KernelType = std::is_same<K, Inexact>::value || std::is_same<K, Exact>::value;
-
-	template<class G>
-	concept GraphType = requires {
-		typename G::Graph_traits;
-	};
-
-	namespace pvr {
-
-		struct EmptyBase {
-		};
+		
 
 		template<KernelType K, class Base>
 		struct VertexData : public Base {
@@ -155,10 +144,9 @@ namespace cartocrow::simplification {
 			Graph_vertex_map<Graph, Vertex_data>* m_vertex_data = nullptr;
 			Graph_path_map<Graph, Path_data>* m_path_data = nullptr;
 		};
-	} // namespace pvr
 
-	template <pvr::DataTraits DT, pvr::ScoreTraits ST>
-		requires pvr::PathVertexRemovalSetup<DT, ST>
+	template <DataTraits DT, ScoreTraits ST>
+		requires PathVertexRemovalSetup<DT, ST>
 	class PathVertexRemoval {
 	public:
 		using Data_traits = DT;
@@ -450,71 +438,6 @@ namespace cartocrow::simplification {
 		}
 	};
 
-	namespace detail {
-		template<KernelType Kernel>
-		struct AreaIncreasedData {
-			Number<Kernel> left_area_increased;
-		};
-
-		template<pvr::DataTraits DT>
-		class PreservingScoreTraits {
-		public:
-			using Graph = DT::Graph;
-			using Vertex_data = DT::Vertex_data;
-			using Path_data = DT::Path_data;
-			using Kernel = DT::Graph::Kernel;
-
-			PreservingScoreTraits() : m_weight(1) {
-			}
-			PreservingScoreTraits(Number<Kernel> weight) : m_weight(weight) {
-			}
-
-			void initialize(Graph& graph, DT& data) {
-				// skip
-			}
-
-			Number<Kernel> compute_cost(Vertex_data& vd) {
-				auto v = static_cast<typename Graph::Vertex_handle>(vd.vertex);
-				return CGAL::abs(
-					CGAL::area(v->point(), v->prev()->point(), v->next()->point()));
-			}
-
-			Number<Kernel> compute_cost(Path_data& pd, Vertex_data& vd) {
-				return vd.cost + (vd.left ? -m_weight : m_weight) * pd.left_area_increased;
-			}
-
-			void update(Path_data& pd, Vertex_data& vd) {
-				if (vd.left) {
-					pd.left_area_increased -= vd.cost;
-				}
-				else {
-					pd.left_area_increased += vd.cost;
-				}
-			}
-		private:
-			Number<Kernel> m_weight;
-		};
-
-		template <GraphType G>
-		using PreservingDataTraits_Generic = pvr::GenericDataTraits<G, pvr::EmptyBase, AreaIncreasedData<typename G::Kernel>>;
-
-		template<KernelType Kernel, bool Historic>
-		using PreservingDataTraits_Dedicated = pvr::GraphDataTraits<Kernel, Historic, pvr::EmptyBase, AreaIncreasedData<Kernel>>;
-	}
-
-	template <GraphType G>
-	using PreservingVisvalingamWhyatt_Generic = PathVertexRemoval<
-		detail::PreservingDataTraits_Generic<G>,
-		detail::PreservingScoreTraits<detail::PreservingDataTraits_Generic<G>>
-	>;
-
-
-	template<KernelType Kernel, bool Historic>
-	using PreservingVisvalingamWhyatt_Dedicated = PathVertexRemoval<
-		detail::PreservingDataTraits_Dedicated<Kernel, Historic>,
-		detail::PreservingScoreTraits<detail::PreservingDataTraits_Dedicated<Kernel, Historic>>
-	>;
-
-} // namespace cartocrow::simplification
+} // namespace cartocrow::simplification::pvr
 
 //#include "preserving_vertex_removal.hpp"

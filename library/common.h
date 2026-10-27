@@ -2,6 +2,18 @@
 
 namespace cartocrow::simplification {
 
+
+	template<class K>
+	concept KernelType = std::is_same<K, Inexact>::value || std::is_same<K, Exact>::value;
+
+	template<class G>
+	concept GraphType = requires {
+		typename G::Graph_traits;
+	};
+
+	struct EmptyBase {
+	};
+
 	template<class Elt>
 	struct GraphQueueTraits {
 

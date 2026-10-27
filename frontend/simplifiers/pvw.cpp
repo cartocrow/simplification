@@ -5,7 +5,7 @@
 #include <QLabel>
 #include <QSpinBox>
 
-#include "library/preserving_vertex_removal.h"
+#include "library/preserving_visvalingam_whyatt.h"
 
 using namespace cartocrow::simplification;
 
