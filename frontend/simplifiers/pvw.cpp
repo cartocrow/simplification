@@ -27,10 +27,10 @@ struct PVWSimplifier::State {
 	virtual std::shared_ptr<OutputGraph> simplifiedToOutputGraph() = 0;
 };
 
-template <class Kernel>
+template <class Alg>
 struct PVWState : PVWSimplifier::State {
-	using Alg = PreservingVisvalingamWhyatt_Dedicated<Kernel, true>;
 	using Graph = Alg::Graph;
+	using Kernel = Graph::Kernel;
 	using PQT = Alg::VertexTree;
 	using Traits = Alg::Score_traits;
 
@@ -101,6 +101,12 @@ struct PVWState : PVWSimplifier::State {
 	}
 };
 
+template <class Kernel>
+using PVWState_Dedicated = PVWState<PreservingVisvalingamWhyatt_Dedicated<Kernel, true>>;
+
+template <class Kernel>
+using PVWState_Generic = PVWState<PreservingVisvalingamWhyatt_Generic<Straight_graph_2<std::monostate, std::monostate, Kernel, DecomposedGraph<true, std::monostate>>>>;
+
 PVWSimplifier::PVWSimplifier(PersistentSettings& settings) : Simplifier("Preserving Visvalingam-Whyatt", settings, { 100, 100, 40 }), m_color(220, 220, 80) {
 	m_exact = settings.getBoolean("pvw_exact", false);
 	m_preservation_weight = settings.getInteger("pvw_weight", 100);
@@ -114,6 +120,17 @@ QWidget* PVWSimplifier::constructWidget() {
 	auto* checkExact = new QCheckBox("Exact computation");
 	checkExact->setChecked(m_exact);
 	layout->addWidget(checkExact);
+	result->connect(checkExact, &QCheckBox::stateChanged, [this](bool checked) {
+		m_settings.setBoolean("pvw_exact", checked);
+		m_exact = checked;
+		});
+
+	auto* checkGeneric = new QCheckBox("Use generic graph");
+	checkGeneric->setChecked(m_generic);
+	layout->addWidget(checkGeneric);
+	result->connect(checkGeneric, &QCheckBox::stateChanged, [this](bool checked) {
+		m_generic = checked;
+		});
 
 	layout->addWidget(new QLabel("Area-preservation weight (%)"));
 	auto* spinWeight = new QSpinBox();
@@ -121,12 +138,6 @@ QWidget* PVWSimplifier::constructWidget() {
 	spinWeight->setMaximum(1000);
 	spinWeight->setValue(m_preservation_weight);
 	layout->addWidget(spinWeight);
-
-	result->connect(checkExact, &QCheckBox::stateChanged, [this](bool checked) {
-		m_settings.setBoolean("pvw_exact", checked);
-		m_exact = checked;
-		});
-
 	result->connect(spinWeight, QOverload<int>::of(&QSpinBox::valueChanged), [this](int value) {
 		m_settings.setInteger("pvw_weight", value);
 		m_preservation_weight = value;		
@@ -138,11 +149,18 @@ QWidget* PVWSimplifier::constructWidget() {
 void PVWSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int depth) {
 	clear();
 
-	if (m_exact) {
-		m_state = std::make_unique<PVWState<Exact>>();
+	if (m_generic) {
+		if (m_exact) {
+			m_state = std::make_unique<PVWState_Generic<Exact>>();
+		}
+		else {
+			m_state = std::make_unique<PVWState_Generic<Inexact>>();
+		}
+	} else if (m_exact) {
+		m_state = std::make_unique<PVWState_Dedicated<Exact>>();
 	}
 	else {
-		m_state = std::make_unique<PVWState<Inexact>>();
+		m_state = std::make_unique<PVWState_Dedicated<Inexact>>();
 	}
 	m_state->initialize(graph, depth, m_preservation_weight / 100.0);
 }

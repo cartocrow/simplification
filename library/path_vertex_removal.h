@@ -11,9 +11,7 @@
 #include "utils.h"
 
 namespace cartocrow::simplification::pvr {
-
-		
-
+			
 		template<KernelType K, class Base>
 		struct VertexData : public Base {
 			using Kernel = K;
@@ -190,7 +188,7 @@ namespace cartocrow::simplification::pvr {
 			Vertex_handle w = v->next();
 
 			Path_handle p = v->outgoing()->path();
-			auto& pdata = data_traits.data(p);
+			Path_data& pdata = data_traits.data(p);
 
 			if (u->is_neighbor_of(w)) {
 				if (vdata.left) {
@@ -230,33 +228,31 @@ namespace cartocrow::simplification::pvr {
 		}
 		void update(Path_data& pdata) {
 
-			if (pdata.left_queue.empty() && pdata.right_queue.empty()) {
-				// no operation
-				queue.remove(&pdata);
-				return;
-			}
+			pdata.next_vertex = nullptr;
+			pdata.cost = 0;
 
-			if (pdata.left_queue.empty()) {
+			if (!pdata.left_queue.empty()) {
+				pdata.next_vertex = pdata.left_queue.peek();
+				pdata.cost = score_traits.compute_cost(pdata, *pdata.next_vertex);
+
+				if (!pdata.right_queue.empty()) {
+					Vertex_data* vd = pdata.right_queue.peek();
+					Number<Kernel> cost = score_traits.compute_cost(pdata, *vd);
+
+					if (cost < pdata.cost) {
+						pdata.cost = cost;
+						pdata.next_vertex = vd;
+					}
+				}
+			}
+			else if (!pdata.right_queue.empty()) {
 				pdata.next_vertex = pdata.right_queue.peek();
 				pdata.cost = score_traits.compute_cost(pdata, *pdata.next_vertex);
 			}
-			else if (pdata.right_queue.empty()) {
-				pdata.next_vertex = pdata.left_queue.peek();
-				pdata.cost = score_traits.compute_cost(pdata, *pdata.next_vertex);
-			}
-			else {
-				pdata.next_vertex = pdata.left_queue.peek();
-				pdata.cost = score_traits.compute_cost(pdata, *pdata.next_vertex);
-				Vertex_data* vd = pdata.right_queue.peek();
-				Number<Kernel> cost = score_traits.compute_cost(pdata, *vd);
 
-				if (cost < pdata.cost) {
-					pdata.cost = cost;
-					pdata.next_vertex = vd;
-				}
-			}
-
-			if (queue.contains(&pdata)) {
+			if (pdata.next_vertex == nullptr) {
+				queue.remove(&pdata);
+			} else if (queue.contains(&pdata)) {
 				queue.update(&pdata);
 			}
 			else {
@@ -313,6 +309,7 @@ namespace cartocrow::simplification::pvr {
 			// no valid steps exist
 			return nullptr;
 		}
+
 		void performStep(Vertex_data& vd) {
 			//std::cout << "performing " << *v << std::endl;
 
@@ -320,7 +317,7 @@ namespace cartocrow::simplification::pvr {
 
 			Vertex_handle v = static_cast<Vertex_handle>(vd.vertex);
 			Path_handle p = v->outgoing()->path();
-			auto& pdata = data_traits.data(p);
+			Path_data& pdata = data_traits.data(p);
 
 			assert(queue.peek() == &pdata);
 			assert(pdata.next_vertex == &vd);
@@ -398,13 +395,13 @@ namespace cartocrow::simplification::pvr {
 			}
 
 			for (Vertex_handle v : graph.vertices()) {
-				Vertex_data vd = data_traits.data(v);
+				Vertex_data& vd = data_traits.data(v);
 				vd.vertex = v;
 				update(v, vd);
 			}
 
 			for (Path_handle p : graph.paths()) {
-				Path_data pd = data_traits.data(p);
+				Path_data& pd = data_traits.data(p);
 				pd.path = p;
 				update(pd);
 			}
