@@ -17,12 +17,13 @@ using namespace std;
 template<bool ExactMode>
 void runVW(const CommandLineArguments& cla) {
 
+	using namespace cartocrow::simplification::vr;
+
 	cout << "Running VW (ExactMode = " << ExactMode << ")" << endl;
 
 	using Kernel = std::conditional<ExactMode, Exact, Inexact>::type;
-	using Graph = VertexRemovalGraph<Kernel, false>;
-	using PQT = VertexQuadTree<Graph>;
-	using Alg = VisvalingamWhyatt<Graph>;
+	using Alg = VertexRemoval<DataTraits_Dedicated<Kernel, false>, EffectiveAreaScore<DataTraits_Dedicated<Kernel, false>>>;
+	using Graph = Alg::Graph;
 
 	filesystem::path input = cla.get_string("-input");
 	int target = cla.get_integer("-target");
@@ -34,36 +35,36 @@ void runVW(const CommandLineArguments& cla) {
 	Stopwatch& load = pool.get("load");
 	Stopwatch& init = pool.get("init");
 	Stopwatch& run = pool.get("run");
-
-	Graph graph;
+	;
 	cout << "Loading " << input << endl;
 	load.start();
-	PQT* pqt = readIpeFile<Graph>(graph, input, depth, 0.0000001);
 
-	if (pqt == nullptr) {
+	Graph* graph = readIpeFile<Graph>(input, depth, M_EPSILON);
+	if (graph == nullptr) {
 		return;
 	}
-	graph.initialize();
+	graph->initialize();
 
 	load.stop();
-	cout << "  Done, " << graph.number_of_edges() << " edges" << endl;
+	cout << "  Done, " << graph->number_of_edges() << " edges" << endl;
 
-	Alg alg(graph, *pqt);
 	cout << "Initializing" << endl;
+	Alg alg(*graph);
 	init.start();
-	alg.initialize(false);
+	alg.initialize(depth);
 	init.stop();
+	cout << "Simplifying" << endl;
 	run.start();
 	alg.run([&target](int complexity, Number<Kernel> cost) {
 		return complexity <= target; });
 	run.stop();
 	run.start();
-	cout << "Done, " << graph.number_of_edges() << " edges" << endl;
+	cout << "Done, " << graph->number_of_edges() << " edges" << endl;
 	run.stop();
 
-	delete pqt;
+	writeIpeFile(*graph, output);
 
-	writeIpeFile(graph, output);
+	delete graph;
 
 	pool.printAll();
 }

@@ -14,8 +14,6 @@ set(HEADERS
 	utils.h
 	vertex_quad_tree.h
 	vertex_removal.h	
-	vertex_removal.hpp	
-	visvalingam_whyatt.h	
 )
 
 install(FILES ${HEADERS} DESTINATION ${CARTOCROW_INSTALL_DIR}/simplification)

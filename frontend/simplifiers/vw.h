@@ -30,11 +30,7 @@ public:
 private:
 	Color m_color;
 	bool m_exact; // NB: GUI setting != state, necessarily
-	bool m_old = false;
-	bool m_generic = false;
-	bool m_v2 = false;
-	bool m_trial = true;
 	std::unique_ptr<State> m_state;
 
-	std::string setState();
+	void setState();
 };
