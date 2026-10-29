@@ -42,6 +42,38 @@ namespace cartocrow::simplification {
 		}
 	};
 
+	template<class Elt, class DataTrait>
+	struct StatefulGraphQueueTraits {
+
+		using Element_handle = Elt;
+
+		DataTrait& m_trait;
+
+		StatefulGraphQueueTraits(DataTrait& trait) : m_trait(trait) {}
+
+		void setIndex(Element_handle elt, int index) {
+			m_trait.data(elt).queue_index = index;
+		}
+
+		int getIndex(Element_handle elt) const {
+			return m_trait.data(elt).queue_index;
+		}
+
+		int compare(Element_handle a, Element_handle b) const {
+			const auto ac = m_trait.data(a).cost;
+			const auto bc = m_trait.data(b).cost;
+			if (ac < bc) {
+				return -1;
+			}
+			else if (ac > bc) {
+				return 1;
+			}
+			else {
+				return 0;
+			}
+		}
+	};
+
 	template<class Elt>
 	struct DataQueueTraits {
 

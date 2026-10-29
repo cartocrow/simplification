@@ -31,7 +31,6 @@ template <class Alg>
 struct PVWState : PVWSimplifier::State {
 	using Graph = Alg::Graph;
 	using Kernel = Graph::Kernel;
-	using PQT = Alg::VertexTree;
 	using Traits = Alg::Score_traits;
 
 	std::shared_ptr<Graph> m_graph = nullptr;
@@ -44,7 +43,7 @@ struct PVWState : PVWSimplifier::State {
 		graph_2_copy(*graph, *m_graph);
 
 		m_alg = std::make_unique<Alg>(*m_graph, Traits(weight));
-		m_alg->initialize(true);
+		m_alg->initialize(depth);
 
 		m_init_complexity = m_graph->number_of_edges();
 	}
@@ -150,17 +149,22 @@ void PVWSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int dept
 	clear();
 
 	if (m_generic) {
+		std::cout << "generic" << std::endl;
 		if (m_exact) {
 			m_state = std::make_unique<PVWState_Generic<Exact>>();
 		}
 		else {
 			m_state = std::make_unique<PVWState_Generic<Inexact>>();
 		}
-	} else if (m_exact) {
-		m_state = std::make_unique<PVWState_Dedicated<Exact>>();
 	}
 	else {
-		m_state = std::make_unique<PVWState_Dedicated<Inexact>>();
+		std::cout << "dedicated" << std::endl;
+		if (m_exact) {
+			m_state = std::make_unique<PVWState_Dedicated<Exact>>();
+		}
+		else {
+			m_state = std::make_unique<PVWState_Dedicated<Inexact>>();
+		}
 	}
 	m_state->initialize(graph, depth, m_preservation_weight / 100.0);
 }

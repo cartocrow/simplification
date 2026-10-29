@@ -79,7 +79,7 @@ namespace cartocrow::simplification::pvr {
 		};
 
 		template<class DT, class ST>
-		concept PathVertexRemovalSetup =
+		concept Setup =
 			DataTraits<DT> && ScoreTraits<ST> &&
 			std::is_same<typename ST::Kernel, typename DT::Kernel>::value &&
 			std::is_same<typename ST::Graph, typename DT::Graph>::value &&
@@ -91,14 +91,14 @@ namespace cartocrow::simplification::pvr {
 		};
 
 		template<KernelType K, bool Historic, class VertexBase = EmptyBase, class PathBase = EmptyBase>
-		class GraphDataTraits {
+		class DataTraits_Dedicated {
 		public:
 			using Kernel = K;
 			using Vertex_data = VertexData<Kernel, VertexBase>;
 			using Path_data = PathData<Kernel, PathBase, VertexBase>;
 			using Graph = Straight_graph_2<Vertex_data, std::monostate, Kernel, DecomposedGraph<Historic, Path_data>>;
 
-			virtual void initialize(Graph& graph) {
+			static void initialize(Graph& graph) {
 				// skip
 			}
 
@@ -112,21 +112,21 @@ namespace cartocrow::simplification::pvr {
 		};
 
 		template<GraphType G, class VertexBase = EmptyBase, class PathBase = EmptyBase>
-		class GenericDataTraits {
+		class DataTraits_Generic {
 		public:
 			using Graph = G;
 			using Kernel = Graph::Kernel;
 			using Vertex_data = VertexData<Kernel, VertexBase>;
 			using Path_data = PathData<Kernel, PathBase, VertexBase>;
 
-			virtual void initialize(Graph& graph) {
+			void initialize(Graph& graph) {
 				delete m_vertex_data;
 				delete m_path_data;
 				m_vertex_data = new Graph_vertex_map<Graph, Vertex_data>(graph, Vertex_data());
 				m_path_data = new Graph_path_map<Graph, Path_data>(graph, Path_data());
 			}
 
-			~GenericDataTraits() {
+			~DataTraits_Generic() {
 				delete m_vertex_data;
 				delete m_path_data;
 			}
@@ -144,7 +144,7 @@ namespace cartocrow::simplification::pvr {
 		};
 
 	template <DataTraits DT, ScoreTraits ST>
-		requires PathVertexRemovalSetup<DT, ST>
+		requires Setup<DT, ST>
 	class PathVertexRemoval {
 	public:
 		using Data_traits = DT;

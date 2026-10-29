@@ -196,6 +196,19 @@ namespace cartocrow::simplification::utils {
 	}
 
 	template<typename T>
+	bool listRemove(T* elt, std::vector<void*>& vec) {
+
+		auto pos = std::find(vec.begin(), vec.end(), elt);
+		if (pos != vec.end()) {
+			vec.erase(pos);
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+
+	template<typename T>
 	T* swapRemove(int index, std::vector<T*>& vec) {
 		if (index == vec.size() - 1) {
 			vec.pop_back();
