@@ -1,12 +1,6 @@
 #pragma once
 
-#include <cartocrow/core/core.h>
-#include <cartocrow/data_structures/indexed_priority_queue.h>
-#include <cartocrow/data_structures/straight_graph_2.h>
-
-#include "vertex_quad_tree.h"
 #include "common.h"
-#include "utils.h"
 
 namespace cartocrow::simplification::vr {
 
@@ -267,14 +261,14 @@ namespace cartocrow::simplification::vr {
 			}
 		}
 
-		bool run(std::optional<std::function<bool(int, Number<Kernel>)>> stop = std::nullopt) {
+		bool run(std::function<bool(int, Number<Kernel>)> stop) {
 			while (true) {
 				Vertex_handle next = findNextStep();
 				if (next == nullptr) {
 					return false;
 				}
 
-				if (!stop.has_value() || (*stop)(graph.number_of_edges(), data_traits.data(next).cost)) {
+				if (stop(graph.number_of_edges(), data_traits.data(next).cost)) {
 					return true;
 				}
 

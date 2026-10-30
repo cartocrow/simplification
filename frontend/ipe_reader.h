@@ -5,10 +5,8 @@
 #include <fstream>
 
 #include <cartocrow/reader/ipe_reader.h>
-#include <cartocrow/data_structures/graph_map_2.h>
 
-#include "library/vertex_quad_tree.h"
-#include "library/utils.h"
+#include "library/common.h"
 
 using namespace cartocrow;
 using namespace cartocrow::simplification;

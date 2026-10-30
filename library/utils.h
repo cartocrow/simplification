@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cartocrow/core/core.h>
 #include "precision_safe_tests.h"
 
 namespace cartocrow::simplification::utils {

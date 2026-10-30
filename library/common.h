@@ -1,5 +1,13 @@
 #pragma once
 
+#include <cartocrow/core/core.h>
+#include <cartocrow/data_structures/indexed_priority_queue.h>
+#include <cartocrow/data_structures/point_quad_tree.h>
+#include <cartocrow/data_structures/quad_tree.h>
+#include <cartocrow/data_structures/straight_graph_2.h>
+
+#include "utils.h"
+
 namespace cartocrow::simplification {
 
 	template<class K>
@@ -103,4 +111,38 @@ namespace cartocrow::simplification {
 			}
 		}
 	};
+
+
+	template<GraphType Graph>
+	struct VertexQuadTreeTraits {
+
+		using Element = Graph::Vertex_handle;
+		using Kernel = Graph::Kernel;
+
+		static const Point<Kernel>& get_point(Element elt) {
+			return elt->point();
+		}
+	};
+
+	template<GraphType Graph>
+	using VertexQuadTree = cartocrow::PointQuadTree<VertexQuadTreeTraits<Graph>>;
+
+	template<GraphType Graph>
+	struct EdgeQuadTreeTraits {
+		using Element = Graph::Edge_handle;
+		using Kernel = Graph::Kernel;
+
+		static Rectangle<Kernel> get_bounding_box(Element elt) {
+			Segment<Kernel> seg = elt->curve();
+			return utils::boxOf({ seg.start(), seg.end() });
+		}
+
+		static bool element_overlaps_rectangle(Element elt, const Rectangle<Kernel>& rect) {
+			Segment<Kernel> seg = elt->curve();
+			return utils::overlaps(rect, seg);
+		}
+	};
+
+	template<GraphType Graph>
+	using EdgeQuadTree = cartocrow::QuadTree<EdgeQuadTreeTraits<Graph>>;
 }

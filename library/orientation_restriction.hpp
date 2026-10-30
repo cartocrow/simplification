@@ -3,11 +3,10 @@
 // Do not include this file, but the .h file instead
 // -----------------------------------------------------------------------------
 
-#include <cartocrow/data_structures/graph_map_2.h>
 #include <cartocrow/data_structures/quad_tree.h>
 
 #include "utils.h"
-#include "vertex_quad_tree.h"
+#include "common.h"
 
 namespace cartocrow::simplification {
 

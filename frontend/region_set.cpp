@@ -1,7 +1,7 @@
 #include "region_set.h"
 
 #include "library/utils.h"
-#include "library/vertex_quad_tree.h"
+#include "library/common.h"
 
 using namespace cartocrow::simplification;
 

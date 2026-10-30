@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cartocrow/core/core.h>
-
 namespace cartocrow::safe_test {
 
 	inline bool close(const Number<Exact> a, const Number<Exact> b) {
