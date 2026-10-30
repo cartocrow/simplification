@@ -71,13 +71,15 @@ void runVW(const CommandLineArguments& cla) {
 template<bool ExactMode>
 void runKSBB(const CommandLineArguments& cla) {
 
+	using namespace cartocrow::simplification::ec;
+
 	cout << "Running KSBB (ExactMode = " << ExactMode << ")" << endl;
 
 	using Kernel = std::conditional<ExactMode, Exact, Inexact>::type;
-	using Graph = EdgeCollapseGraph<Kernel, false>;
-	using PQT = VertexQuadTree<Graph>;
-	using SQT = EdgeQuadTree<Graph>;
-	using Alg = KronenfeldEtAl<Graph>;
+	using DT = DataTraits_Dedicated<Kernel, false>;
+	using ST = MinimumSymmetricDifferenceCollapse<DT, false>;
+	using Alg = EdgeCollapse<DT, ST>;
+	using Graph = DT::Graph;
 
 	filesystem::path input = cla.get_string("-input");
 	int target = cla.get_integer("-target", 1);
@@ -91,34 +93,30 @@ void runKSBB(const CommandLineArguments& cla) {
 	Stopwatch& init = pool.get("init");
 	Stopwatch& run = pool.get("run");
 
-	Graph graph;
 	cout << "Loading " << input << endl;
 	load.start();
-	auto res = readIpeFile<Graph>(graph, input, depth, 0.0000001);
-	if (!res) {
+
+	Graph* graph =  readIpeFile<Graph>(input, depth, M_EPSILON);
+	if (graph == nullptr) {
 		return;
 	}
-	PQT pqt = *res;
-	graph.initialize();
+	graph->initialize();
 	load.stop();
-	cout << "  Done, " << graph.number_of_edges() << " edges" << endl;
+	cout << "  Done, " << graph->number_of_edges() << " edges" << endl;
 
-	Rectangle box = pqt.root_box();
-	pqt.clear();
-	SQT sqt(box, depth, fuzz);
-	Alg alg(graph, sqt, pqt);
+	Alg alg(*graph);
 	cout << "Initializing" << endl;
 	init.start();
-	alg.initialize(false, true);
+	alg.initialize(depth, fuzz);
 	init.stop();
 	cout << "Running" << endl;
 	run.start();
 	alg.run([&target](int complexity, Number<Kernel> cost) {
 		return complexity <= target; });
 	run.stop();
-	cout << "Done, " << graph.number_of_edges() << " edges" << endl;
+	cout << "Done, " << graph->number_of_edges() << " edges" << endl;
 
-	writeIpeFile(graph, output);
+	writeIpeFile(*graph, output);
 
 	pool.printAll();
 }

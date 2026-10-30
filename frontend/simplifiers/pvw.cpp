@@ -11,6 +11,8 @@ using namespace cartocrow::simplification::pvr;
 
 struct PVWSimplifier::State {
 
+	virtual ~State() {}
+
 	int m_init_complexity;
 
 	virtual void initialize(std::shared_ptr<InputGraph> graph, const int depth, const double weight) = 0;

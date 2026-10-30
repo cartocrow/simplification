@@ -6,9 +6,11 @@
 
 #include "library/edge_collapse.h"
 
-using namespace cartocrow::simplification;
+using namespace cartocrow::simplification::ec;
 
 struct KSBBSimplifier::State {
+
+	virtual ~State() {}
 
 	int m_init_complexity;
 
@@ -28,21 +30,13 @@ struct KSBBSimplifier::State {
 
 template <class Kernel, bool ApproxExact>
 struct KSBBState : KSBBSimplifier::State {
-	using Graph = EdgeCollapseGraph<Kernel, true>;
-	using Alg = EdgeCollapse<KronenfeldEtAlTraits<Graph, ApproxExact>>;
-	using PQT = Alg::VertexTree;
-	using SQT = Alg::EdgeTree;
+	using DT = DataTraits_Dedicated<Kernel, true>;
+	using ST = MinimumSymmetricDifferenceCollapse<DT, ApproxExact>;
+	using Alg = EdgeCollapse<DT, ST>;	
+	using Graph = Alg::Graph;
 
 	std::shared_ptr<Graph> m_graph = nullptr;
-	PQT* m_pqt = nullptr;
-	SQT* m_sqt = nullptr;
-	Alg* m_alg = nullptr;
-
-	~KSBBState() {
-		delete m_alg;
-		delete m_pqt;
-		delete m_sqt;
-	}
+	std::unique_ptr<Alg> m_alg = nullptr;
 
 	void initialize(std::shared_ptr<InputGraph> graph, const int depth) override {
 
@@ -50,12 +44,8 @@ struct KSBBState : KSBBSimplifier::State {
 
 		graph_2_copy(*graph, *m_graph);
 
-		Rectangle<Kernel> box = m_graph->bounding_rectangle();
-		m_pqt = new PQT(box, depth);
-		m_sqt = new SQT(box, depth, 0.05);
-
-		m_alg = new Alg(*m_graph, *m_sqt, *m_pqt);
-		m_alg->initialize(true, true);
+		m_alg = std::make_unique<Alg>(*m_graph);
+		m_alg->initialize(depth, 0.05);
 
 		m_init_complexity = m_graph->number_of_edges();
 	}

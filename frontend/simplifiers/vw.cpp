@@ -14,8 +14,7 @@ struct VWSimplifier::State {
 
 	int m_init_complexity;
 
-	virtual ~State() {
-	}
+	virtual ~State() {}
 
 	virtual void initialize(std::shared_ptr<InputGraph> graph, const int depth) = 0;
 	virtual void runToComplexity(const int k, std::optional<std::function<void(int)>> progress = std::nullopt,

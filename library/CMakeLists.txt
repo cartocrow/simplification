@@ -1,7 +1,6 @@
 set(HEADERS
 	common.h
 	edge_collapse.h
-	edge_collapse.hpp
 	edge_moves.h
 	edge_moves.hpp
 	edge_quad_tree.h
