@@ -302,7 +302,7 @@ namespace cartocrow::simplification::vr {
 		using Graph = DT::Graph;
 		using Vertex_handle = Graph::Vertex_handle;
 		using Vertex_data = DT::Vertex_data;
-		using Kernel = DT::Graph::Kernel;
+		using Kernel = Graph::Kernel;
 
 		static void initialize(Graph& graph, DT& data) {
 			// skip

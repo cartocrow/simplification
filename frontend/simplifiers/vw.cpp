@@ -33,7 +33,8 @@ struct VWSimplifier::State {
 
 template <class Kernel>
 struct VWState : VWSimplifier::State {
-	using Alg = VertexRemoval<DataTraits_Dedicated<Kernel, true>, EffectiveAreaScore<DataTraits_Dedicated<Kernel, true>>>;
+	using DT = DataTraits_Dedicated<Kernel, true>;
+	using Alg = VertexRemoval<DT, EffectiveAreaScore<DT>>;
 	using Graph = Alg::Graph;
 
 	std::shared_ptr<Graph> m_graph = nullptr;
