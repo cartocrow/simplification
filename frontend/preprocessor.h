@@ -4,7 +4,7 @@
 #include <cartocrow/utils/persistent_settings.h>
 #include "simplification_algorithm.h"
 
-using namespace cartocrow::utils;
+using namespace cartocrow;
 
 class Preprocessor {
 protected:

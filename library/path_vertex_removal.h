@@ -32,7 +32,7 @@ namespace cartocrow::simplification::pvr {
 			using Vertex_handle = void*; // needed to avoid co-dependent templates for dedicated graphs
 			using Path_handle = void*; // needed to avoid co-dependent templates for dedicated graphs
 			using Vertex_data = VertexData<Kernel, VertexBase>;
-			using Queue = cartocrow::data_structures::IndexedPriorityQueue<DataQueueTraits<Vertex_data*>>;
+			using Queue = cartocrow::IndexedPriorityQueue<DataQueueTraits<Vertex_data*>>;
 
 			Path_handle path;
 			Vertex_data* next_vertex = nullptr;
@@ -159,7 +159,7 @@ namespace cartocrow::simplification::pvr {
 		using VertexTree = VertexQuadTree<Graph>;
 
 	private:
-		using Queue = cartocrow::data_structures::IndexedPriorityQueue<DataQueueTraits<Path_data*>>;
+		using Queue = cartocrow::IndexedPriorityQueue<DataQueueTraits<Path_data*>>;
 
 		Graph& graph;
 		VertexTree* pqt = nullptr;

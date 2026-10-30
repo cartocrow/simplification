@@ -70,7 +70,7 @@ namespace cartocrow::simplification::vr {
 	public:
 		using Kernel = K;
 		using Vertex_data = VertexData<Kernel, VertexBase>;
-		using Graph = Straight_graph_2<Vertex_data, std::monostate, Kernel, DecomposedGraph<Historic, std::monostate>>;
+		using Graph = cartocrow::Straight_graph_2<Vertex_data, std::monostate, Kernel, DecomposedGraph<Historic, std::monostate>>;
 
 		static void initialize(Graph& graph) {
 			// skip
@@ -118,7 +118,7 @@ namespace cartocrow::simplification::vr {
 
 	private:
 		using VertexTree = VertexQuadTree<Graph>;
-		using Queue = cartocrow::data_structures::IndexedPriorityQueue<StatefulGraphQueueTraits<Vertex_handle, Data_traits>>;
+		using Queue = cartocrow::IndexedPriorityQueue<StatefulGraphQueueTraits<Vertex_handle, Data_traits>>;
 
 		Graph& graph;
 		VertexTree* pqt = nullptr;

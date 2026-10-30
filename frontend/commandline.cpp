@@ -10,7 +10,6 @@
 #include "library/edge_moves.h"
 
 using namespace cartocrow;
-using namespace cartocrow::utils;
 using namespace cartocrow::simplification;
 using namespace std;
 

@@ -23,5 +23,5 @@ namespace cartocrow::simplification {
 	};
 
 	template<class Graph>
-	using EdgeQuadTree = cartocrow::data_structures::QuadTree<EdgeQuadTreeTraits<Graph>>;
+	using EdgeQuadTree = cartocrow::QuadTree<EdgeQuadTreeTraits<Graph>>;
 }

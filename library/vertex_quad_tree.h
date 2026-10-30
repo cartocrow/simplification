@@ -16,5 +16,5 @@ namespace cartocrow::simplification {
 	};	
 
 	template<class Graph>
-	using VertexQuadTree = cartocrow::data_structures::PointQuadTree<VertexQuadTreeTraits<Graph>>;
+	using VertexQuadTree = cartocrow::PointQuadTree<VertexQuadTreeTraits<Graph>>;
 }

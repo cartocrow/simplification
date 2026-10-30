@@ -378,7 +378,7 @@ void SimplificationGUI::addSimplifyTab() {
 
 	connect(initAndRunButton, &QPushButton::clicked, [this, runAlg]() {
 		Simplifier* alg = algorithms[algorithmSelector->currentIndex()];
-		cartocrow::utils::StopwatchPool pool("Init & run");
+		cartocrow::StopwatchPool pool("Init & run");
 		if (input != nullptr) {
 
 			QProgressDialog progress("Initializing", nullptr, 0, 2, this);

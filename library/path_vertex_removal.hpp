@@ -86,7 +86,7 @@ namespace cartocrow::simplification {
 			using Vertex_handle = Graph::Vertex_handle;
 			using VertexData = PVRData<PVRT>;
 			using QueueTraits = PVRVertexQueueTraits<PVRT>;
-			using Queue = cartocrow::data_structures::IndexedPriorityQueue<PVRVertexQueueTraits<PVRT>>;
+			using Queue = cartocrow::IndexedPriorityQueue<PVRVertexQueueTraits<PVRT>>;
 
 			void resetQueues(Graph_vertex_map<Graph, VertexData>* map) requires !PVRT::use_graph_data {
 				left_queue = Queue(QueueTraits(map));
@@ -104,7 +104,7 @@ namespace cartocrow::simplification {
 		class PVRTraits_DedicatedBase {
 		public:
 			using Kernel = K;
-			using Graph = Straight_graph_2<detail::PVRData<PVRT>, std::monostate, Kernel, DecomposedGraph<Historic, detail::PVRPathData<PVRT>>>;
+			using Graph = cartocrow::Straight_graph_2<detail::PVRData<PVRT>, std::monostate, Kernel, DecomposedGraph<Historic, detail::PVRPathData<PVRT>>>;
 			using Vertex_handle = Graph::Vertex_handle;
 			using Path_handle = Graph::Path_handle;
 			using VertexData = PVRData<PVRT>;

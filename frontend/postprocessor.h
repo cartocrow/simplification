@@ -7,7 +7,6 @@
 #include <cartocrow/data_structures/straight_graph_2.h>
 
 using namespace cartocrow;
-using namespace cartocrow::utils;
 
 using OutputGraph = Straight_graph_2<std::monostate, std::monostate, Inexact, DecomposedGraph<false, std::monostate>>;
 

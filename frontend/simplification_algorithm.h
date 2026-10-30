@@ -7,8 +7,6 @@
 #include <cartocrow/utils/persistent_settings.h>
 
 using namespace cartocrow;
-using namespace cartocrow::renderer;
-using namespace cartocrow::utils;
 
 using InputGraph = Straight_graph_2<std::monostate, std::monostate, Exact, CustomGraphTraits<false, true, true, true, std::monostate>>;
 extern template GraphPainting<InputGraph>;

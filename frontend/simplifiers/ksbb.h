@@ -4,7 +4,6 @@
 #include "frontend/simplifier.h"
 
 using namespace cartocrow;
-using namespace cartocrow::renderer;
 
 class KSBBSimplifier : public Simplifier {
 public:

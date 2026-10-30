@@ -18,8 +18,6 @@
 #include "preprocessor.h"
 
 using namespace cartocrow;
-using namespace cartocrow::renderer;
-using namespace cartocrow::utils;
 
 void launchGUI(int argc, char* argv[]);
 
