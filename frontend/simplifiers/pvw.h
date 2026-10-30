@@ -29,7 +29,6 @@ public:
 private:
 	Color m_color;
 	bool m_exact; // NB: GUI setting != state, necessarily
-	bool m_generic = false;
 	int m_preservation_weight;
 	std::unique_ptr<State> m_state;
 };

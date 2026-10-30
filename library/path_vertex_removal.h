@@ -3,8 +3,6 @@
 #include <cartocrow/core/core.h>
 #include <cartocrow/data_structures/indexed_priority_queue.h>
 #include <cartocrow/data_structures/straight_graph_2.h>
-#include <cartocrow/data_structures/graph_traits_2.h>
-#include <cartocrow/data_structures/graph_map_2.h>
 
 #include "vertex_quad_tree.h"
 #include "common.h"
@@ -12,33 +10,35 @@
 
 namespace cartocrow::simplification::pvr {
 			
-		template<KernelType K, class Base>
+		template<KernelType K, class Base = EmptyBase>
 		struct VertexData : public Base {
 			using Kernel = K;
-			using Vertex_data_handle = VertexData<K, Base>*;
 			using Vertex_handle = void*; // needed to avoid co-dependent templates for dedicated graphs
 
-			Vertex_handle vertex;
 			bool left;
-			std::vector<Vertex_data_handle> blocked_by;
-			std::vector<Vertex_data_handle> blocking;
+			std::vector<Vertex_handle> blocked_by;
+			std::vector<Vertex_handle> blocking;
 			Number<Kernel> cost;
 			int queue_index = -1;
 		};
 
-		template<KernelType K, class Base, class VertexBase>
+		template<KernelType K, class Base = EmptyBase>
 		struct PathData : public Base {
 			using Kernel = K;
 			using Vertex_handle = void*; // needed to avoid co-dependent templates for dedicated graphs
 			using Path_handle = void*; // needed to avoid co-dependent templates for dedicated graphs
-			using Vertex_data = VertexData<Kernel, VertexBase>;
-			using Queue = cartocrow::IndexedPriorityQueue<DataQueueTraits<Vertex_data*>>;
+			using Queue = void*; // needed to avoid co-dependent templates for dedicated graphs (?)
 
 			Path_handle path;
-			Vertex_data* next_vertex = nullptr;
-			Queue left_queue, right_queue;
+			bool next_from_left;
+			Queue left_queue = nullptr, right_queue = nullptr;
 			Number<Kernel> cost;
 			int queue_index = -1;
+
+			~PathData() {
+				delete left_queue;
+				delete right_queue;
+			}
 		};
 
 		template<class DT> 
@@ -66,16 +66,16 @@ namespace cartocrow::simplification::pvr {
 			GraphType<typename ST::Graph> &&
 			ST::Graph::Graph_traits::oriented &&
 			ST::Graph::Graph_traits::decomposed &&
-			requires(ST score, typename ST::Graph graph, typename ST::Vertex_data vdata, typename ST::Path_data pdata) {
+			requires(ST score, typename ST::Graph graph, typename ST::Graph::Vertex_handle v, typename ST::Graph::Path_handle p, typename ST::Vertex_data vdata, typename ST::Path_data pdata) {
 
 			typename ST::Kernel;
 			typename ST::Graph;
 			typename ST::Vertex_data;
 			typename ST::Path_data;
 			//{ score.initialize(graph, data) }; Moved to general Setup concept, to not make this depend on DataTraits
-			{ score.compute_cost(vdata) } -> std::same_as<Number<typename ST::Kernel>>;
-			{ score.compute_cost(pdata, vdata) } -> std::same_as<Number<typename ST::Kernel>>;
-			{ score.update(pdata, vdata) };
+			{ score.compute_cost(v, vdata) } -> std::same_as<Number<typename ST::Kernel>>;
+			{ score.compute_cost(p, pdata, v, vdata) } -> std::same_as<Number<typename ST::Kernel>>;
+			{ score.update(p, pdata, v, vdata) };
 		};
 
 		template<class DT, class ST>
@@ -90,12 +90,12 @@ namespace cartocrow::simplification::pvr {
 			{ score.initialize(graph, data) };
 		};
 
-		template<KernelType K, bool Historic, class VertexBase = EmptyBase, class PathBase = EmptyBase>
+		template<KernelType K, bool Historic, class PathBase = EmptyBase, class VertexBase = EmptyBase>
 		class DataTraits_Dedicated {
 		public:
 			using Kernel = K;
 			using Vertex_data = VertexData<Kernel, VertexBase>;
-			using Path_data = PathData<Kernel, PathBase, VertexBase>;
+			using Path_data = PathData<Kernel, PathBase>;
 			using Graph = Straight_graph_2<Vertex_data, std::monostate, Kernel, DecomposedGraph<Historic, Path_data>>;
 
 			static void initialize(Graph& graph) {
@@ -111,13 +111,13 @@ namespace cartocrow::simplification::pvr {
 			}
 		};
 
-		template<GraphType G, class VertexBase = EmptyBase, class PathBase = EmptyBase>
+		template<GraphType G, class PathBase = EmptyBase, class VertexBase = EmptyBase>
 		class DataTraits_Generic {
 		public:
 			using Graph = G;
 			using Kernel = Graph::Kernel;
 			using Vertex_data = VertexData<Kernel, VertexBase>;
-			using Path_data = PathData<Kernel, PathBase, VertexBase>;
+			using Path_data = PathData<Kernel, PathBase>;
 
 			void initialize(Graph& graph) {
 				delete m_vertex_data;
@@ -159,28 +159,39 @@ namespace cartocrow::simplification::pvr {
 		using VertexTree = VertexQuadTree<Graph>;
 
 	private:
-		using Queue = cartocrow::IndexedPriorityQueue<DataQueueTraits<Path_data*>>;
+		using VertexQueue = cartocrow::IndexedPriorityQueue<StatefulGraphQueueTraits<Vertex_handle, Data_traits>>;
+		using PathQueue = cartocrow::IndexedPriorityQueue<StatefulGraphQueueTraits<Path_handle, Data_traits>>;
 
 		Graph& graph;
 		VertexTree* pqt = nullptr;
-		Queue queue;
 		Data_traits data_traits;
 		Score_traits score_traits;
+		PathQueue queue = PathQueue(data_traits);
+
+		VertexQueue& left_queue(Path_data& pd) {
+			return *static_cast<VertexQueue*>(pd.left_queue);
+		}
+
+		VertexQueue& right_queue(Path_data& pd) {
+			return *static_cast<VertexQueue*>(pd.left_queue);
+		}
+
+		VertexQueue& path_queue(Path_data& pd, const bool& left) {
+			return left ? left_queue(pd) : right_queue(pd);
+		}
 
 		void update(Vertex_handle v) {
-			update(v, data_traits.data(v));
-		}
-		void update(Vertex_data& vdata) {
-			update(static_cast<Vertex_handle>(vdata.vertex), vdata);
-		}
-		void update(Vertex_handle v, Vertex_data& vdata) {
+
 			if (v->degree() != 2) {
 				return;
 			}
 
+			Vertex_data& vdata = data_traits.data(v);
+
 			// clear topology
-			for (Vertex_data* bd : vdata.blocked_by) {
-				utils::listRemove(&vdata, bd->blocking);
+			for (void* bvoid : vdata.blocked_by) {
+				Vertex_handle b = static_cast<Vertex_handle>(bvoid);
+				utils::listRemove(v, data_traits.data(b).blocking);
 			}
 			vdata.blocked_by.clear();
 
@@ -191,84 +202,80 @@ namespace cartocrow::simplification::pvr {
 			Path_data& pdata = data_traits.data(p);
 
 			if (u->is_neighbor_of(w)) {
-				if (vdata.left) {
-					pdata.left_queue.remove(&vdata);
-				}
-				else {
-					pdata.right_queue.remove(&vdata);
-				}
+				path_queue(pdata, vdata.left).remove(v);
 				return;
 			}
 
 			vdata.left = CGAL::left_turn(u->point(), v->point(), w->point());
-			vdata.cost = score_traits.compute_cost(vdata);
+			vdata.cost = score_traits.compute_cost(v, vdata);
 
-			if (vdata.left) {
-				pdata.right_queue.remove(&vdata);
-				if (pdata.left_queue.contains(&vdata)) {
-					pdata.left_queue.update(&vdata);
-				}
-				else {
-					pdata.left_queue.push(&vdata);
-				}
+			path_queue(pdata, !vdata.left).remove(v);
+			VertexQueue& q = path_queue(pdata, vdata.left);
+			if (q.contains(v)) {
+				q.update(v);
 			}
 			else {
-				pdata.left_queue.remove(&vdata);
-				if (pdata.right_queue.contains(&vdata)) {
-					pdata.right_queue.update(&vdata);
-				}
-				else {
-					pdata.right_queue.push(&vdata);
-				}
+				q.push(v);
 			}
 		}
 
 		void update(Path_handle p) {
-			update(data_traits.data(p));
+			update(p, data_traits.data(p));
 		}
-		void update(Path_data& pdata) {
+		void update(Path_handle p, Path_data& pdata) {
+			
+			VertexQueue& left_q = left_queue(pdata);
+			VertexQueue& right_q = right_queue(pdata);
 
-			pdata.next_vertex = nullptr;
-			pdata.cost = 0;
+			if (!left_q.empty()) {
+				Vertex_handle left_v = left_q.peek();
+				pdata.cost = score_traits.compute_cost(p, pdata, left_v, data_traits.data(left_v));
 
-			if (!pdata.left_queue.empty()) {
-				pdata.next_vertex = pdata.left_queue.peek();
-				pdata.cost = score_traits.compute_cost(pdata, *pdata.next_vertex);
-
-				if (!pdata.right_queue.empty()) {
-					Vertex_data* vd = pdata.right_queue.peek();
-					Number<Kernel> cost = score_traits.compute_cost(pdata, *vd);
+				if (!right_q.empty()) {
+					Vertex_handle right_v = right_q.peek();
+					Number<Kernel> cost = score_traits.compute_cost(p, pdata, right_v, data_traits.data(right_v));
 
 					if (cost < pdata.cost) {
+						pdata.next_from_left = false;
 						pdata.cost = cost;
-						pdata.next_vertex = vd;
+					}
+					else {
+						pdata.next_from_left = true;
 					}
 				}
+				else {
+					pdata.next_from_left = true;
+				}
 			}
-			else if (!pdata.right_queue.empty()) {
-				pdata.next_vertex = pdata.right_queue.peek();
-				pdata.cost = score_traits.compute_cost(pdata, *pdata.next_vertex);
-			}
-
-			if (pdata.next_vertex == nullptr) {
-				queue.remove(&pdata);
-			} else if (queue.contains(&pdata)) {
-				queue.update(&pdata);
+			else if (!right_q.empty()) {
+				Vertex_handle right_v = right_q.peek();
+				pdata.cost = score_traits.compute_cost(p, pdata, right_v, data_traits.data(right_v));
+				pdata.next_from_left = false;
 			}
 			else {
-				queue.push(&pdata);
+				// no operation
+				queue.remove(p);
+				return;
+			}
+
+			if (queue.contains(p)) {
+				queue.update(p);
+			}
+			else {
+				queue.push(p);
 			}
 		}
 
-		Vertex_data* findNextStep() {
+		Vertex_handle findNextStep() {
 			assert(graph.can_perform_operation());
 
 			while (!queue.empty()) {
-				Path_data* pdata = queue.peek();
+				Path_handle p = queue.peek();
+				Path_data& pdata = data_traits.data(p);
 
-				Vertex_data* vd = pdata->next_vertex;
+				Vertex_handle v = path_queue(pdata, pdata.next_from_left).peek();
+				Vertex_data& vdata = data_traits.data(v);
 
-				Vertex_handle v = static_cast<Vertex_handle>(vd->vertex);
 				Vertex_handle u = v->prev();
 				Vertex_handle w = v->next();
 
@@ -280,29 +287,24 @@ namespace cartocrow::simplification::pvr {
 
 				Rectangle<Kernel> rect = utils::boxOf(up, vp, wp);
 
-				pqt->findContained(rect, [&T, u, v, w, vd, this](Vertex_handle b) {
+				pqt->findContained(rect, [&T, u, v, w, &vdata, this](Vertex_handle b) {
 					if (b != u && b != v && b != w && !T.has_on_unbounded_side(b->point())) {
 						// blocked, record the pair
 						Vertex_data& bd = data_traits.data(b);
-						bd.blocking.push_back(vd);
-						vd->blocked_by.push_back(&bd);
+						bd.blocking.push_back(v);
+						vdata.blocked_by.push_back(b);
 					}
 					});
 
 
-				if (vd->blocked_by.empty()) {
+				if (vdata.blocked_by.empty()) {
 					// not blocked, this is the next step
-					return vd;
+					return v;
 				}
 				else {
 					// remove the element from the queue as it's not valid and continue searching
-					if (vd->left) {
-						pdata->left_queue.pop();
-					}
-					else {
-						pdata->right_queue.pop();
-					}
-					update(*pdata);
+					path_queue(pdata, pdata.next_from_left).pop();
+					update(p, pdata);
 				}
 			}
 
@@ -310,40 +312,41 @@ namespace cartocrow::simplification::pvr {
 			return nullptr;
 		}
 
-		void performStep(Vertex_data& vd) {
+		void performStep(Vertex_handle v) {
 			//std::cout << "performing " << *v << std::endl;
 
 			assert(graph.can_perform_operation());
 
-			Vertex_handle v = static_cast<Vertex_handle>(vd.vertex);
+			Vertex_data& vdata = data_traits.data(v);
+
 			Path_handle p = v->outgoing()->path();
 			Path_data& pdata = data_traits.data(p);
 
-			assert(queue.peek() == &pdata);
-			assert(pdata.next_vertex == &vd);
+			assert(queue.peek() == p);
+			assert(pdata.next_from_left == vdata.left);
 
-			if (vd.left) {
-				pdata.left_queue.pop();
-			}
-			else {
-				pdata.right_queue.pop();
-			}
+			path_queue(pdata, vdata.left).pop();
 
 			// remove from blocking lists and search structure
 			pqt->remove(v);
-			for (Vertex_data* bd : vd.blocking) {
+			for (void* bvoid : vdata.blocking) {
+				Vertex_handle b = static_cast<Vertex_handle>(bvoid);
+				Vertex_data& bd = data_traits.data(b);
 
-				if (utils::listRemove(&vd, bd->blocked_by)) {
-					if (bd->blocked_by.empty()) {
-						Vertex_handle b = static_cast<Vertex_handle>(bd->vertex);
-						if (b->outgoing()->path() != p) {
-							update(b->outgoing()->path());
+				if (utils::listRemove(v, bd.blocked_by)) {
+					if (bd.blocked_by.empty()) {
+						Path_data& bpd = data_traits.data(b->outgoing()->path());
+
+						path_queue(bpd, bd.left).push(b);
+
+						if (&bpd != &pdata) {
+							update(b->outgoing()->path(), bpd);
 						}
 					}
 				}
 			}
 
-			score_traits.update(pdata, vd);
+			score_traits.update(p, pdata, v, vdata);
 
 			// perform the removal
 			Vertex_handle u = v->prev();
@@ -366,7 +369,7 @@ namespace cartocrow::simplification::pvr {
 				}
 			}
 
-			update(pdata);
+			update(p, pdata);
 		}
 	public:
 		PathVertexRemoval(Graph& g) requires std::is_default_constructible<Data_traits>::value&& std::is_default_constructible<Score_traits>::value : graph(g) {
@@ -390,51 +393,97 @@ namespace cartocrow::simplification::pvr {
 			score_traits.initialize(graph, data_traits);
 
 			pqt = new VertexTree(graph.bounding_rectangle(), tree_depth);
-			for (Vertex_handle v : graph.vertices()) {
-				pqt->insert(v);
-			}
-
-			for (Vertex_handle v : graph.vertices()) {
-				Vertex_data& vd = data_traits.data(v);
-				vd.vertex = v;
-				update(v, vd);
-			}
 
 			for (Path_handle p : graph.paths()) {
 				Path_data& pd = data_traits.data(p);
-				pd.path = p;
-				update(pd);
+				delete pd.left_queue;
+				pd.left_queue = new VertexQueue(data_traits);
+				delete pd.right_queue;
+				pd.right_queue = new VertexQueue(data_traits);
+			}
+
+			for (Vertex_handle v : graph.vertices()) {
+				pqt->insert(v);
+				update(v);
+			}
+
+			for (Path_handle p : graph.paths()) {
+				update(p);
 			}
 		}
 
 		bool run(std::optional<std::function<bool(int, Number<Kernel>)>> stop = std::nullopt) {
 			while (true) {
-				Vertex_data* next = findNextStep();
+				Vertex_handle next = findNextStep();
 				if (next == nullptr) {
 					return false;
 				}
 
-				if (!stop.has_value() || (*stop)(graph.number_of_edges(), next->cost)) {
+				if (!stop.has_value() || (*stop)(graph.number_of_edges(), data_traits.data(next).cost)) {
 					return true;
 				}
 
-				performStep(*next);
+				performStep(next);
 			}
 		}
 
 		bool step() {
 			assert(graph.can_perform_operation());
 
-			Vertex_data* vd = findNextStep();
-			if (vd == nullptr) {
+			Vertex_handle v = findNextStep();
+			if (v == nullptr) {
 				return false;
 			}
 
-			performStep(vd);
+			performStep(v);
 			return true;
 		}
 	};
 
-} // namespace cartocrow::simplification::pvr
+	template<KernelType Kernel>
+	struct BiasedEffectiveArea_PathBase {
+		Number<Kernel> left_area_increased;
+	};
 
-//#include "preserving_vertex_removal.hpp"
+	template<DataTraits DT>
+	requires std::is_base_of<BiasedEffectiveArea_PathBase<typename DT::Kernel>, typename DT::Path_data>::value
+	class BiasedEffectiveAreaScore {
+	public:
+		using Graph = DT::Graph;
+		using Vertex_handle = Graph::Vertex_handle;
+		using Vertex_data = DT::Vertex_data;
+		using Path_handle = Graph::Path_handle;
+		using Path_data = DT::Path_data;
+		using Kernel = DT::Graph::Kernel;
+
+		BiasedEffectiveAreaScore() : m_weight(1) {
+		}
+		BiasedEffectiveAreaScore(Number<Kernel> weight) : m_weight(weight) {
+		}
+
+		static void initialize(Graph& graph, DT& data) {
+			// skip
+		}
+
+		static Number<Kernel> compute_cost(Vertex_handle v, Vertex_data& vd) {
+			return CGAL::abs(
+				CGAL::area(v->point(), v->prev()->point(), v->next()->point()));
+		}
+
+		Number<Kernel> compute_cost(Path_handle p, Path_data& pd, Vertex_handle v, Vertex_data& vd) {
+			return vd.cost + (vd.left ? -m_weight : m_weight) * pd.left_area_increased;
+		}
+
+		static void update(Path_handle p, Path_data& pd, Vertex_handle v, Vertex_data& vd) {
+			if (vd.left) {
+				pd.left_area_increased -= vd.cost;
+			}
+			else {
+				pd.left_area_increased += vd.cost;
+			}
+		}
+	private:
+		Number<Kernel> m_weight;
+	};
+
+} // namespace cartocrow::simplification::pvr

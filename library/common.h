@@ -12,6 +12,7 @@ namespace cartocrow::simplification {
 	};
 
 	struct EmptyBase {
+		virtual ~EmptyBase() {}
 	};
 
 	template<class Elt>
@@ -47,21 +48,23 @@ namespace cartocrow::simplification {
 
 		using Element_handle = Elt;
 
-		DataTrait& m_trait;
+		DataTrait* m_trait;
 
-		StatefulGraphQueueTraits(DataTrait& trait) : m_trait(trait) {}
+		StatefulGraphQueueTraits() : m_trait(nullptr) {}
+
+		StatefulGraphQueueTraits(DataTrait& trait) : m_trait(&trait) {}
 
 		void setIndex(Element_handle elt, int index) {
-			m_trait.data(elt).queue_index = index;
+			m_trait->data(elt).queue_index = index;
 		}
 
 		int getIndex(Element_handle elt) const {
-			return m_trait.data(elt).queue_index;
+			return m_trait->data(elt).queue_index;
 		}
 
 		int compare(Element_handle a, Element_handle b) const {
-			const auto ac = m_trait.data(a).cost;
-			const auto bc = m_trait.data(b).cost;
+			const auto ac = m_trait->data(a).cost;
+			const auto bc = m_trait->data(b).cost;
 			if (ac < bc) {
 				return -1;
 			}
@@ -76,7 +79,7 @@ namespace cartocrow::simplification {
 
 	template<class Elt>
 	struct DataQueueTraits {
-
+		
 		using Element_handle = Elt;
 
 		static void setIndex(Element_handle elt, int index) {

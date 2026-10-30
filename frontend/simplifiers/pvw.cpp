@@ -5,9 +5,9 @@
 #include <QLabel>
 #include <QSpinBox>
 
-#include "library/preserving_visvalingam_whyatt.h"
+#include "library/path_vertex_removal.h"
 
-using namespace cartocrow::simplification;
+using namespace cartocrow::simplification::pvr;
 
 struct PVWSimplifier::State {
 
@@ -27,10 +27,11 @@ struct PVWSimplifier::State {
 	virtual std::shared_ptr<OutputGraph> simplifiedToOutputGraph() = 0;
 };
 
-template <class Alg>
+template <class Kernel>
 struct PVWState : PVWSimplifier::State {
+	using DT = DataTraits_Dedicated<Kernel, true, BiasedEffectiveArea_PathBase<Kernel>>;
+	using Alg = PathVertexRemoval<DT, BiasedEffectiveAreaScore<DT>>;
 	using Graph = Alg::Graph;
-	using Kernel = Graph::Kernel;
 	using Traits = Alg::Score_traits;
 
 	std::shared_ptr<Graph> m_graph = nullptr;
@@ -100,12 +101,6 @@ struct PVWState : PVWSimplifier::State {
 	}
 };
 
-template <class Kernel>
-using PVWState_Dedicated = PVWState<PreservingVisvalingamWhyatt_Dedicated<Kernel, true>>;
-
-template <class Kernel>
-using PVWState_Generic = PVWState<PreservingVisvalingamWhyatt_Generic<Straight_graph_2<std::monostate, std::monostate, Kernel, DecomposedGraph<true, std::monostate>>>>;
-
 PVWSimplifier::PVWSimplifier(PersistentSettings& settings) : Simplifier("Preserving Visvalingam-Whyatt", settings, { 100, 100, 40 }), m_color(220, 220, 80) {
 	m_exact = settings.getBoolean("pvw_exact", false);
 	m_preservation_weight = settings.getInteger("pvw_weight", 100);
@@ -124,13 +119,6 @@ QWidget* PVWSimplifier::constructWidget() {
 		m_exact = checked;
 		});
 
-	auto* checkGeneric = new QCheckBox("Use generic graph");
-	checkGeneric->setChecked(m_generic);
-	layout->addWidget(checkGeneric);
-	result->connect(checkGeneric, &QCheckBox::stateChanged, [this](bool checked) {
-		m_generic = checked;
-		});
-
 	layout->addWidget(new QLabel("Area-preservation weight (%)"));
 	auto* spinWeight = new QSpinBox();
 	spinWeight->setMinimum(0);
@@ -139,7 +127,7 @@ QWidget* PVWSimplifier::constructWidget() {
 	layout->addWidget(spinWeight);
 	result->connect(spinWeight, QOverload<int>::of(&QSpinBox::valueChanged), [this](int value) {
 		m_settings.setInteger("pvw_weight", value);
-		m_preservation_weight = value;		
+		m_preservation_weight = value;
 		});
 
 	return result;
@@ -147,24 +135,11 @@ QWidget* PVWSimplifier::constructWidget() {
 
 void PVWSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int depth) {
 	clear();
-
-	if (m_generic) {
-		std::cout << "generic" << std::endl;
-		if (m_exact) {
-			m_state = std::make_unique<PVWState_Generic<Exact>>();
-		}
-		else {
-			m_state = std::make_unique<PVWState_Generic<Inexact>>();
-		}
+	if (m_exact) {
+		m_state = std::make_unique<PVWState<Exact>>();
 	}
 	else {
-		std::cout << "dedicated" << std::endl;
-		if (m_exact) {
-			m_state = std::make_unique<PVWState_Dedicated<Exact>>();
-		}
-		else {
-			m_state = std::make_unique<PVWState_Dedicated<Inexact>>();
-		}
+		m_state = std::make_unique<PVWState<Inexact>>();
 	}
 	m_state->initialize(graph, depth, m_preservation_weight / 100.0);
 }
