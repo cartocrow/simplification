@@ -2,7 +2,7 @@
 
 #include <cartocrow/core/core.h>
 
-#include "simplification_algorithm.h"
+#include "plain_graphs.h"
 
 namespace cartocrow {
 	using RegionAttribute = std::variant<int, std::vector<int>, double, std::vector<double>, std::string, std::vector<std::string>, int64_t>;

@@ -2,10 +2,9 @@
 
 #include <filesystem>
 #include <cartocrow/core/cubic_bezier.h>
-#include "region_set.h"
-#include "simplification_algorithm.h"
-
 #include <ogrsf_frmts.h>
+
+#include "region_set.h"
 
 std::pair<RegionSet<Exact>*, std::optional<std::string>> readRegionSetUsingGDAL(const std::filesystem::path& path);
 

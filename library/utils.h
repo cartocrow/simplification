@@ -5,7 +5,6 @@
 
 namespace cartocrow::simplification::utils {
 
-
 	template <typename K>
 	Rectangle<K> boxOf(const Polygon<K>& p) {
 		auto v = p.vertices_begin();

@@ -2,7 +2,6 @@
 
 namespace cartocrow::simplification {
 
-
 	template<class K>
 	concept KernelType = std::is_same<K, Inexact>::value || std::is_same<K, Exact>::value;
 

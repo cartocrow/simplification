@@ -2,16 +2,9 @@
 
 #include <QWidget>
 #include <memory>
-#include <cartocrow/renderer/graph_painting.h>
-#include <cartocrow/data_structures/straight_graph_2.h>
 #include <cartocrow/utils/persistent_settings.h>
 
 #include "postprocessor.h"
-
-using namespace cartocrow;
-
-using InputGraph = Straight_graph_2<std::monostate, std::monostate, Exact, CustomGraphTraits<false, true, true, true, std::monostate>>;
-extern template GraphPainting<InputGraph>;
 
 class Simplifier {
 protected:

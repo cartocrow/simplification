@@ -16,6 +16,7 @@
 #include "region_set.h"
 #include "simplifier.h"
 #include "preprocessor.h"
+#include "postprocessor.h"
 
 using namespace cartocrow;
 

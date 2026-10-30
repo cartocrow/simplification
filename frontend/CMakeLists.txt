@@ -12,9 +12,9 @@ set(SOURCES
     commandline.cpp
     gui.cpp
     main.cpp
+    plain_graphs.cpp
     read_graph_gdal.cpp
     region_set.cpp
-    simplification_algorithm.cpp
     simplifier.cpp
 )
 add_executable(simplification ${SOURCES})

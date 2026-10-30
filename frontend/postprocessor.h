@@ -2,13 +2,9 @@
 
 #include <memory>
 #include <QWidget>
-#include <cartocrow/core/core.h>
 #include <cartocrow/utils/persistent_settings.h>
-#include <cartocrow/data_structures/straight_graph_2.h>
 
-using namespace cartocrow;
-
-using OutputGraph = Straight_graph_2<std::monostate, std::monostate, Inexact, DecomposedGraph<false, std::monostate>>;
+#include "plain_graphs.h"
 
 class Postprocessor {
 protected:

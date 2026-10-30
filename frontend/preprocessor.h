@@ -2,9 +2,8 @@
 
 #include <QWidget>
 #include <cartocrow/utils/persistent_settings.h>
-#include "simplification_algorithm.h"
 
-using namespace cartocrow;
+#include "plain_graphs.h"
 
 class Preprocessor {
 protected:
