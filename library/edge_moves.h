@@ -47,12 +47,13 @@ namespace cartocrow::simplification::em {
 		DEG_THREE_ALIGNED
 	};
 
-	template<KernelType Kernel> 
+	template<class EdgeHandle> 
 	struct BaseMove {
 
 		virtual ~BaseMove() {} // necessary for inheritance to work...
 
-		using Edge_handle = void*;
+		using Kernel = EdgeHandle::Kernel;
+		using Edge_handle = EdgeHandle;
 
 		Edge_handle edge;
 
@@ -69,7 +70,10 @@ namespace cartocrow::simplification::em {
 		}
 	};
 
-	template<KernelType Kernel> struct SingleMove : public BaseMove<Kernel> {
+	template<class EdgeHandle> struct SingleMove : public BaseMove<EdgeHandle> {
+
+		using Kernel = EdgeHandle::Kernel;
+		using Edge_handle = EdgeHandle;
 
 		bool left;
 		enum VertexType src_type, tar_type;
@@ -599,9 +603,11 @@ namespace cartocrow::simplification::em {
 		}
 	};
 
-	template<KernelType Kernel> struct ComboMove : public BaseMove<Kernel> {
-		
-		using Single = SingleMove<Kernel>;
+	template<class EdgeHandle> struct ComboMove : public BaseMove<EdgeHandle> {
+
+		using Kernel = EdgeHandle::Kernel;
+		using Edge_handle = EdgeHandle;
+		using Single = SingleMove<EdgeHandle>;
 
 		bool executable;
 		Single* prev_move;
@@ -897,18 +903,29 @@ namespace cartocrow::simplification::em {
 		}
 	};
 
+	template<bool UseSelfEdgeData, class VertexData, class ActualEdgeData, bool UseSelfPathData, class ActualPathData, KernelType K, class GraphTraits>
+	struct PathData;
 
-	template <KernelType Kernel> 
+	template<bool UseSelfEdgeData, class VertexData, class ActualEdgeData, bool UseSelfPathData, class ActualPathData, KernelType K, class GraphTraits>
 	struct EdgeData {
+		using Edge_data = std::conditional<UseSelfEdgeData, EdgeData, ActualEdgeData>::type;
+		using Path_data = PathData<UseSelfEdgeData, VertexData, ActualEdgeData, UseSelfPathData, ActualPathData, K, GraphTraits>::Path_data;
 
-		SingleMove<Kernel> left, right;
-		ComboMove<Kernel> combo;
-		std::vector<BaseMove<Kernel>*> blocking;
+		using Kernel = K;
+		using Edge_handle = Graph_2_edge<VertexData, Edge_data, Path_data, Graph_segment_curve_traits_2<K>, GraphTraits>*; // needed to avoid co-dependent templates for dedicated graphs
+
+		SingleMove<Edge_handle> left, right;
+		ComboMove<Edge_handle> combo;
+		std::vector<BaseMove<Edge_handle>*> blocking;
 	};
 
 
-	template <KernelType Kernel> struct PathData {
-		using Single = SingleMove<Kernel>;
+	template<bool UseSelfEdgeData, class VertexData, class ActualEdgeData, bool UseSelfPathData, class ActualPathData, KernelType K, class GraphTraits>
+	struct PathData {
+		using Path_data = std::conditional<UseSelfPathData, PathData, ActualPathData>::type;
+		using Edge_data = EdgeData<UseSelfEdgeData, VertexData, ActualEdgeData, UseSelfPathData, ActualPathData, K, GraphTraits>::Edge_data;
+
+		using Single = SingleMove<typename Edge_data::Edge_handle>;
 		std::vector<Single*> left_waiting;
 		std::vector<Single*> right_waiting;
 
@@ -985,9 +1002,9 @@ namespace cartocrow::simplification::em {
 	class DataTraits_Dedicated {
 	public:
 		using Kernel = K;
-		using Edge_data = EdgeData<Kernel>;
-		using Path_data = PathData<Kernel>;
-		using Graph = Straight_graph_2<std::monostate, Edge_data, Kernel, DecomposedGraph<Historic, Path_data>>;
+		using Edge_data = EdgeData<true, std::monostate, void, true, void, Kernel, DecomposedGraph<Historic>>;
+		using Path_data = PathData<true, std::monostate, void, true, void, Kernel, DecomposedGraph<Historic>>;
+		using Graph = Straight_graph_2<std::monostate, Edge_data, Path_data, Kernel, DecomposedGraph<Historic>>;
 
 		static void initialize(Graph& graph) {
 			// skip
@@ -1006,8 +1023,8 @@ namespace cartocrow::simplification::em {
 	public:
 		using Graph = G;
 		using Kernel = Graph::Kernel;
-		using Edge_data = EdgeData<Kernel>;
-		using Path_data = PathData<Kernel>;
+		using Edge_data = EdgeData<false, typename G::Vertex_data, typename G::Edge_date, false, typename G::Path_data, Kernel, typename G::Graph_traits>;
+		using Path_data = PathData<false, typename G::Vertex_data, typename G::Edge_date, false, typename G::Path_data, Kernel, typename G::Graph_traits>;
 
 		void initialize(Graph& graph) {
 			delete m_edge_data;
@@ -1464,7 +1481,7 @@ namespace cartocrow::simplification {
 		template <class K, bool H> struct EMPathData;
 
 		template<class K, bool H>
-		using EMGraphTraits = CustomGraphTraits<H, true, true, true, EMPathData<K, H>>;
+		using EMGraphTraits = CustomGraphTraits<H, true, true, true>;
 
 		template <class EMT>
 		concept EMTraits = requires(typename EMT::Graph::Edge_handle e, typename EMT::Graph::Path_handle p, SingleMove<typename EMT::Graph>&sm, ComboMove<typename EMT::Graph>&cm) {
@@ -1488,7 +1505,7 @@ namespace cartocrow::simplification {
 	}
 
 	template<typename K, bool H>
-	using EdgeMovesGraph = Straight_graph_2<std::monostate, detail::EMData<K, H>, K, detail::EMGraphTraits<K, H>>;
+	using EdgeMovesGraph = Straight_graph_2<std::monostate, detail::EMData<K, H>, detail::EMPathData<K, H>, K, detail::EMGraphTraits<K, H>>;
 
 	template <detail::EMTraits EMT> class EdgeMoves {
 	public:

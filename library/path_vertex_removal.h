@@ -3,139 +3,169 @@
 #include "common.h"
 
 namespace cartocrow::simplification::pvr {
-			
-		template<KernelType K, class Base = EmptyBase>
-		struct VertexData : public Base {
-			using Kernel = K;
-			using Vertex_handle = void*; // needed to avoid co-dependent templates for dedicated graphs
 
-			bool left;
-			std::vector<Vertex_handle> blocked_by;
-			std::vector<Vertex_handle> blocking;
-			Number<Kernel> cost;
-			int queue_index = -1;
-		};
+	template<bool UseSelfVertexData, class ActualVertexData,
+		class EdgeData,
+		bool UseSelfPathData, class ActualPathData, 
+		KernelType K, class GraphTraits, class DT, typename CustomVertexData, typename CustomPathData>
+	struct PathData;
 
-		template<KernelType K, class Base = EmptyBase>
-		struct PathData : public Base {
-			using Kernel = K;
-			using Vertex_handle = void*; // needed to avoid co-dependent templates for dedicated graphs
-			using Path_handle = void*; // needed to avoid co-dependent templates for dedicated graphs
-			using Queue = void*; // needed to avoid co-dependent templates for dedicated graphs (?)
+	template<bool UseSelfVertexData, class ActualVertexData,
+		class EdgeData,
+		bool UseSelfPathData, class ActualPathData,
+		KernelType K, class GraphTraits, class DT, typename CustomVertexData, typename CustomPathData>
+	struct VertexData {
+		using Graph_vertex_data = std::conditional<UseSelfVertexData, VertexData, ActualVertexData>::type;
+		using Graph_path_data = PathData<UseSelfVertexData, ActualVertexData, EdgeData, UseSelfPathData, ActualPathData, K, GraphTraits, DT, CustomVertexData, CustomPathData>::Graph_path_data;		
 
-			Path_handle path;
-			bool next_from_left;
-			Queue left_queue = nullptr, right_queue = nullptr;
-			Number<Kernel> cost;
-			int queue_index = -1;
+		using Kernel = K;
+		using Vertex_handle = Graph_2_vertex<Graph_vertex_data, EdgeData, Graph_path_data, Graph_segment_curve_traits_2<K>, GraphTraits>*; // needed to avoid co-dependent templates for dedicated graphs
 
-			~PathData() {
-				delete left_queue;
-				delete right_queue;
-			}
-		};
+		bool left;
+		std::vector<Vertex_handle> blocked_by;
+		std::vector<Vertex_handle> blocking;
+		Number<Kernel> cost;
+		int queue_index = -1;
 
-		template<class DT> 
-		concept DataTraits = 
-			KernelType<typename DT::Kernel> &&
-			GraphType<typename DT::Graph> &&
-			DT::Graph::Graph_traits::oriented &&
-			DT::Graph::Graph_traits::decomposed &&
-			std::is_default_constructible<typename DT::Vertex_data>::value &&
-			std::is_default_constructible<typename DT::Path_data>::value &&
-			requires(DT data, typename DT::Graph graph, typename DT::Graph::Vertex_handle v, typename DT::Graph::Path_handle p) {
+		CustomVertexData custom;
+	};
 
-			typename DT::Kernel;
-			typename DT::Graph;
-			typename DT::Vertex_data;
-			typename DT::Path_data;
-			{ data.initialize(graph) };
-			{ data.data(v) } -> std::same_as<typename DT::Vertex_data&>;
-			{ data.data(p) } -> std::same_as<typename DT::Path_data&>;
-		};
+	template<bool UseSelfVertexData, class ActualVertexData,
+		class EdgeData,
+		bool UseSelfPathData, class ActualPathData,
+		KernelType K, class GraphTraits, class DT, typename CustomVertexData, typename CustomPathData>
+	struct PathData {
+		using Graph_vertex_data = VertexData<UseSelfVertexData, ActualVertexData, EdgeData, UseSelfPathData, ActualPathData, K, GraphTraits, DT, CustomVertexData, CustomPathData>::Graph_vertex_data;
+		using Graph_path_data = std::conditional<UseSelfPathData, PathData, ActualPathData>::type;
+	
+		using Kernel = K;
+		using Vertex_handle = Graph_2_vertex<Graph_vertex_data, EdgeData, Graph_path_data, Graph_segment_curve_traits_2<K>, GraphTraits>*; // needed to avoid co-dependent templates for dedicated graphs
+		using VertexQueue = cartocrow::IndexedPriorityQueue<StatefulGraphQueueTraits<Vertex_handle, DT>>;
 
-		template<class ST>
-		concept ScoreTraits =
-			KernelType<typename ST::Kernel> &&
-			GraphType<typename ST::Graph> &&
-			ST::Graph::Graph_traits::oriented &&
-			ST::Graph::Graph_traits::decomposed &&
-			requires(ST score, typename ST::Graph graph, typename ST::Graph::Vertex_handle v, typename ST::Graph::Path_handle p, typename ST::Vertex_data vdata, typename ST::Path_data pdata) {
+		bool next_from_left;
+		VertexQueue* left_queue = nullptr;
+		VertexQueue* right_queue = nullptr;
+		Number<Kernel> cost;
+		int queue_index = -1;
 
-			typename ST::Kernel;
-			typename ST::Graph;
-			typename ST::Vertex_data;
-			typename ST::Path_data;
-			//{ score.initialize(graph, data) }; Moved to general Setup concept, to not make this depend on DataTraits
-			{ score.compute_cost(v, vdata) } -> std::same_as<Number<typename ST::Kernel>>;
-			{ score.compute_cost(p, pdata, v, vdata) } -> std::same_as<Number<typename ST::Kernel>>;
-			{ score.update(p, pdata, v, vdata) };
-		};
+		CustomPathData custom;
 
-		template<class DT, class ST>
-		concept Setup =
-			DataTraits<DT> && ScoreTraits<ST> &&
-			std::is_same<typename ST::Kernel, typename DT::Kernel>::value &&
-			std::is_same<typename ST::Graph, typename DT::Graph>::value &&
-			std::is_same<typename ST::Vertex_data, typename DT::Vertex_data>::value &&
-			std::is_same<typename ST::Path_data, typename DT::Path_data>::value &&
-			requires(ST score, DT data, typename DT::Graph graph) {
+		void initQueues(DT& dt) {
+			delete left_queue;
+			left_queue = new VertexQueue(dt);
+			delete right_queue;
+			right_queue = new VertexQueue(dt);
+		}
+
+		~PathData() {
+			delete left_queue;
+			delete right_queue;
+		}
+	};
+
+	template<class DT>
+	concept DataTraits =
+		KernelType<typename DT::Kernel> &&
+		GraphType<typename DT::Graph> &&
+		DT::Graph::Graph_traits::oriented &&
+		DT::Graph::Graph_traits::decomposed &&
+		std::is_default_constructible<typename DT::Vertex_data>::value &&
+		std::is_default_constructible<typename DT::Path_data>::value &&
+		std::is_same<typename DT::Graph::Vertex_handle, typename DT::Vertex_data::Vertex_handle>::value &&
+		std::is_same<typename DT::Graph::Vertex_handle, typename DT::Path_data::Vertex_handle>::value &&
+		requires(DT data, typename DT::Graph graph, typename DT::Graph::Vertex_handle v, typename DT::Graph::Path_handle p) {
+
+		typename DT::Kernel;
+		typename DT::Graph;
+		typename DT::Vertex_data;
+		typename DT::Path_data;
+		{ data.initialize(graph) };
+		{ data.data(v) } -> std::same_as<typename DT::Vertex_data&>;
+		{ data.data(p) } -> std::same_as<typename DT::Path_data&>;
+	};
+
+	template<class ST>
+	concept ScoreTraits =
+		KernelType<typename ST::Kernel> &&
+		GraphType<typename ST::Graph> &&
+		ST::Graph::Graph_traits::oriented &&
+		ST::Graph::Graph_traits::decomposed &&
+		requires(ST score, typename ST::Graph graph, typename ST::Graph::Vertex_handle v, typename ST::Graph::Path_handle p, typename ST::Vertex_data vdata, typename ST::Path_data pdata) {
+
+		typename ST::Kernel;
+		typename ST::Graph;
+		typename ST::Vertex_data;
+		typename ST::Path_data;
+		//{ score.initialize(graph, data) }; Moved to general Setup concept, to not make this depend on DataTraits
+		{ score.compute_cost(v, vdata) } -> std::same_as<Number<typename ST::Kernel>>;
+		{ score.compute_cost(p, pdata, v, vdata) } -> std::same_as<Number<typename ST::Kernel>>;
+		{ score.update(p, pdata, v, vdata) };
+	};
+
+	template<class DT, class ST>
+	concept Setup =
+		DataTraits<DT> && ScoreTraits<ST> &&
+		std::is_same<typename ST::Kernel, typename DT::Kernel>::value&&
+		std::is_same<typename ST::Graph, typename DT::Graph>::value&&
+		std::is_same<typename ST::Vertex_data, typename DT::Vertex_data>::value&&
+		std::is_same<typename ST::Path_data, typename DT::Path_data>::value&&
+		requires(ST score, DT data, typename DT::Graph graph) {
 
 			{ score.initialize(graph, data) };
-		};
+	};
 
-		template<KernelType K, bool Historic, class PathBase = EmptyBase, class VertexBase = EmptyBase>
-		class DataTraits_Dedicated {
-		public:
-			using Kernel = K;
-			using Vertex_data = VertexData<Kernel, VertexBase>;
-			using Path_data = PathData<Kernel, PathBase>;
-			using Graph = Straight_graph_2<Vertex_data, std::monostate, Kernel, DecomposedGraph<Historic, Path_data>>;
+	template<KernelType K, bool Historic, class CustomPathData = std::monostate, class CustomVertexData = std::monostate>
+	class DataTraits_Dedicated {
+	public:
+		using Kernel = K;
+		using Vertex_data = VertexData<true, std::monostate, std::monostate, true, std::monostate, Kernel, DecomposedGraph<Historic>, DataTraits_Dedicated, CustomVertexData, CustomPathData>;
+		using Path_data = PathData<true, std::monostate, std::monostate, true, std::monostate, Kernel, DecomposedGraph<Historic>, DataTraits_Dedicated, CustomVertexData, CustomPathData>;
+		using Graph = Straight_graph_2<Vertex_data, std::monostate, Path_data, Kernel, DecomposedGraph<Historic>>;
 
-			static void initialize(Graph& graph) {
-				// skip
-			}
+		static void initialize(Graph& graph) {
+			// skip
+		}
 
-			static Vertex_data& data(typename Graph::Vertex_handle v) {
-				return v->data();
-			}
+		static Vertex_data& data(typename Graph::Vertex_handle v) {
+			return v->data();
+		}
 
-			static Path_data& data(typename Graph::Path_handle p) {
-				return p->data();
-			}
-		};
+		static Path_data& data(typename Graph::Path_handle p) {
+			return p->data();
+		}
+	};
 
-		template<GraphType G, class PathBase = EmptyBase, class VertexBase = EmptyBase>
-		class DataTraits_Generic {
-		public:
-			using Graph = G;
-			using Kernel = Graph::Kernel;
-			using Vertex_data = VertexData<Kernel, VertexBase>;
-			using Path_data = PathData<Kernel, PathBase>;
+	template<GraphType G, class CustomPathData = std::monostate, class CustomVertexData = std::monostate>
+	class DataTraits_Generic {
+	public:
+		using Graph = G;
+		using Kernel = Graph::Kernel;
+		using Vertex_data = VertexData<false, typename G::Vertex_data, typename G::Edge_data, false, typename G::Path_data, Kernel, typename G::Graph_traits, DataTraits_Generic, CustomVertexData, CustomPathData>;
+		using Path_data = PathData<false, typename G::Vertex_data, typename G::Edge_data, false, typename G::Path_data, Kernel, typename G::Graph_traits, DataTraits_Generic, CustomVertexData, CustomPathData>;
 
-			void initialize(Graph& graph) {
-				delete m_vertex_data;
-				delete m_path_data;
-				m_vertex_data = new Graph_vertex_map<Graph, Vertex_data>(graph, Vertex_data());
-				m_path_data = new Graph_path_map<Graph, Path_data>(graph, Path_data());
-			}
+		void initialize(Graph& graph) {
+			delete m_vertex_data;
+			delete m_path_data;
+			m_vertex_data = new Graph_vertex_map<Graph, Vertex_data>(graph, Vertex_data());
+			m_path_data = new Graph_path_map<Graph, Path_data>(graph, Path_data());
+		}
 
-			~DataTraits_Generic() {
-				delete m_vertex_data;
-				delete m_path_data;
-			}
+		~DataTraits_Generic() {
+			delete m_vertex_data;
+			delete m_path_data;
+		}
 
-			Vertex_data& data(typename Graph::Vertex_handle v) {
-				return (*m_vertex_data)[v];
-			}
+		Vertex_data& data(typename Graph::Vertex_handle v) {
+			return (*m_vertex_data)[v];
+		}
 
-			Path_data& data(typename Graph::Path_handle p) {
-				return (*m_path_data)[p];
-			}
-		private:
-			Graph_vertex_map<Graph, Vertex_data>* m_vertex_data = nullptr;
-			Graph_path_map<Graph, Path_data>* m_path_data = nullptr;
-		};
+		Path_data& data(typename Graph::Path_handle p) {
+			return (*m_path_data)[p];
+		}
+	private:
+		Graph_vertex_map<Graph, Vertex_data>* m_vertex_data = nullptr;
+		Graph_path_map<Graph, Path_data>* m_path_data = nullptr;
+	};
 
 	template <DataTraits DT, ScoreTraits ST>
 		requires Setup<DT, ST>
@@ -217,7 +247,7 @@ namespace cartocrow::simplification::pvr {
 			update(p, data_traits.data(p));
 		}
 		void update(Path_handle p, Path_data& pdata) {
-			
+
 			VertexQueue& left_q = left_queue(pdata);
 			VertexQueue& right_q = right_queue(pdata);
 
@@ -390,10 +420,7 @@ namespace cartocrow::simplification::pvr {
 
 			for (Path_handle p : graph.paths()) {
 				Path_data& pd = data_traits.data(p);
-				delete pd.left_queue;
-				pd.left_queue = new VertexQueue(data_traits);
-				delete pd.right_queue;
-				pd.right_queue = new VertexQueue(data_traits);
+				pd.initQueues(data_traits);
 			}
 
 			for (Vertex_handle v : graph.vertices()) {
@@ -434,14 +461,10 @@ namespace cartocrow::simplification::pvr {
 		}
 	};
 
-	template<KernelType Kernel>
-	struct BiasedEffectiveArea_PathBase {
-		Number<Kernel> left_area_increased;
-	};
-
 	template<DataTraits DT>
-	requires std::is_base_of<BiasedEffectiveArea_PathBase<typename DT::Kernel>, typename DT::Path_data>::value
+//	requires std::is_same<decltype(DT::Path_data::custom), Number<typename DT::Kernel>>::value
 	class BiasedEffectiveAreaScore {
+		// Custom field is used to store a number in a path: "left area increased".
 	public:
 		using Graph = DT::Graph;
 		using Vertex_handle = Graph::Vertex_handle;
@@ -465,15 +488,15 @@ namespace cartocrow::simplification::pvr {
 		}
 
 		Number<Kernel> compute_cost(Path_handle p, Path_data& pd, Vertex_handle v, Vertex_data& vd) {
-			return vd.cost + (vd.left ? -m_weight : m_weight) * pd.left_area_increased;
+			return vd.cost + (vd.left ? -m_weight : m_weight) * pd.custom;
 		}
 
 		static void update(Path_handle p, Path_data& pd, Vertex_handle v, Vertex_data& vd) {
 			if (vd.left) {
-				pd.left_area_increased -= vd.cost;
+				pd.custom -= vd.cost;
 			}
 			else {
-				pd.left_area_increased += vd.cost;
+				pd.custom += vd.cost;
 			}
 		}
 	private:

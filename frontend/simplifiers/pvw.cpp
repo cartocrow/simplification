@@ -31,10 +31,12 @@ struct PVWSimplifier::State {
 
 template <class Kernel>
 struct PVWState : PVWSimplifier::State {
-	using DT = DataTraits_Dedicated<Kernel, true, BiasedEffectiveArea_PathBase<Kernel>>;
-	using Alg = PathVertexRemoval<DT, BiasedEffectiveAreaScore<DT>>;
-	using Graph = Alg::Graph;
-	using Traits = Alg::Score_traits;
+	using Graph = Straight_graph_2<std::monostate, std::monostate, std::monostate, Kernel, DecomposedGraph<true>>;
+	using DT = DataTraits_Generic<Graph, Number<Kernel>>;
+	//using DT = DataTraits_Dedicated<Kernel, true, Number<Kernel>>;
+	//using Graph = DT::Graph;
+	using Score = BiasedEffectiveAreaScore<DT>;
+	using Alg = PathVertexRemoval<DT, Score>;
 
 	std::shared_ptr<Graph> m_graph = nullptr;
 	std::unique_ptr<Alg> m_alg = nullptr;
@@ -45,7 +47,7 @@ struct PVWState : PVWSimplifier::State {
 
 		graph_2_copy(*graph, *m_graph);
 
-		m_alg = std::make_unique<Alg>(*m_graph, Traits(weight));
+		m_alg = std::make_unique<Alg>(*m_graph, Score(weight));
 		m_alg->initialize(depth);
 
 		m_init_complexity = m_graph->number_of_edges();

@@ -4,12 +4,12 @@
 
 namespace cartocrow::simplification::vr {
 
-	template<bool UseSelfVertexData, class ActualVertexData, class EdgeData, KernelType K, class GraphTraits, typename CustomData>
+	template<bool UseSelfVertexData, class ActualVertexData, class EdgeData, class PathData, KernelType K, class GraphTraits, typename CustomData>
 	struct VertexData {
 		using Kernel = K;
 		using Vertex_handle = std::conditional<UseSelfVertexData, 
-			Graph_2_vertex<VertexData, EdgeData, Graph_segment_curve_traits_2<K>, GraphTraits>*,
-			Graph_2_vertex<ActualVertexData, EdgeData, Graph_segment_curve_traits_2<K>, GraphTraits>*>::type; // needed to avoid co-dependent templates for dedicated graphs
+			Graph_2_vertex<VertexData, EdgeData, PathData, Graph_segment_curve_traits_2<K>, GraphTraits>*,
+			Graph_2_vertex<ActualVertexData, EdgeData, PathData, Graph_segment_curve_traits_2<K>, GraphTraits>*>::type; // needed to avoid co-dependent templates for dedicated graphs
 
 		std::vector<Vertex_handle> blocked_by;
 		std::vector<Vertex_handle> blocking;
@@ -67,8 +67,8 @@ namespace cartocrow::simplification::vr {
 	class DataTraits_Dedicated {
 	public:
 		using Kernel = K;
-		using Vertex_data = VertexData<true, std::monostate, std::monostate, Kernel, DecomposedGraph<Historic, std::monostate>, CustomData>;
-		using Graph = cartocrow::Straight_graph_2<Vertex_data, std::monostate, Kernel, DecomposedGraph<Historic, std::monostate>>;
+		using Vertex_data = VertexData<true, std::monostate, std::monostate, std::monostate, Kernel, DecomposedGraph<Historic>, CustomData>;
+		using Graph = cartocrow::Straight_graph_2<Vertex_data, std::monostate, std::monostate, Kernel, DecomposedGraph<Historic>>;
 
 		static void initialize(Graph& graph) {
 			// skip
@@ -84,7 +84,7 @@ namespace cartocrow::simplification::vr {
 	public:
 		using Graph = G;
 		using Kernel = Graph::Kernel;
-		using Vertex_data = VertexData<false, typename G::Vertex_data, typename G::Edge_data, Kernel, typename G::Graph_traits, CustomData>;
+		using Vertex_data = VertexData<false, typename G::Vertex_data, typename G::Edge_data, typename G::Path_data, Kernel, typename G::Graph_traits, CustomData>;
 
 		void initialize(Graph& graph) {
 			delete m_vertex_data;

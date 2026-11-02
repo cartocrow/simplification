@@ -4,12 +4,12 @@
 
 namespace cartocrow::simplification::ec {
 
-	template<bool UseSelfEdgeData, class VertexData, class ActualEdgeData, KernelType K, class GraphTraits, typename CustomData>
+	template<bool UseSelfEdgeData, class VertexData, class ActualEdgeData, class PathData, KernelType K, class GraphTraits, typename CustomData>
 	struct EdgeData {
 		using Kernel = K;
 		using Edge_handle = std::conditional<UseSelfEdgeData,
-			Graph_2_edge<VertexData, EdgeData, Graph_segment_curve_traits_2<K>, GraphTraits>*,
-			Graph_2_edge<VertexData, ActualEdgeData, Graph_segment_curve_traits_2<K>, GraphTraits>*>::type; // needed to avoid co-dependent templates for dedicated graphs
+			Graph_2_edge<VertexData, EdgeData, PathData, Graph_segment_curve_traits_2<K>, GraphTraits>*,
+			Graph_2_edge<VertexData, ActualEdgeData, PathData, Graph_segment_curve_traits_2<K>, GraphTraits>*>::type; // needed to avoid co-dependent templates for dedicated graphs
 
 		// collapse specification
 		bool erase_both; // special case: both endpoints are to be removed
@@ -74,8 +74,8 @@ namespace cartocrow::simplification::ec {
 	class DataTraits_Dedicated {
 	public:
 		using Kernel = K;
-		using Edge_data = EdgeData<true, std::monostate, std::monostate, Kernel, DecomposedGraph<Historic, std::monostate>, CustomData>;
-		using Graph = Straight_graph_2<std::monostate, Edge_data, Kernel, DecomposedGraph<Historic, std::monostate>>;
+		using Edge_data = EdgeData<true, std::monostate, std::monostate, std::monostate, Kernel, DecomposedGraph<Historic>, CustomData>;
+		using Graph = Straight_graph_2<std::monostate, Edge_data, std::monostate, Kernel, DecomposedGraph<Historic>>;
 
 		static void initialize(Graph& graph) {
 			// skip
@@ -91,7 +91,7 @@ namespace cartocrow::simplification::ec {
 	public:
 		using Graph = G;
 		using Kernel = Graph::Kernel;
-		using Edge_data = EdgeData<false, typename G::Vertex_data, typename G::Edge_data, Kernel, typename G::Graph_traits, CustomData>;
+		using Edge_data = EdgeData<false, typename G::Vertex_data, typename G::Edge_data, typename G::Path_data, Kernel, typename G::Graph_traits, CustomData>;
 
 		void initialize(Graph& graph) {
 			delete m_edge_data;

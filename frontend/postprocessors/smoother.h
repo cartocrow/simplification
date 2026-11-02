@@ -7,8 +7,6 @@
 
 using namespace cartocrow;
 
-using SmoothGraph = Straight_graph_2<std::monostate, std::monostate, Inexact, DecomposedGraph<false, std::monostate>>;
-
 class Smoother : public Postprocessor {
 public:
 	Smoother(PersistentSettings& settings);
