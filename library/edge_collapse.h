@@ -4,10 +4,12 @@
 
 namespace cartocrow::simplification::ec {
 
-	template<KernelType K, class Base = EmptyBase>
-	struct EdgeData : public Base {
+	template<bool UseSelfEdgeData, class VertexData, class ActualEdgeData, KernelType K, class GraphTraits, typename CustomData>
+	struct EdgeData {
 		using Kernel = K;
-		using Edge_handle = void*; // needed to avoid co-dependent templates for dedicated graphs
+		using Edge_handle = std::conditional<UseSelfEdgeData,
+			Graph_2_edge<VertexData, EdgeData, Graph_segment_curve_traits_2<K>, GraphTraits>*,
+			Graph_2_edge<VertexData, ActualEdgeData, Graph_segment_curve_traits_2<K>, GraphTraits>*>::type; // needed to avoid co-dependent templates for dedicated graphs
 
 		// collapse specification
 		bool erase_both; // special case: both endpoints are to be removed
@@ -21,6 +23,8 @@ namespace cartocrow::simplification::ec {
 		std::vector<Edge_handle> blocked_by;
 		std::vector<Edge_handle> blocking;
 		int queue_index = -1;
+
+		CustomData custom;
 	};
 
 	template<class DT>
@@ -30,6 +34,7 @@ namespace cartocrow::simplification::ec {
 		DT::Graph::Graph_traits::oriented &&
 		DT::Graph::Graph_traits::decomposed &&
 		std::is_default_constructible<typename DT::Edge_data>::value &&
+		std::is_same<typename DT::Graph::Edge_handle, typename DT::Edge_data::Edge_handle>::value &&
 		requires(DT data, typename DT::Graph graph, typename DT::Graph::Edge_handle e) {
 
 		typename DT::Kernel;
@@ -65,11 +70,11 @@ namespace cartocrow::simplification::ec {
 			{ score.initialize(graph, data) };
 	};
 
-	template<KernelType K, bool Historic, class EdgeBase = EmptyBase>
+	template<KernelType K, bool Historic, class CustomData = std::monostate>
 	class DataTraits_Dedicated {
 	public:
 		using Kernel = K;
-		using Edge_data = EdgeData<Kernel, EdgeBase>;
+		using Edge_data = EdgeData<true, std::monostate, std::monostate, Kernel, DecomposedGraph<Historic, std::monostate>, CustomData>;
 		using Graph = Straight_graph_2<std::monostate, Edge_data, Kernel, DecomposedGraph<Historic, std::monostate>>;
 
 		static void initialize(Graph& graph) {
@@ -81,12 +86,12 @@ namespace cartocrow::simplification::ec {
 		}
 	};
 
-	template<GraphType G, class EdgeBase = EmptyBase>
+	template<GraphType G, class CustomData = std::monostate>
 	class DataTraits_Generic {
 	public:
 		using Graph = G;
 		using Kernel = Graph::Kernel;
-		using Edge_data = EdgeData<Kernel, EdgeBase>;
+		using Edge_data = EdgeData<false, typename G::Vertex_data, typename G::Edge_data, Kernel, typename G::Graph_traits, CustomData>;
 
 		void initialize(Graph& graph) {
 			delete m_edge_data;
@@ -135,8 +140,7 @@ namespace cartocrow::simplification::ec {
 			Edge_data& edata = data_traits.data(e);
 
 			// clear topology
-			for (void* bvoid : edata.blocked_by) {
-				Edge_handle b = static_cast<Edge_handle>(bvoid);
+			for (Edge_handle b : edata.blocked_by) {
 				utils::listRemove(e, data_traits.data(b).blocking);
 			}
 			edata.blocked_by.clear();
@@ -301,8 +305,7 @@ namespace cartocrow::simplification::ec {
 
 			// clear blocking data from collapsing edge.
 			// NB: this edge will be removed in the collapse, so we dont need to consider blocked_by
-			for (void* bvoid : edata.blocking) {
-				Edge_handle b = static_cast<Edge_handle>(bvoid);
+			for (Edge_handle b : edata.blocking) {
 				Edge_data& bdata = data_traits.data(b);
 				if (utils::listRemove(e, bdata.blocked_by)) {
 					if (bdata.blocked_by.empty() && !bdata.blocked_by_degzero) {
@@ -315,9 +318,8 @@ namespace cartocrow::simplification::ec {
 			// clear blocking data from previous edge
 			{
 				Edge_data& pdata = data_traits.data(prev);
-				for (void* bvoid : pdata.blocking) {
-					if (bvoid == next) continue; // NB: next could be blocking prev, but will be reset or removed
-					Edge_handle b = static_cast<Edge_handle>(bvoid);
+				for (Edge_handle b : pdata.blocking) {
+					if (b == next) continue; // NB: next could be blocking prev, but will be reset or removed
 					auto& bdata = data_traits.data(b);
 					if (utils::listRemove(prev, bdata.blocked_by)) {
 						if (bdata.blocked_by.empty() && !bdata.blocked_by_degzero) {
@@ -326,8 +328,7 @@ namespace cartocrow::simplification::ec {
 					}
 				}
 				pdata.blocking.clear();
-				for (void* bvoid : pdata.blocked_by) {
-					Edge_handle b = static_cast<Edge_handle>(bvoid);
+				for (Edge_handle b : pdata.blocked_by) {
 					utils::listRemove(prev, data_traits.data(b).blocking);
 				}
 				pdata.blocked_by.clear();
@@ -336,9 +337,8 @@ namespace cartocrow::simplification::ec {
 			// clear blocking data from next edge
 			{
 				Edge_data& ndata = data_traits.data(next);
-				for (void* bvoid : ndata.blocking) {
-					if (bvoid == prev) continue; // NB: next could be blocking prev, but will be reset or removed
-					Edge_handle b = static_cast<Edge_handle>(bvoid);
+				for (Edge_handle b : ndata.blocking) {
+					if (b == prev) continue; // NB: next could be blocking prev, but will be reset or removed
 					auto& bdata = data_traits.data(b);
 					if (utils::listRemove(next, bdata.blocked_by)) {
 						if (bdata.blocked_by.empty() && !bdata.blocked_by_degzero) {
@@ -347,8 +347,7 @@ namespace cartocrow::simplification::ec {
 					}
 				}
 				ndata.blocking.clear();
-				for (void* bvoid : ndata.blocked_by) {
-					Edge_handle b = static_cast<Edge_handle>(bvoid);
+				for (Edge_handle b : ndata.blocked_by) {
 					utils::listRemove(next, data_traits.data(b).blocking);
 				}
 				ndata.blocked_by.clear();

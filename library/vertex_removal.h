@@ -4,15 +4,19 @@
 
 namespace cartocrow::simplification::vr {
 
-	template<KernelType K, class Base>
-	struct VertexData : public Base {
+	template<bool UseSelfVertexData, class ActualVertexData, class EdgeData, KernelType K, class GraphTraits, typename CustomData>
+	struct VertexData {
 		using Kernel = K;
-		using Vertex_handle = void*; // needed to avoid co-dependent templates for dedicated graphs
+		using Vertex_handle = std::conditional<UseSelfVertexData, 
+			Graph_2_vertex<VertexData, EdgeData, Graph_segment_curve_traits_2<K>, GraphTraits>*,
+			Graph_2_vertex<ActualVertexData, EdgeData, Graph_segment_curve_traits_2<K>, GraphTraits>*>::type; // needed to avoid co-dependent templates for dedicated graphs
 
 		std::vector<Vertex_handle> blocked_by;
 		std::vector<Vertex_handle> blocking;
 		Number<Kernel> cost;
 		int queue_index = -1;
+
+		CustomData custom;
 	};
 
 	template<class DT>
@@ -22,6 +26,7 @@ namespace cartocrow::simplification::vr {
 		DT::Graph::Graph_traits::oriented &&
 		DT::Graph::Graph_traits::decomposed &&
 		std::is_default_constructible<typename DT::Vertex_data>::value &&
+		std::is_same<typename DT::Graph::Vertex_handle, typename DT::Vertex_data::Vertex_handle>::value &&
 		requires(DT data, typename DT::Graph graph, typename DT::Graph::Vertex_handle v) {
 
 		typename DT::Kernel;
@@ -58,11 +63,11 @@ namespace cartocrow::simplification::vr {
 			{ score.initialize(graph, data) };
 	};
 
-	template<KernelType K, bool Historic, class VertexBase = EmptyBase>
+	template<KernelType K, bool Historic, class CustomData = std::monostate>
 	class DataTraits_Dedicated {
 	public:
 		using Kernel = K;
-		using Vertex_data = VertexData<Kernel, VertexBase>;
+		using Vertex_data = VertexData<true, std::monostate, std::monostate, Kernel, DecomposedGraph<Historic, std::monostate>, CustomData>;
 		using Graph = cartocrow::Straight_graph_2<Vertex_data, std::monostate, Kernel, DecomposedGraph<Historic, std::monostate>>;
 
 		static void initialize(Graph& graph) {
@@ -74,12 +79,12 @@ namespace cartocrow::simplification::vr {
 		}
 	};
 
-	template<GraphType G, class VertexBase = EmptyBase>
+	template<GraphType G, class CustomData = std::monostate>
 	class DataTraits_Generic {
 	public:
 		using Graph = G;
 		using Kernel = Graph::Kernel;
-		using Vertex_data = VertexData<Kernel, VertexBase>;
+		using Vertex_data = VertexData<false, typename G::Vertex_data, typename G::Edge_data, Kernel, typename G::Graph_traits, CustomData>;
 
 		void initialize(Graph& graph) {
 			delete m_vertex_data;
@@ -127,8 +132,8 @@ namespace cartocrow::simplification::vr {
 			Vertex_data& vdata = data_traits.data(v);
 
 			// clear topology
-			for (void* bvoid : vdata.blocked_by) {
-				utils::listRemove(v, data_traits.data(static_cast<Vertex_handle>(bvoid)).blocking);
+			for (Vertex_handle b : vdata.blocked_by) {
+				utils::listRemove(v, data_traits.data(b).blocking);
 			}
 			vdata.blocked_by.clear();
 
@@ -204,8 +209,7 @@ namespace cartocrow::simplification::vr {
 
 			// remove from blocking lists and search structure
 			pqt->remove(v);
-			for (void* bvoid : vdata.blocking) {
-				Vertex_handle b = static_cast<Vertex_handle>(bvoid);
+			for (Vertex_handle b : vdata.blocking) {
 				Vertex_data& bdata = data_traits.data(b);
 				utils::listRemove(v, bdata.blocked_by);
 				if (bdata.blocked_by.empty()) {

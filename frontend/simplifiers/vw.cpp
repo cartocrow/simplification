@@ -32,9 +32,11 @@ struct VWSimplifier::State {
 
 template <class Kernel>
 struct VWState : VWSimplifier::State {
+	//using Graph = Straight_graph_2<std::monostate, std::monostate, Kernel, DecomposedGraph<true, std::monostate>>;
+	//using DT = DataTraits_Generic<Graph>;
 	using DT = DataTraits_Dedicated<Kernel, true>;
-	using Alg = VertexRemoval<DT, EffectiveAreaScore<DT>>;
-	using Graph = Alg::Graph;
+	using Graph = DT::Graph;
+	using Alg = VertexRemoval<DT, EffectiveAreaScore<DT>>;	
 
 	std::shared_ptr<Graph> m_graph = nullptr;
 	std::unique_ptr<Alg> m_alg = nullptr;
