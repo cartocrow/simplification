@@ -30,7 +30,7 @@ struct KSBBSimplifier::State {
 
 template <class Kernel, bool ApproxExact>
 struct KSBBState : KSBBSimplifier::State {
-	//using Graph = Straight_graph_2<std::monostate, std::monostate, std::monostate, Kernel, DecomposedGraph<true>>;
+	//using Graph = Straight_graph_2<Kernel, DecomposedGraph<true>>;
 	//using DT = DataTraits_Generic<Graph>;
 	using DT = DataTraits_Dedicated<Kernel, true>;
 	using Graph = DT::Graph;

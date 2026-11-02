@@ -19,7 +19,7 @@ namespace cartocrow::simplification::pvr {
 		using Graph_path_data = PathData<UseSelfVertexData, ActualVertexData, EdgeData, UseSelfPathData, ActualPathData, K, GraphTraits, DT, CustomVertexData, CustomPathData>::Graph_path_data;		
 
 		using Kernel = K;
-		using Vertex_handle = Graph_2_vertex<Graph_vertex_data, EdgeData, Graph_path_data, Graph_segment_curve_traits_2<K>, GraphTraits>*; // needed to avoid co-dependent templates for dedicated graphs
+		using Vertex_handle = Graph_2_vertex<Graph_segment_curve_traits_2<K>, GraphTraits, Graph_vertex_data, EdgeData, Graph_path_data>*; // needed to avoid co-dependent templates for dedicated graphs
 
 		bool left;
 		std::vector<Vertex_handle> blocked_by;
@@ -39,7 +39,7 @@ namespace cartocrow::simplification::pvr {
 		using Graph_path_data = std::conditional<UseSelfPathData, PathData, ActualPathData>::type;
 	
 		using Kernel = K;
-		using Vertex_handle = Graph_2_vertex<Graph_vertex_data, EdgeData, Graph_path_data, Graph_segment_curve_traits_2<K>, GraphTraits>*; // needed to avoid co-dependent templates for dedicated graphs
+		using Vertex_handle = Graph_2_vertex<Graph_segment_curve_traits_2<K>, GraphTraits, Graph_vertex_data, EdgeData, Graph_path_data>*; // needed to avoid co-dependent templates for dedicated graphs
 		using VertexQueue = cartocrow::IndexedPriorityQueue<StatefulGraphQueueTraits<Vertex_handle, DT>>;
 
 		bool next_from_left;
@@ -120,7 +120,7 @@ namespace cartocrow::simplification::pvr {
 		using Kernel = K;
 		using Vertex_data = VertexData<true, std::monostate, std::monostate, true, std::monostate, Kernel, DecomposedGraph<Historic>, DataTraits_Dedicated, CustomVertexData, CustomPathData>;
 		using Path_data = PathData<true, std::monostate, std::monostate, true, std::monostate, Kernel, DecomposedGraph<Historic>, DataTraits_Dedicated, CustomVertexData, CustomPathData>;
-		using Graph = Straight_graph_2<Vertex_data, std::monostate, Path_data, Kernel, DecomposedGraph<Historic>>;
+		using Graph = Straight_graph_2<Kernel, DecomposedGraph<Historic>, Vertex_data, std::monostate, Path_data>;
 
 		static void initialize(Graph& graph) {
 			// skip

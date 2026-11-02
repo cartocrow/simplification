@@ -6,10 +6,9 @@ namespace cartocrow::simplification::vr {
 
 	template<bool UseSelfVertexData, class ActualVertexData, class EdgeData, class PathData, KernelType K, class GraphTraits, typename CustomData>
 	struct VertexData {
+		using Graph_vertex_data = std::conditional<UseSelfVertexData, VertexData, ActualVertexData>::type;
 		using Kernel = K;
-		using Vertex_handle = std::conditional<UseSelfVertexData, 
-			Graph_2_vertex<VertexData, EdgeData, PathData, Graph_segment_curve_traits_2<K>, GraphTraits>*,
-			Graph_2_vertex<ActualVertexData, EdgeData, PathData, Graph_segment_curve_traits_2<K>, GraphTraits>*>::type; // needed to avoid co-dependent templates for dedicated graphs
+		using Vertex_handle = Graph_2_vertex<Graph_segment_curve_traits_2<K>, GraphTraits, VertexData, EdgeData, PathData>*; // needed to avoid co-dependent templates for dedicated graphs
 
 		std::vector<Vertex_handle> blocked_by;
 		std::vector<Vertex_handle> blocking;
@@ -68,7 +67,7 @@ namespace cartocrow::simplification::vr {
 	public:
 		using Kernel = K;
 		using Vertex_data = VertexData<true, std::monostate, std::monostate, std::monostate, Kernel, DecomposedGraph<Historic>, CustomData>;
-		using Graph = cartocrow::Straight_graph_2<Vertex_data, std::monostate, std::monostate, Kernel, DecomposedGraph<Historic>>;
+		using Graph = cartocrow::Straight_graph_2<Kernel, DecomposedGraph<Historic>, Vertex_data>;
 
 		static void initialize(Graph& graph) {
 			// skip

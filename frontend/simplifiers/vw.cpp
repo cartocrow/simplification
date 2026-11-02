@@ -32,7 +32,7 @@ struct VWSimplifier::State {
 
 template <class Kernel>
 struct VWState : VWSimplifier::State {
-	//using Graph = Straight_graph_2<std::monostate, std::monostate, std::monostate, Kernel, DecomposedGraph<true>>;
+	//using Graph = Straight_graph_2<Kernel, DecomposedGraph<true>>;
 	//using DT = DataTraits_Generic<Graph>;
 	using DT = DataTraits_Dedicated<Kernel, true>;
 	using Graph = DT::Graph;

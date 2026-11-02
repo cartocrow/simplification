@@ -6,10 +6,9 @@ namespace cartocrow::simplification::ec {
 
 	template<bool UseSelfEdgeData, class VertexData, class ActualEdgeData, class PathData, KernelType K, class GraphTraits, typename CustomData>
 	struct EdgeData {
+		using Graph_edge_data = std::conditional<UseSelfEdgeData, EdgeData, ActualEdgeData>::type;
 		using Kernel = K;
-		using Edge_handle = std::conditional<UseSelfEdgeData,
-			Graph_2_edge<VertexData, EdgeData, PathData, Graph_segment_curve_traits_2<K>, GraphTraits>*,
-			Graph_2_edge<VertexData, ActualEdgeData, PathData, Graph_segment_curve_traits_2<K>, GraphTraits>*>::type; // needed to avoid co-dependent templates for dedicated graphs
+		using Edge_handle = Graph_2_edge<Graph_segment_curve_traits_2<K>, GraphTraits, VertexData, Graph_edge_data, PathData>*; // needed to avoid co-dependent templates for dedicated graphs
 
 		// collapse specification
 		bool erase_both; // special case: both endpoints are to be removed
@@ -75,7 +74,7 @@ namespace cartocrow::simplification::ec {
 	public:
 		using Kernel = K;
 		using Edge_data = EdgeData<true, std::monostate, std::monostate, std::monostate, Kernel, DecomposedGraph<Historic>, CustomData>;
-		using Graph = Straight_graph_2<std::monostate, Edge_data, std::monostate, Kernel, DecomposedGraph<Historic>>;
+		using Graph = Straight_graph_2<Kernel, DecomposedGraph<Historic>, std::monostate, Edge_data>;
 
 		static void initialize(Graph& graph) {
 			// skip

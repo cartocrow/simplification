@@ -31,10 +31,10 @@ struct PVWSimplifier::State {
 
 template <class Kernel>
 struct PVWState : PVWSimplifier::State {
-	using Graph = Straight_graph_2<std::monostate, std::monostate, std::monostate, Kernel, DecomposedGraph<true>>;
-	using DT = DataTraits_Generic<Graph, Number<Kernel>>;
-	//using DT = DataTraits_Dedicated<Kernel, true, Number<Kernel>>;
-	//using Graph = DT::Graph;
+	//using Graph = Straight_graph_2<Kernel, DecomposedGraph<true>>;
+	//using DT = DataTraits_Generic<Graph, Number<Kernel>>;
+	using DT = DataTraits_Dedicated<Kernel, true, Number<Kernel>>;
+	using Graph = DT::Graph;
 	using Score = BiasedEffectiveAreaScore<DT>;
 	using Alg = PathVertexRemoval<DT, Score>;
 
