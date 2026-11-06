@@ -50,6 +50,10 @@ namespace cartocrow::simplification::pvr {
 
 		CustomPathData custom;
 
+		VertexQueue* queue(const bool& left) {
+			return left ? left_queue : right_queue;
+		}
+
 		void initQueues(DT& dt) {
 			delete left_queue;
 			left_queue = new VertexQueue(dt);
@@ -192,18 +196,6 @@ namespace cartocrow::simplification::pvr {
 		Score_traits score_traits;
 		PathQueue queue = PathQueue(data_traits);
 
-		VertexQueue& left_queue(Path_data& pd) {
-			return *static_cast<VertexQueue*>(pd.left_queue);
-		}
-
-		VertexQueue& right_queue(Path_data& pd) {
-			return *static_cast<VertexQueue*>(pd.left_queue);
-		}
-
-		VertexQueue& path_queue(Path_data& pd, const bool& left) {
-			return left ? left_queue(pd) : right_queue(pd);
-		}
-
 		void update(Vertex_handle v) {
 
 			if (v->degree() != 2) {
@@ -213,8 +205,7 @@ namespace cartocrow::simplification::pvr {
 			Vertex_data& vdata = data_traits.data(v);
 
 			// clear topology
-			for (void* bvoid : vdata.blocked_by) {
-				Vertex_handle b = static_cast<Vertex_handle>(bvoid);
+			for (Vertex_handle b : vdata.blocked_by) {
 				utils::listRemove(v, data_traits.data(b).blocking);
 			}
 			vdata.blocked_by.clear();
@@ -226,15 +217,15 @@ namespace cartocrow::simplification::pvr {
 			Path_data& pdata = data_traits.data(p);
 
 			if (u->is_neighbor_of(w)) {
-				path_queue(pdata, vdata.left).remove(v);
+				pdata.queue(vdata.left)->remove(v);
 				return;
 			}
 
 			vdata.left = CGAL::left_turn(u->point(), v->point(), w->point());
 			vdata.cost = score_traits.compute_cost(v, vdata);
 
-			path_queue(pdata, !vdata.left).remove(v);
-			VertexQueue& q = path_queue(pdata, vdata.left);
+			pdata.queue(!vdata.left)->remove(v);
+			VertexQueue& q = *pdata.queue(vdata.left);
 			if (q.contains(v)) {
 				q.update(v);
 			}
@@ -248,15 +239,12 @@ namespace cartocrow::simplification::pvr {
 		}
 		void update(Path_handle p, Path_data& pdata) {
 
-			VertexQueue& left_q = left_queue(pdata);
-			VertexQueue& right_q = right_queue(pdata);
-
-			if (!left_q.empty()) {
-				Vertex_handle left_v = left_q.peek();
+			if (!pdata.left_queue->empty()) {
+				Vertex_handle left_v = pdata.left_queue->peek();
 				pdata.cost = score_traits.compute_cost(p, pdata, left_v, data_traits.data(left_v));
 
-				if (!right_q.empty()) {
-					Vertex_handle right_v = right_q.peek();
+				if (!pdata.right_queue->empty()) {
+					Vertex_handle right_v = pdata.right_queue->peek();
 					Number<Kernel> cost = score_traits.compute_cost(p, pdata, right_v, data_traits.data(right_v));
 
 					if (cost < pdata.cost) {
@@ -271,8 +259,8 @@ namespace cartocrow::simplification::pvr {
 					pdata.next_from_left = true;
 				}
 			}
-			else if (!right_q.empty()) {
-				Vertex_handle right_v = right_q.peek();
+			else if (!pdata.right_queue->empty()) {
+				Vertex_handle right_v = pdata.right_queue->peek();
 				pdata.cost = score_traits.compute_cost(p, pdata, right_v, data_traits.data(right_v));
 				pdata.next_from_left = false;
 			}
@@ -297,7 +285,7 @@ namespace cartocrow::simplification::pvr {
 				Path_handle p = queue.peek();
 				Path_data& pdata = data_traits.data(p);
 
-				Vertex_handle v = path_queue(pdata, pdata.next_from_left).peek();
+				Vertex_handle v = pdata.queue(pdata.next_from_left)->peek();
 				Vertex_data& vdata = data_traits.data(v);
 
 				Vertex_handle u = v->prev();
@@ -327,7 +315,7 @@ namespace cartocrow::simplification::pvr {
 				}
 				else {
 					// remove the element from the queue as it's not valid and continue searching
-					path_queue(pdata, pdata.next_from_left).pop();
+					pdata.queue(pdata.next_from_left)->pop();
 					update(p, pdata);
 				}
 			}
@@ -349,19 +337,18 @@ namespace cartocrow::simplification::pvr {
 			assert(queue.peek() == p);
 			assert(pdata.next_from_left == vdata.left);
 
-			path_queue(pdata, vdata.left).pop();
+			pdata.queue(vdata.left)->pop();
 
 			// remove from blocking lists and search structure
 			pqt->remove(v);
-			for (void* bvoid : vdata.blocking) {
-				Vertex_handle b = static_cast<Vertex_handle>(bvoid);
+			for (Vertex_handle b : vdata.blocking) {
 				Vertex_data& bd = data_traits.data(b);
 
 				if (utils::listRemove(v, bd.blocked_by)) {
 					if (bd.blocked_by.empty()) {
 						Path_data& bpd = data_traits.data(b->outgoing()->path());
 
-						path_queue(bpd, bd.left).push(b);
+						bpd.queue(bd.left)->push(b);
 
 						if (&bpd != &pdata) {
 							update(b->outgoing()->path(), bpd);

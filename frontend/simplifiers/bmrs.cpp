@@ -6,7 +6,7 @@
 
 #include "library/edge_moves.h"
 
-using namespace cartocrow::simplification;
+using namespace cartocrow::simplification::em;
 
 struct BMRSSimplifier::State {
 
@@ -28,21 +28,13 @@ struct BMRSSimplifier::State {
 
 template <class Kernel>
 struct BMRSState : BMRSSimplifier::State {
-	using Graph = EdgeMovesGraph<Kernel, true>;
-	using Alg = BuchinEtAl<Graph>;
-	using PQT = Alg::VertexTree;
-	using SQT = Alg::EdgeTree;
+	using DT = DataTraits_Dedicated<Kernel, true>;
+	using Graph = DT::Graph;
+	using ST = SweptAreaScore<DT>;
+	using Alg = EdgeMoves<DT, ST>;
 
 	std::shared_ptr<Graph> m_graph = nullptr;
-	PQT* m_pqt = nullptr;
-	SQT* m_sqt = nullptr;
-	Alg* m_alg = nullptr;
-
-	~BMRSState() {
-		delete m_alg;
-		delete m_pqt;
-		delete m_sqt;
-	}
+	std::unique_ptr<Alg> m_alg = nullptr;
 
 	void initialize(std::shared_ptr<InputGraph> graph, const int depth) override {
 
@@ -50,12 +42,8 @@ struct BMRSState : BMRSSimplifier::State {
 
 		graph_2_copy(*graph, *m_graph);
 
-		Rectangle<Kernel> box = m_graph->bounding_rectangle();
-		m_pqt = new PQT(box, depth);
-		m_sqt = new SQT(box, depth, 0.05);
-
-		m_alg = new Alg(*m_graph, *m_sqt, *m_pqt);
-		m_alg->initialize(true, true);
+		m_alg = std::make_unique<Alg>(*m_graph);
+		m_alg->initialize(depth, 0.05);
 
 		m_init_complexity = m_graph->number_of_edges();
 	}

@@ -4,6 +4,9 @@
 
 namespace cartocrow::simplification::em {
 
+	//#define EDGEMOVE_OUTPUT(line) std::cout << line << std::endl
+#define EDGEMOVE_OUTPUT(line) //
+
 	template<typename Edge_handle>
 	inline Edge_handle safe_next(Edge_handle e) {
 		if (e->target()->degree() == 2) {
@@ -47,12 +50,12 @@ namespace cartocrow::simplification::em {
 		DEG_THREE_ALIGNED
 	};
 
-	template<class EdgeHandle> 
+	template<class K, typename EdgeHandle>
 	struct BaseMove {
 
 		virtual ~BaseMove() {} // necessary for inheritance to work...
 
-		using Kernel = EdgeHandle::Kernel;
+		using Kernel = K;
 		using Edge_handle = EdgeHandle;
 
 		Edge_handle edge;
@@ -70,10 +73,12 @@ namespace cartocrow::simplification::em {
 		}
 	};
 
-	template<class EdgeHandle> struct SingleMove : public BaseMove<EdgeHandle> {
+	template<class K, typename EdgeHandle, typename VertexHandle>
+	struct SingleMove : public BaseMove<K, EdgeHandle> {
 
-		using Kernel = EdgeHandle::Kernel;
+		using Kernel = K;
 		using Edge_handle = EdgeHandle;
+		using Vertex_handle = VertexHandle;
 
 		bool left;
 		enum VertexType src_type, tar_type;
@@ -87,166 +92,166 @@ namespace cartocrow::simplification::em {
 			return true;
 		}
 
-		//bool is_blocked_by(Edge_handle candidate) const {
-		//	return is_blocked_by(candidate, swept, true);
-		//}
+		bool is_blocked_by(Edge_handle candidate) const {
+			return is_blocked_by(candidate, swept, true);
+		}
 
-		//bool is_blocked_by(Edge_handle candidate, const Polygon<Kernel>& swept_polygon, const bool contract) const {
-		//	if (this->edge->common_vertex(candidate) != nullptr) {
-		//		// shares a vertex with the moving edge, part of configuration
-		//		return false;
-		//	}
+		bool is_blocked_by(Edge_handle candidate, const Polygon<Kernel>& swept_polygon, const bool contract) const {
+			if (this->edge->common_vertex(candidate) != nullptr) {
+				// shares a vertex with the moving edge, part of configuration
+				return false;
+			}
 
-		//	Edge_handle prev = this->edge->prev(left);
-		//	Vertex_handle exclude = prev->common_vertex(candidate);
+			Edge_handle prev = this->edge->prev(left);
+			Vertex_handle exclude = prev->common_vertex(candidate);
 
-		//	Edge_handle next = this->edge->next(!left);
-		//	Vertex_handle next_exclude = next->common_vertex(candidate);
+			Edge_handle next = this->edge->next(!left);
+			Vertex_handle next_exclude = next->common_vertex(candidate);
 
-		//	if (next_exclude != nullptr) {
-		//		if (exclude != nullptr) {
-		//			assert(contract);
-		//			// convex quad, just make sure candidate is not aligned with edge itself
-		//			Vector<K> dir_edge(this->edge->curve());
-		//			Vector<K> dir_cand(candidate->curve());
-		//			return safe_test::aligned_or_opposite_vectors(dir_edge, dir_cand);
-		//		}
-		//		else {
-		//			exclude = next_exclude;
-		//			// exclude comes from next, make sure it doesnt align with edge itself on contraction
-		//			if (contract && this->remove_next) {
-		//				// moving left: edge to next makes a left turn. test if next to candidate also makes a left turn
-		//				// moving right: edge to next makes a right turn, test if next to candidate also makes a right turn
-		//				if (left == CGAL::left_turn(this->edge->target()->point(), exclude->point(), candidate->other(exclude)->point())) {
-		//					// same turns
-		//					Vector<K> dir_edge(this->edge->curve());
-		//					Vector<K> dir_cand(candidate->curve());
-		//					return safe_test::aligned_or_opposite_vectors(dir_edge, dir_cand);
-		//				}
-		//			}
-		//		}
-		//	}
-		//	else if (contract && exclude != nullptr && this->remove_previous) {
-		//		// exclude comes from prev, make sure it doesnt align with edge itself on contraction
-		//			// moving left: edge to prev makes a right turn. test if prev to candidate also makes a right turn
-		//			// moving right: edge to prev makes a left turn, test if prev to candidate also makes a left turn
-		//		if (left == CGAL::right_turn(this->edge->target()->point(), exclude->point(), candidate->other(exclude)->point())) {
-		//			// same turns
-		//			Vector<K> dir_edge(this->edge->curve());
-		//			Vector<K> dir_cand(candidate->curve());
-		//			return safe_test::aligned_or_opposite_vectors(dir_edge, dir_cand);
-		//		}
-		//	}
+			if (next_exclude != nullptr) {
+				if (exclude != nullptr) {
+					assert(contract);
+					// convex quad, just make sure candidate is not aligned with edge itself
+					Vector<Kernel> dir_edge(this->edge->curve());
+					Vector<Kernel> dir_cand(candidate->curve());
+					return safe_test::aligned_or_opposite_vectors(dir_edge, dir_cand);
+				}
+				else {
+					exclude = next_exclude;
+					// exclude comes from next, make sure it doesnt align with edge itself on contraction
+					if (contract && this->remove_next) {
+						// moving left: edge to next makes a left turn. test if next to candidate also makes a left turn
+						// moving right: edge to next makes a right turn, test if next to candidate also makes a right turn
+						if (left == CGAL::left_turn(this->edge->target()->point(), exclude->point(), candidate->other(exclude)->point())) {
+							// same turns
+							Vector<Kernel> dir_edge(this->edge->curve());
+							Vector<Kernel> dir_cand(candidate->curve());
+							return safe_test::aligned_or_opposite_vectors(dir_edge, dir_cand);
+						}
+					}
+				}
+			}
+			else if (contract && exclude != nullptr && this->remove_previous) {
+				// exclude comes from prev, make sure it doesnt align with edge itself on contraction
+					// moving left: edge to prev makes a right turn. test if prev to candidate also makes a right turn
+					// moving right: edge to prev makes a left turn, test if prev to candidate also makes a left turn
+				if (left == CGAL::right_turn(this->edge->target()->point(), exclude->point(), candidate->other(exclude)->point())) {
+					// same turns
+					Vector<Kernel> dir_edge(this->edge->curve());
+					Vector<Kernel> dir_cand(candidate->curve());
+					return safe_test::aligned_or_opposite_vectors(dir_edge, dir_cand);
+				}
+			}
 
-		//	if (exclude != candidate->source() && safe_test::convex_contains(candidate->source()->point(), swept_polygon)) {
-		//		return true;
-		//	}
+			if (exclude != candidate->source() && safe_test::convex_contains(candidate->source()->point(), swept_polygon)) {
+				return true;
+			}
 
-		//	if (exclude != candidate->target() && safe_test::convex_contains(candidate->target()->point(), swept_polygon)) {
-		//		return true;
-		//	}
+			if (exclude != candidate->target() && safe_test::convex_contains(candidate->target()->point(), swept_polygon)) {
+				return true;
+			}
 
-		//	const Segment<K> cc = candidate->curve();
-		//	for (const Segment<K> e : swept_polygon.edges()) {
-		//		auto is = CGAL::intersection(e, cc);
-		//		if (is) {
-		//			if (exclude != nullptr && std::holds_alternative<Point<K>>(is.value())) {
-		//				// make sure its not the endpoint (we could have just touched the corner of swept)
-		//				if (!safe_test::same_point(exclude->point(), std::get<Point<K>>(is.value()))) {
-		//					return true;
-		//				}
-		//			}
-		//			else {
-		//				// anything beyond a point must be a proper intersect
-		//				return true;
-		//			}
-		//		}
-		//	}
+			const Segment<Kernel> cc = candidate->curve();
+			for (const Segment<Kernel> e : swept_polygon.edges()) {
+				auto is = CGAL::intersection(e, cc);
+				if (is) {
+					if (exclude != nullptr && std::holds_alternative<Point<Kernel>>(is.value())) {
+						// make sure its not the endpoint (we could have just touched the corner of swept)
+						if (!safe_test::same_point(exclude->point(), std::get<Point<Kernel>>(is.value()))) {
+							return true;
+						}
+					}
+					else {
+						// anything beyond a point must be a proper intersect
+						return true;
+					}
+				}
+			}
 
-		//	// no intersections were found, not blocking
-		//	return false;
-		//}
+			// no intersections were found, not blocking
+			return false;
+		}
 
-		//bool can_compensate_for(const SingleMove<Kernel>& contract, const int reduc, const Number<Kernel> area) const {
-		//	if (this->is_blocked()) {
-		//		return false;
-		//	}
+		bool can_compensate_for(const SingleMove& contract, const int reduc, const Number<Kernel> area) const {
+			if (this->is_blocked()) {
+				return false;
+			}
 
-		//	if (!movable()) {
-		//		// cannot move
-		//		return false;
-		//	}
+			if (!movable()) {
+				// cannot move
+				return false;
+			}
 
-		//	Number<Kernel> swept = swept_area();
-		//	if (area > swept) {
-		//		// too small
-		//		return false;
-		//	}
-		//	else if (swept == area) {
-		//		// contract
-		//		if (!this->contract_merges_highdegrees) {
-		//			// not allowed to contract
-		//			return false;
-		//		}
+			Number<Kernel> swept = swept_area();
+			if (area > swept) {
+				// too small
+				return false;
+			}
+			else if (swept == area) {
+				// contract
+				if (!this->contract_merges_highdegrees) {
+					// not allowed to contract
+					return false;
+				}
 
-		//		if (reduc + decrease_on_contract() <= 0) {
-		//			// no progress
-		//			return false;
-		//		}
-		//	}
-		//	else {
-		//		// move only
-		//		if (increase_on_move() >= reduc) {
-		//			// no progress
-		//			return false;
-		//		}
-		//	}
+				if (reduc + decrease_on_contract() <= 0) {
+					// no progress
+					return false;
+				}
+			}
+			else {
+				// move only
+				if (increase_on_move() >= reduc) {
+					// no progress
+					return false;
+				}
+			}
 
-		//	if (contract.edge->common_vertex(this->edge) != nullptr) {
-		//		// same or neighboring edges
-		//		return false;
-		//	}
+			if (contract.edge->common_vertex(this->edge) != nullptr) {
+				// same or neighboring edges
+				return false;
+			}
 
-		//	Edge_handle next = safe_next(this->edge);
-		//	if (next != nullptr && next->common_vertex(contract.edge) != nullptr) {
-		//		// sharing next edge (== prev edge of contract)
-		//		if (contract.remove_previous) {
-		//			// but contract is relying on its removal
-		//			return false;
-		//		}
-		//		else {
-		//			// make sure its not convex-reflex sequence
-		//			bool left_at_source = CGAL::left_turn(this->edge->source()->point(), next->source()->point(), next->target()->point());
-		//			bool right_at_target = CGAL::right_turn(next->source()->point(), next->target()->point(), contract.edge->target()->point());
+			Edge_handle next = safe_next(this->edge);
+			if (next != nullptr && next->common_vertex(contract.edge) != nullptr) {
+				// sharing next edge (== prev edge of contract)
+				if (contract.remove_previous) {
+					// but contract is relying on its removal
+					return false;
+				}
+				else {
+					// make sure its not convex-reflex sequence
+					bool left_at_source = CGAL::left_turn(this->edge->source()->point(), next->source()->point(), next->target()->point());
+					bool right_at_target = CGAL::right_turn(next->source()->point(), next->target()->point(), contract.edge->target()->point());
 
-		//			if (left_at_source == right_at_target) {
-		//				// different turns, disallow, and leave to ComboMove
-		//				return false;
-		//			}
-		//		}
-		//	}
+					if (left_at_source == right_at_target) {
+						// different turns, disallow, and leave to ComboMove
+						return false;
+					}
+				}
+			}
 
-		//	Edge_handle prev = safe_prev(this->edge);
-		//	if (prev != nullptr && prev->common_vertex(contract.edge) != nullptr) {
-		//		// sharing previous edge (== next edge of contract)
-		//		if (contract.remove_next) {
-		//			// but contract is relying on its removal
-		//			return false;
-		//		}
-		//		else {
-		//			// make sure its not convex-reflex sequence
-		//			bool left_at_source = CGAL::left_turn(contract.edge->source()->point(), prev->source()->point(), prev->target()->point());
-		//			bool right_at_target = CGAL::right_turn(prev->source()->point(), prev->target()->point(), this->edge->target()->point());
+			Edge_handle prev = safe_prev(this->edge);
+			if (prev != nullptr && prev->common_vertex(contract.edge) != nullptr) {
+				// sharing previous edge (== next edge of contract)
+				if (contract.remove_next) {
+					// but contract is relying on its removal
+					return false;
+				}
+				else {
+					// make sure its not convex-reflex sequence
+					bool left_at_source = CGAL::left_turn(contract.edge->source()->point(), prev->source()->point(), prev->target()->point());
+					bool right_at_target = CGAL::right_turn(prev->source()->point(), prev->target()->point(), this->edge->target()->point());
 
-		//			if (left_at_source == right_at_target) {
-		//				// different turns, disallow, and leave to CombinedMove
-		//				return false;
-		//			}
-		//		}
-		//	}
+					if (left_at_source == right_at_target) {
+						// different turns, disallow, and leave to CombinedMove
+						return false;
+					}
+				}
+			}
 
-		//	return true;
-		//}
+			return true;
+		}
 
 		bool movable() const {
 			return src_type != UNMOVABLE && tar_type != UNMOVABLE;
@@ -295,256 +300,256 @@ namespace cartocrow::simplification::em {
 			return dec - increase_on_move();
 		}
 
-		//void update() {
-		//	swept.clear();
+		void update() {
+			swept.clear();
 
-		//	Vertex_handle a = nullptr, d = nullptr;
-		//	Vertex_handle a_alt = nullptr, d_alt = nullptr;
+			Vertex_handle a = nullptr, d = nullptr;
+			Vertex_handle a_alt = nullptr, d_alt = nullptr;
 
-		//	Vertex_handle b = this->edge->source();
-		//	Vertex_handle c = this->edge->target();
+			Vertex_handle b = this->edge->source();
+			Vertex_handle c = this->edge->target();
 
-		//	Line<K> baseline = Line<K>(b->point(), c->point());
+			Line<Kernel> baseline = Line<Kernel>(b->point(), c->point());
 
-		//	// determine start type
-		//	switch (b->degree()) {
-		//	case 2: {
-		//		a = b->prev();
-		//		if (left == CGAL::left_turn(a->point(), b->point(), c->point())) {
-		//			src_type = detail::DEG_TWO_SUPPORT;
-		//		}
-		//		else {
-		//			src_type = detail::DEG_TWO_NO_SUPPORT;
-		//		}
-		//		break;
-		//	}
-		//	case 3: {
-		//		size_t edge_index = b->find_incident_index(this->edge);
-		//		a = b->neighboring_incident_edge(edge_index, left)->other(b);
-		//		a_alt = b->neighboring_incident_edge(edge_index, !left)->other(b);
+			// determine start type
+			switch (b->degree()) {
+			case 2: {
+				a = b->prev();
+				if (left == CGAL::left_turn(a->point(), b->point(), c->point())) {
+					src_type = DEG_TWO_SUPPORT;
+				}
+				else {
+					src_type = DEG_TWO_NO_SUPPORT;
+				}
+				break;
+			}
+			case 3: {
+				size_t edge_index = b->find_incident_index(this->edge);
+				a = b->neighboring_incident_edge(edge_index, left)->other(b);
+				a_alt = b->neighboring_incident_edge(edge_index, !left)->other(b);
 
-		//		if (safe_test::point_on_line(a->point(), baseline)) {
-		//			src_type = detail::DEG_THREE_ALIGNED;
-		//		}
-		//		else if (left == CGAL::left_turn(a->point(), b->point(), c->point())) {
-		//			if (safe_test::collinear(a->point(), b->point(), a_alt->point())) {
-		//				src_type = detail::DEG_THREE_SMOOTH;
-		//			}
-		//			else {
-		//				src_type = detail::DEG_THREE_SUPPORT;
-		//			}
-		//		}
-		//		else {
-		//			src_type = detail::DEG_THREE_NO_SUPPORT;
-		//		}
-		//		break;
-		//	}
-		//	default:
-		//		src_type = detail::UNMOVABLE;
-		//		break;
-		//	}
+				if (safe_test::point_on_line(a->point(), baseline)) {
+					src_type = DEG_THREE_ALIGNED;
+				}
+				else if (left == CGAL::left_turn(a->point(), b->point(), c->point())) {
+					if (safe_test::collinear(a->point(), b->point(), a_alt->point())) {
+						src_type = DEG_THREE_SMOOTH;
+					}
+					else {
+						src_type = DEG_THREE_SUPPORT;
+					}
+				}
+				else {
+					src_type = DEG_THREE_NO_SUPPORT;
+				}
+				break;
+			}
+			default:
+				src_type = UNMOVABLE;
+				break;
+			}
 
-		//	// determine end type
-		//	switch (c->degree()) {
-		//	case 2: {
-		//		d = c->next();
-		//		if (left == CGAL::left_turn(b->point(), c->point(), d->point())) {
-		//			tar_type = detail::DEG_TWO_SUPPORT;
-		//		}
-		//		else {
-		//			tar_type = detail::DEG_TWO_NO_SUPPORT;
-		//		}
-		//		break;
-		//	}
-		//	case 3: {
-		//		size_t edge_index = c->find_incident_index(this->edge);
-		//		d = c->neighboring_incident_edge(edge_index, !left)->other(c);
-		//		d_alt = c->neighboring_incident_edge(edge_index, left)->other(c);
-		//		if (safe_test::point_on_line(d->point(), baseline)) {
-		//			tar_type = detail::DEG_THREE_ALIGNED;
-		//		}
-		//		else if (left == CGAL::left_turn(b->point(), c->point(), d->point())) {
-		//			if (safe_test::collinear(c->point(), d->point(), d_alt->point())) {
-		//				tar_type = detail::DEG_THREE_SMOOTH;
-		//			}
-		//			else {
-		//				tar_type = detail::DEG_THREE_SUPPORT;
-		//			}
-		//		}
-		//		else {
-		//			tar_type = detail::DEG_THREE_NO_SUPPORT;
-		//		}
-		//		break;
-		//	}
-		//	default:
-		//		tar_type = detail::UNMOVABLE;
-		//		break;
-		//	}
+			// determine end type
+			switch (c->degree()) {
+			case 2: {
+				d = c->next();
+				if (left == CGAL::left_turn(b->point(), c->point(), d->point())) {
+					tar_type = DEG_TWO_SUPPORT;
+				}
+				else {
+					tar_type = DEG_TWO_NO_SUPPORT;
+				}
+				break;
+			}
+			case 3: {
+				size_t edge_index = c->find_incident_index(this->edge);
+				d = c->neighboring_incident_edge(edge_index, !left)->other(c);
+				d_alt = c->neighboring_incident_edge(edge_index, left)->other(c);
+				if (safe_test::point_on_line(d->point(), baseline)) {
+					tar_type = DEG_THREE_ALIGNED;
+				}
+				else if (left == CGAL::left_turn(b->point(), c->point(), d->point())) {
+					if (safe_test::collinear(c->point(), d->point(), d_alt->point())) {
+						tar_type = DEG_THREE_SMOOTH;
+					}
+					else {
+						tar_type = DEG_THREE_SUPPORT;
+					}
+				}
+				else {
+					tar_type = DEG_THREE_NO_SUPPORT;
+				}
+				break;
+			}
+			default:
+				tar_type = UNMOVABLE;
+				break;
+			}
 
-		//	if (!movable()) {
-		//		return;
-		//	}
+			if (!movable()) {
+				return;
+			}
 
-		//	// how far can we move along the previous track before the previous edge vanishes
-		//	Number<K> prev_dist_squared;
-		//	switch (src_type) {
-		//	case DEG_TWO_SUPPORT:
-		//	case DEG_THREE_SMOOTH:
-		//	case DEG_THREE_SUPPORT:
-		//		prev_dist_squared = CGAL::squared_distance(baseline, a->point());
-		//		break;
-		//	default:
-		//		prev_dist_squared = -1;
-		//		break;
-		//	}
+			// how far can we move along the previous track before the previous edge vanishes
+			Number<Kernel> prev_dist_squared;
+			switch (src_type) {
+			case DEG_TWO_SUPPORT:
+			case DEG_THREE_SMOOTH:
+			case DEG_THREE_SUPPORT:
+				prev_dist_squared = CGAL::squared_distance(baseline, a->point());
+				break;
+			default:
+				prev_dist_squared = -1;
+				break;
+			}
 
-		//	// how far can we move along the next track before the next edge vanishes
-		//	Number<K> next_dist_squared;
-		//	switch (tar_type) {
-		//	case DEG_TWO_SUPPORT:
-		//	case DEG_THREE_SMOOTH:
-		//	case DEG_THREE_SUPPORT:
-		//		next_dist_squared = CGAL::squared_distance(baseline, d->point());
-		//		break;
-		//	default:
-		//		next_dist_squared = -1;
-		//		break;
-		//	}
+			// how far can we move along the next track before the next edge vanishes
+			Number<Kernel> next_dist_squared;
+			switch (tar_type) {
+			case DEG_TWO_SUPPORT:
+			case DEG_THREE_SMOOTH:
+			case DEG_THREE_SUPPORT:
+				next_dist_squared = CGAL::squared_distance(baseline, d->point());
+				break;
+			default:
+				next_dist_squared = -1;
+				break;
+			}
 
-		//	// how far can we move until the edge itself vanishes
-		//	Line<K> prev_track = Line<K>(b->point(), (src_type == detail::DEG_THREE_ALIGNED ? a_alt : a)->point());
-		//	Line<K> next_track = Line<K>(c->point(), (tar_type == detail::DEG_THREE_ALIGNED ? d_alt : d)->point());
+			// how far can we move until the edge itself vanishes
+			Line<Kernel> prev_track = Line<Kernel>(b->point(), (src_type == DEG_THREE_ALIGNED ? a_alt : a)->point());
+			Line<Kernel> next_track = Line<Kernel>(c->point(), (tar_type == DEG_THREE_ALIGNED ? d_alt : d)->point());
 
-		//	Number<K> edge_dist_squared = -1;
-		//	Point<K> edge_lim;
+			Number<Kernel> edge_dist_squared = -1;
+			Point<Kernel> edge_lim;
 
-		//	{
-		//		const auto is = CGAL::intersection(prev_track, next_track);
-		//		if (is) {
-		//			if (const Point<K>* pt = std::get_if<Point<K>>(&*is)) {
-		//				edge_lim = *pt;
-		//				if (left && baseline.oriented_side(edge_lim) != CGAL::ON_NEGATIVE_SIDE) {
-		//					edge_dist_squared = CGAL::squared_distance(baseline, edge_lim);
-		//				}
-		//				else if (!left && baseline.oriented_side(edge_lim) != CGAL::ON_POSITIVE_SIDE) {
-		//					edge_dist_squared = CGAL::squared_distance(baseline, edge_lim);
-		//				}
-		//			}
-		//		}
-		//	}
+			{
+				const auto is = CGAL::intersection(prev_track, next_track);
+				if (is) {
+					if (const Point<Kernel>* pt = std::get_if<Point<Kernel>>(&*is)) {
+						edge_lim = *pt;
+						if (left && baseline.oriented_side(edge_lim) != CGAL::ON_NEGATIVE_SIDE) {
+							edge_dist_squared = CGAL::squared_distance(baseline, edge_lim);
+						}
+						else if (!left && baseline.oriented_side(edge_lim) != CGAL::ON_POSITIVE_SIDE) {
+							edge_dist_squared = CGAL::squared_distance(baseline, edge_lim);
+						}
+					}
+				}
+			}
 
-		//	// which is the limiting factor? and which edges then get removed?
-		//	if (prev_dist_squared < 0 && next_dist_squared < 0) {
-		//		// no support at all
-		//		// TODO: refine, to allow converging unsupported moves?
-		//		src_type = detail::UNMOVABLE;
-		//		tar_type = detail::UNMOVABLE;
-		//		return;
-		//	}
+			// which is the limiting factor? and which edges then get removed?
+			if (prev_dist_squared < 0 && next_dist_squared < 0) {
+				// no support at all
+				// TODO: refine, to allow converging unsupported moves?
+				src_type = UNMOVABLE;
+				tar_type = UNMOVABLE;
+				return;
+			}
 
-		//	assert(prev_dist_squared >= 0 || next_dist_squared >= 0); // NB: if TODO above is resolved, this may fail
+			assert(prev_dist_squared >= 0 || next_dist_squared >= 0); // NB: if TODO above is resolved, this may fail
 
-		//	Number<K> min_dist_squared;
-		//	if (prev_dist_squared < 0) {
-		//		min_dist_squared = next_dist_squared;
-		//	}
-		//	else if (next_dist_squared < 0) {
-		//		min_dist_squared = prev_dist_squared;
-		//	}
-		//	else {
-		//		min_dist_squared = CGAL::min(prev_dist_squared, next_dist_squared);
-		//	}
+			Number<Kernel> min_dist_squared;
+			if (prev_dist_squared < 0) {
+				min_dist_squared = next_dist_squared;
+			}
+			else if (next_dist_squared < 0) {
+				min_dist_squared = prev_dist_squared;
+			}
+			else {
+				min_dist_squared = CGAL::min(prev_dist_squared, next_dist_squared);
+			}
 
-		//	if (edge_dist_squared >= 0) {
-		//		min_dist_squared = CGAL::min(min_dist_squared, edge_dist_squared);
-		//	}
+			if (edge_dist_squared >= 0) {
+				min_dist_squared = CGAL::min(min_dist_squared, edge_dist_squared);
+			}
 
-		//	remove_self = safe_test::close(edge_dist_squared, min_dist_squared);
-		//	remove_previous = safe_test::close(prev_dist_squared, min_dist_squared);
-		//	remove_next = safe_test::close(next_dist_squared, min_dist_squared);
+			remove_self = safe_test::close(edge_dist_squared, min_dist_squared);
+			remove_previous = safe_test::close(prev_dist_squared, min_dist_squared);
+			remove_next = safe_test::close(next_dist_squared, min_dist_squared);
 
-		//	// determine if the previous edge allows merging
-		//	if (remove_previous && b->degree() == 2 && a->degree() == 2) {
-		//		if (remove_self) {
-		//			// check if double-prev can merge with next
-		//			merge_previous = safe_test::aligned_vectors(a->point() - a->prev()->point(),
-		//				d->point() - c->point());
-		//		}
-		//		else {
-		//			// check alignment with self
-		//			merge_previous = safe_test::aligned_vectors(a->point() - a->prev()->point(),
-		//				c->point() - b->point());
-		//		}
-		//	}
-		//	else {
-		//		merge_previous = false;
-		//	}
+			// determine if the previous edge allows merging
+			if (remove_previous && b->degree() == 2 && a->degree() == 2) {
+				if (remove_self) {
+					// check if double-prev can merge with next
+					merge_previous = safe_test::aligned_vectors(a->point() - a->prev()->point(),
+						d->point() - c->point());
+				}
+				else {
+					// check alignment with self
+					merge_previous = safe_test::aligned_vectors(a->point() - a->prev()->point(),
+						c->point() - b->point());
+				}
+			}
+			else {
+				merge_previous = false;
+			}
 
-		//	// determine if the next edge allows merging
-		//	if (remove_next && c->degree() == 2 && d->degree() == 2) {
+			// determine if the next edge allows merging
+			if (remove_next && c->degree() == 2 && d->degree() == 2) {
 
-		//		if (remove_self) {
-		//			// check if double-next can merge with prev
-		//			merge_next = safe_test::aligned_vectors(d->next()->point() - d->point(),
-		//				b->point() - a->point());
-		//		}
-		//		else {
-		//			// check alignment with self
-		//			merge_next = safe_test::aligned_vectors(d->next()->point() - d->point(),
-		//				c->point() - b->point());
-		//		}
-		//	}
-		//	else {
-		//		merge_next = false;
-		//	}
+				if (remove_self) {
+					// check if double-next can merge with prev
+					merge_next = safe_test::aligned_vectors(d->next()->point() - d->point(),
+						b->point() - a->point());
+				}
+				else {
+					// check alignment with self
+					merge_next = safe_test::aligned_vectors(d->next()->point() - d->point(),
+						c->point() - b->point());
+				}
+			}
+			else {
+				merge_next = false;
+			}
 
-		//	// construct the swept area
-		//	if (remove_self) {
-		//		swept.push_back(edge_lim);
-		//	}
-		//	else if (remove_previous) {
-		//		swept.push_back(a->point());
-		//	}
-		//	else {
-		//		assert(remove_next);
-		//		// force using the actual intersection, we (should) have eliminated exactly equal directions
-		//		const auto is = CGAL::intersection(Line<K>(d->point(), c->point() - b->point()), prev_track);
-		//		swept.push_back(*std::get_if<Point<K>>(&*is));
-		//	}
-		//	swept.push_back(b->point());
-		//	swept.push_back(c->point());
-		//	if (remove_self) {
-		//		// do nothing, triangular area
-		//	}
-		//	else if (remove_next) {
-		//		swept.push_back(d->point());
-		//	}
-		//	else {
-		//		assert(remove_previous);
-		//		// force using the actual intersection, we (should) have eliminated exactly equal directions
-		//		const auto is = CGAL::intersection(Line<K>(a->point(), c->point() - b->point()), next_track);
-		//		swept.push_back(*std::get_if<Point<K>>(&*is));
-		//	}
+			// construct the swept area
+			if (remove_self) {
+				swept.push_back(edge_lim);
+			}
+			else if (remove_previous) {
+				swept.push_back(a->point());
+			}
+			else {
+				assert(remove_next);
+				// force using the actual intersection, we (should) have eliminated exactly equal directions
+				const auto is = CGAL::intersection(Line<Kernel>(d->point(), c->point() - b->point()), prev_track);
+				swept.push_back(*std::get_if<Point<Kernel>>(&*is));
+			}
+			swept.push_back(b->point());
+			swept.push_back(c->point());
+			if (remove_self) {
+				// do nothing, triangular area
+			}
+			else if (remove_next) {
+				swept.push_back(d->point());
+			}
+			else {
+				assert(remove_previous);
+				// force using the actual intersection, we (should) have eliminated exactly equal directions
+				const auto is = CGAL::intersection(Line<Kernel>(a->point(), c->point() - b->point()), next_track);
+				swept.push_back(*std::get_if<Point<Kernel>>(&*is));
+			}
 
-		//	// precision, be sure we dont want to remove self...  
-		//	if (!remove_self && safe_test::same_point(source_destination(), target_destination())) {
-		//		remove_self = true;
-		//		swept.erase(--swept.vertices_end());
-		//	}
+			// precision, be sure we dont want to remove self...  
+			if (!remove_self && safe_test::same_point(source_destination(), target_destination())) {
+				remove_self = true;
+				swept.erase(--swept.vertices_end());
+			}
 
-		//	if (remove_self && b->degree() != 2 && c->degree() != 2) {
-		//		contract_merges_highdegrees = true;
-		//	}
-		//	else if (remove_previous && a->degree() != 2 && b->degree() != 2) {
-		//		contract_merges_highdegrees = true;
-		//	}
-		//	else if (remove_next && c->degree() != 2 && d->degree() != 2) {
-		//		contract_merges_highdegrees = true;
-		//	}
-		//	else {
-		//		contract_merges_highdegrees = false;
-		//	}
-		//}
+			if (remove_self && b->degree() != 2 && c->degree() != 2) {
+				contract_merges_highdegrees = true;
+			}
+			else if (remove_previous && a->degree() != 2 && b->degree() != 2) {
+				contract_merges_highdegrees = true;
+			}
+			else if (remove_next && c->degree() != 2 && d->degree() != 2) {
+				contract_merges_highdegrees = true;
+			}
+			else {
+				contract_merges_highdegrees = false;
+			}
+		}
 
 		Number<Inexact> base_length() const {
 			return std::sqrt(approximate(CGAL::squared_distance(source(), target())));
@@ -603,11 +608,13 @@ namespace cartocrow::simplification::em {
 		}
 	};
 
-	template<class EdgeHandle> struct ComboMove : public BaseMove<EdgeHandle> {
+	template<class K, typename EdgeHandle, typename VertexHandle>
+	struct ComboMove : public BaseMove<K, EdgeHandle> {
 
-		using Kernel = EdgeHandle::Kernel;
+		using Kernel = K;
 		using Edge_handle = EdgeHandle;
-		using Single = SingleMove<EdgeHandle>;
+		using Vertex_handle = VertexHandle;
+		using Single = SingleMove<K, EdgeHandle, VertexHandle>;
 
 		bool executable;
 		Single* prev_move;
@@ -621,11 +628,11 @@ namespace cartocrow::simplification::em {
 			return false;
 		}
 
-		//bool is_blocked_by(Edge_handle candidate) const {
+		bool is_blocked_by(Edge_handle candidate) const {
 
-		//	return prev_move->is_blocked_by(candidate, prev_swept, !prev_partial)
-		//		|| next_move->is_blocked_by(candidate, next_swept, !next_partial);
-		//}
+			return prev_move->is_blocked_by(candidate, prev_swept, !prev_partial)
+				|| next_move->is_blocked_by(candidate, next_swept, !next_partial);
+		}
 
 		Point<Kernel> prev_source_destination() {
 			return prev_swept[0];
@@ -643,256 +650,256 @@ namespace cartocrow::simplification::em {
 			return next_swept[next_swept.size() == 3 ? 0 : 3];
 		}
 
-		//void update() {
+		template<class DT>
+		void update(DT& data_traits) {
 
-		//	size_t edgeindex = this->edge->graph_index();
+			size_t edgeindex = this->edge->graph_index();
 
-		//	prev_swept.clear();
-		//	next_swept.clear();
+			prev_swept.clear();
+			next_swept.clear();
 
-		//	if (this->edge->source()->degree() != 2 || this->edge->target()->degree() != 2) {
-		//		executable = false;
-		//		return;
-		//	}
+			if (this->edge->source()->degree() != 2 || this->edge->target()->degree() != 2) {
+				executable = false;
+				return;
+			}
 
-		//	Edge_handle prev = this->edge->prev();
-		//	Edge_handle next = this->edge->next();
+			Edge_handle prev = this->edge->prev();
+			Edge_handle next = this->edge->next();
 
-		//	bool left_at_source = CGAL::left_turn(prev->source()->point(), this->edge->source()->point(), this->edge->target()->point());
-		//	bool right_at_target = CGAL::right_turn(this->edge->source()->point(), this->edge->target()->point(), next->target()->point());
+			bool left_at_source = CGAL::left_turn(prev->source()->point(), this->edge->source()->point(), this->edge->target()->point());
+			bool right_at_target = CGAL::right_turn(this->edge->source()->point(), this->edge->target()->point(), next->target()->point());
 
-		//	if (left_at_source != right_at_target) {
-		//		// same turn
-		//		executable = false;
-		//		return;
-		//	}
+			if (left_at_source != right_at_target) {
+				// same turn
+				executable = false;
+				return;
+			}
 
-		//	// TODO: use traits
-		//	if (left_at_source) {
-		//		prev_move = &(prev->data().left);
-		//		next_move = &(next->data().right);
-		//	}
-		//	else {
-		//		prev_move = &(prev->data().right);
-		//		next_move = &(next->data().left);
-		//	}
+			if (left_at_source) {
+				prev_move = &data_traits.data(prev).left;
+				next_move = &data_traits.data(next).right;
+			}
+			else {
+				prev_move = &data_traits.data(prev).right;
+				next_move = &data_traits.data(next).left;
+			}
 
-		//	if (!prev_move->movable() || !next_move->movable()) {
-		//		executable = false;
-		//		return;
-		//	}
+			if (!prev_move->movable() || !next_move->movable()) {
+				executable = false;
+				return;
+			}
 
-		//	// TODO: reduce approximate use?
+			// TODO: reduce approximate use?
 
-		//	// now, determine how far both need to move until the common edge vanishes
-		//	Vector<Inexact> edgedir = approximate(this->edge->target()->point() - this->edge->source()->point());
-		//	Number<Inexact> edge_length = std::sqrt(edgedir.squared_length());
-		//	edgedir /= edge_length;
+			// now, determine how far both need to move until the common edge vanishes
+			Vector<Inexact> edgedir = approximate(this->edge->target()->point() - this->edge->source()->point());
+			Number<Inexact> edge_length = std::sqrt(edgedir.squared_length());
+			edgedir /= edge_length;
 
-		//	Vector<Inexact> prev_movedir = prev_move->move_direction();
-		//	Number<Inexact> prev_len = prev_move->base_length();
-		//	Number<Inexact> prev_len_end = prev_move->end_length();
-		//	Vector<Inexact> prev_common_vector = approximate(prev_move->target_move());
-		//	Number<Inexact> prev_s = 1.0 / CGAL::scalar_product(edgedir, prev_movedir); // NB: signswap between sides
-		//	Number<Inexact> prev_lim_dist = CGAL::scalar_product(prev_movedir, prev_common_vector);
-		//	Number<Inexact> prev_r = (prev_len_end - prev_len) / prev_lim_dist;
+			Vector<Inexact> prev_movedir = prev_move->move_direction();
+			Number<Inexact> prev_len = prev_move->base_length();
+			Number<Inexact> prev_len_end = prev_move->end_length();
+			Vector<Inexact> prev_common_vector = approximate(prev_move->target_move());
+			Number<Inexact> prev_s = 1.0 / CGAL::scalar_product(edgedir, prev_movedir); // NB: signswap between sides
+			Number<Inexact> prev_lim_dist = CGAL::scalar_product(prev_movedir, prev_common_vector);
+			Number<Inexact> prev_r = (prev_len_end - prev_len) / prev_lim_dist;
 
-		//	Vector<Inexact> next_movedir = next_move->move_direction();
-		//	Number<Inexact> next_len = next_move->base_length();
-		//	Number<Inexact> next_len_end = next_move->end_length();
-		//	Vector<Inexact> next_common_vector = approximate(next_move->source_move());
-		//	Number<Inexact> next_s = -1.0 / CGAL::scalar_product(edgedir, next_movedir); // NB: signswap between sides
-		//	Number<Inexact> next_lim_dist = CGAL::scalar_product(next_movedir, next_common_vector);
-		//	Number<Inexact> next_r = (next_len_end - next_len) / next_lim_dist;
+			Vector<Inexact> next_movedir = next_move->move_direction();
+			Number<Inexact> next_len = next_move->base_length();
+			Number<Inexact> next_len_end = next_move->end_length();
+			Vector<Inexact> next_common_vector = approximate(next_move->source_move());
+			Number<Inexact> next_s = -1.0 / CGAL::scalar_product(edgedir, next_movedir); // NB: signswap between sides
+			Number<Inexact> next_lim_dist = CGAL::scalar_product(next_movedir, next_common_vector);
+			Number<Inexact> next_r = (next_len_end - next_len) / next_lim_dist;
 
-		//	// edge left/right of length _len expands at rate _r, covering the common edge at rate _s
-		//	// so, moving a distance _d sweeps area
-		//	//    _d * (_len + _d * _r / 2)
-		//	// and covers the common edge for
-		//	//    _d * _s;
-		//	//
-		//	// we need the swept areas to match, and the common edge to be fully covered
-		//	//    p_d * p_s + n_d * n_s = e_len
-		//	//    p_d * (p_len + p_d * p_r / 2) = n_d * (n_len + n_d * n_r / 2)
-		//	// the former gives
-		//	//    p_d = (e_len - n_d * n_s) / p_s
-		//	// substituting in the latter and rewriting to quadratic form
-		//	//     n_d^2 * (n_s ^ 2 * p_r / (2 * p_s ^ 2) - n_r / 2)
-		//	//     + n_d (- n_s * p_len / p_s - e_len *  n_s * p_r / p_s^2 - n_len)
-		//	//     + (e_len * p_len / p_s + e_len^2 * p_r / (2 * p_s^2)  )
-		//	//     = 0
-		//	// find smallest positive solution for n_d
-		//	Number<Inexact> a = prev_r * next_s * next_s / (2 * prev_s * prev_s) - next_r / 2.0;
-		//	Number<Inexact> b = -prev_len * next_s / prev_s - next_len - prev_r * next_s * edge_length / (prev_s * prev_s);
-		//	Number<Inexact> c = prev_len * edge_length / prev_s + prev_r * edge_length * edge_length / (2 * prev_s * prev_s);
+			// edge left/right of length _len expands at rate _r, covering the common edge at rate _s
+			// so, moving a distance _d sweeps area
+			//    _d * (_len + _d * _r / 2)
+			// and covers the common edge for
+			//    _d * _s;
+			//
+			// we need the swept areas to match, and the common edge to be fully covered
+			//    p_d * p_s + n_d * n_s = e_len
+			//    p_d * (p_len + p_d * p_r / 2) = n_d * (n_len + n_d * n_r / 2)
+			// the former gives
+			//    p_d = (e_len - n_d * n_s) / p_s
+			// substituting in the latter and rewriting to quadratic form
+			//     n_d^2 * (n_s ^ 2 * p_r / (2 * p_s ^ 2) - n_r / 2)
+			//     + n_d (- n_s * p_len / p_s - e_len *  n_s * p_r / p_s^2 - n_len)
+			//     + (e_len * p_len / p_s + e_len^2 * p_r / (2 * p_s^2)  )
+			//     = 0
+			// find smallest positive solution for n_d
+			Number<Inexact> a = prev_r * next_s * next_s / (2 * prev_s * prev_s) - next_r / 2.0;
+			Number<Inexact> b = -prev_len * next_s / prev_s - next_len - prev_r * next_s * edge_length / (prev_s * prev_s);
+			Number<Inexact> c = prev_len * edge_length / prev_s + prev_r * edge_length * edge_length / (2 * prev_s * prev_s);
 
-		//	Number<Inexact> next_d;
-		//	if (safe_test::close(a, 0) && safe_test::close(b, 0) && safe_test::close(c, 0)) {
-		//		// we'll get division by zero / NaNs... but if c is also zero, then things just line up perfectly...
-		//		next_d = next_lim_dist;
-		//	}
-		//	else {
-		//		next_d = utils::solveQuadraticEquationForSmallestPositive(a, b, c); // NB: will be <= 0 if there is no positive solution
-		//	}
-		//	Number<Inexact> prev_d = (edge_length - next_d * next_s) / prev_s;
+			Number<Inexact> next_d;
+			if (safe_test::close(a, 0) && safe_test::close(b, 0) && safe_test::close(c, 0)) {
+				// we'll get division by zero / NaNs... but if c is also zero, then things just line up perfectly...
+				next_d = next_lim_dist;
+			}
+			else {
+				next_d = utils::solveQuadraticEquationForSmallestPositive(a, b, c); // NB: will be <= 0 if there is no positive solution
+			}
+			Number<Inexact> prev_d = (edge_length - next_d * next_s) / prev_s;
 
-		//	// we need to make sure that after the move, no (approximately) zero-length edges remain
-		//	// there are a couple of cases to consider:
-		//	// if _d > _lim_dist, then the move contracts before the edges meet
-		//	// if _d = _lim_dist, then the move contracts as the edges meet
-		//	// if _d < _lim_dist, then the move only has to do a partial move, for the edges to meet
-		//	// now, if ONE of the edges contracts before meeting, then this effectively is just a pair of edge moves
-		//	// otherwise, we need to account for the meeting point, and the possibility of either move still contracting
-		//	prev_swept = prev_move->swept;
-		//	next_swept = next_move->swept;
+			// we need to make sure that after the move, no (approximately) zero-length edges remain
+			// there are a couple of cases to consider:
+			// if _d > _lim_dist, then the move contracts before the edges meet
+			// if _d = _lim_dist, then the move contracts as the edges meet
+			// if _d < _lim_dist, then the move only has to do a partial move, for the edges to meet
+			// now, if ONE of the edges contracts before meeting, then this effectively is just a pair of edge moves
+			// otherwise, we need to account for the meeting point, and the possibility of either move still contracting
+			prev_swept = prev_move->swept;
+			next_swept = next_move->swept;
 
-		//	if (next_d <= 0 || prev_d > prev_lim_dist + M_EPSILON || next_d > next_lim_dist + M_EPSILON) {
-		//		// just a pair
+			if (next_d <= 0 || prev_d > prev_lim_dist + M_EPSILON || next_d > next_lim_dist + M_EPSILON) {
+				// just a pair
 
-		//		Number<K> prev_area = CGAL::abs(prev_move->swept.area());
-		//		Number<K> next_area = CGAL::abs(next_move->swept.area());
-		//		if (prev_area < next_area) {
-		//			// prev contracts
-		//			if (!prev_move->contractable()) {
-		//				executable = false;
-		//				return;
-		//			}
-		//			prev_partial = false;
+				Number<Kernel> prev_area = CGAL::abs(prev_move->swept.area());
+				Number<Kernel> next_area = CGAL::abs(next_move->swept.area());
+				if (prev_area < next_area) {
+					// prev contracts
+					if (!prev_move->contractable()) {
+						executable = false;
+						return;
+					}
+					prev_partial = false;
 
-		//			// and possibly next
-		//			auto startend = next_move->end_positions_for(prev_area);
-		//			if (!startend || safe_test::same_point(next_swept[0], startend->first)) {
-		//				if (!next_move->contractable()) {
-		//					executable = false;
-		//					return;
-		//				}
-		//				next_partial = false;
-		//			}
-		//			else {
-		//				next_partial = true;
-		//				next_swept[0] = startend->first;
-		//				if (next_swept.size() < 4) {
-		//					next_swept.push_back(startend->second);
-		//				}
-		//				else {
-		//					next_swept[3] = startend->second;
-		//				}
-		//			}
+					// and possibly next
+					auto startend = next_move->end_positions_for(prev_area);
+					if (!startend || safe_test::same_point(next_swept[0], startend->first)) {
+						if (!next_move->contractable()) {
+							executable = false;
+							return;
+						}
+						next_partial = false;
+					}
+					else {
+						next_partial = true;
+						next_swept[0] = startend->first;
+						if (next_swept.size() < 4) {
+							next_swept.push_back(startend->second);
+						}
+						else {
+							next_swept[3] = startend->second;
+						}
+					}
 
-		//		}
-		//		else {
-		//			// next contract
-		//			if (!next_move->contractable()) {
-		//				executable = false;
-		//				return;
-		//			}
-		//			next_partial = false;
+				}
+				else {
+					// next contract
+					if (!next_move->contractable()) {
+						executable = false;
+						return;
+					}
+					next_partial = false;
 
-		//			// and possibly prev
-		//			auto startend = prev_move->end_positions_for(next_area);
-		//			if (!startend || safe_test::same_point(prev_swept[0], startend->first)) {
-		//				if (!prev_move->contractable()) {
-		//					executable = false;
-		//					return;
-		//				}
-		//				prev_partial = false;
-		//			}
-		//			else {
-		//				prev_partial = true;
-		//				prev_swept[0] = startend->first;
-		//				if (prev_swept.size() < 4) {
-		//					prev_swept.push_back(startend->second);
-		//				}
-		//				else {
-		//					prev_swept[3] = startend->second;
-		//				}
-		//			}
-		//		}
+					// and possibly prev
+					auto startend = prev_move->end_positions_for(next_area);
+					if (!startend || safe_test::same_point(prev_swept[0], startend->first)) {
+						if (!prev_move->contractable()) {
+							executable = false;
+							return;
+						}
+						prev_partial = false;
+					}
+					else {
+						prev_partial = true;
+						prev_swept[0] = startend->first;
+						if (prev_swept.size() < 4) {
+							prev_swept.push_back(startend->second);
+						}
+						else {
+							prev_swept[3] = startend->second;
+						}
+					}
+				}
 
-		//		// handling precision issues: if one is trying to remove the common edge, we should just let it be handled by the combined move
-		//		remove_self = (!prev_partial && prev_move->remove_next) || (!next_partial && next_move->remove_previous);
-		//	}
-		//	else {
-		//		// construct the meeting point
-		//		remove_self = true;
+				// handling precision issues: if one is trying to remove the common edge, we should just let it be handled by the combined move
+				remove_self = (!prev_partial && prev_move->remove_next) || (!next_partial && next_move->remove_previous);
+			}
+			else {
+				// construct the meeting point
+				remove_self = true;
 
-		//		Number<K> prev_ratio = convert_kernel<K>(CGAL::min(1.0, prev_d / prev_lim_dist));
-		//		Point<K> merge_point = this->edge->source()->point() + prev_ratio * convert_kernel<K>(prev_common_vector);
-		//		Point<K> prev_other_end = prev_move->swept[1] + prev_ratio * prev_move->source_move();
+				Number<Kernel> prev_ratio = convert_kernel<Kernel>(CGAL::min(1.0, prev_d / prev_lim_dist));
+				Point<Kernel> merge_point = this->edge->source()->point() + prev_ratio * convert_kernel<Kernel>(prev_common_vector);
+				Point<Kernel> prev_other_end = prev_move->swept[1] + prev_ratio * prev_move->source_move();
 
-		//		//std::cout << " meeting point " << merge_point << std::endl;
-		//		prev_partial = !safe_test::same_point(merge_point, prev_swept[prev_swept.size() == 3 ? 0 : 3])
-		//			&& !safe_test::same_point(merge_point, prev_other_end)
-		//			&& !safe_test::same_point(prev_other_end, prev_move->source_destination());
-		//		if (prev_partial) {
-		//			prev_swept[0] = prev_other_end;
-		//			if (prev_swept.size() < 4) {
-		//				prev_swept.push_back(merge_point);
-		//			}
-		//			else {
-		//				prev_swept[3] = merge_point;
-		//			}
-		//		}
-		//		else if (!prev_move->contractable()) {
-		//			executable = false;
-		//			return;
-		//		}
+				//std::cout << " meeting point " << merge_point << std::endl;
+				prev_partial = !safe_test::same_point(merge_point, prev_swept[prev_swept.size() == 3 ? 0 : 3])
+					&& !safe_test::same_point(merge_point, prev_other_end)
+					&& !safe_test::same_point(prev_other_end, prev_move->source_destination());
+				if (prev_partial) {
+					prev_swept[0] = prev_other_end;
+					if (prev_swept.size() < 4) {
+						prev_swept.push_back(merge_point);
+					}
+					else {
+						prev_swept[3] = merge_point;
+					}
+				}
+				else if (!prev_move->contractable()) {
+					executable = false;
+					return;
+				}
 
-		//		Number<K> next_ratio = convert_kernel<K>(CGAL::min(1.0, next_d / next_lim_dist));
-		//		Point<K> next_other_end = next_move->swept[2] + next_ratio * next_move->target_move();
+				Number<Kernel> next_ratio = convert_kernel<Kernel>(CGAL::min(1.0, next_d / next_lim_dist));
+				Point<Kernel> next_other_end = next_move->swept[2] + next_ratio * next_move->target_move();
 
-		//		next_partial = !safe_test::same_point(merge_point, next_swept[0])
-		//			&& !safe_test::same_point(merge_point, next_other_end)
-		//			&& !safe_test::same_point(next_other_end, next_move->target_destination());
-		//		if (next_partial) {
+				next_partial = !safe_test::same_point(merge_point, next_swept[0])
+					&& !safe_test::same_point(merge_point, next_other_end)
+					&& !safe_test::same_point(next_other_end, next_move->target_destination());
+				if (next_partial) {
 
-		//			next_swept[0] = merge_point;
-		//			if (next_swept.size() < 4) {
-		//				next_swept.push_back(next_other_end);
-		//			}
-		//			else {
-		//				next_swept[3] = next_other_end;
-		//			}
-		//		}
-		//		else if (!next_move->contractable()) {
-		//			executable = false;
-		//			return;
-		//		}
-		//	}
+					next_swept[0] = merge_point;
+					if (next_swept.size() < 4) {
+						next_swept.push_back(next_other_end);
+					}
+					else {
+						next_swept[3] = next_other_end;
+					}
+				}
+				else if (!next_move->contractable()) {
+					executable = false;
+					return;
+				}
+			}
 
-		//	if (remove_self) {
-		//		Vector<K> prevdir_at_join;
-		//		if (prev_swept.size() == 3) {
-		//			prevdir_at_join = prev_swept[0] - prev_swept[1];
-		//		}
-		//		else {
-		//			prevdir_at_join = prev_swept[2] - prev_swept[1];
-		//		}
+			if (remove_self) {
+				Vector<Kernel> prevdir_at_join;
+				if (prev_swept.size() == 3) {
+					prevdir_at_join = prev_swept[0] - prev_swept[1];
+				}
+				else {
+					prevdir_at_join = prev_swept[2] - prev_swept[1];
+				}
 
-		//		Vector<K> nextdir_at_join;
-		//		if (next_swept.size() == 3) {
-		//			nextdir_at_join = next_swept[0] - next_swept[2];
-		//		}
-		//		else {
-		//			nextdir_at_join = next_swept[2] - next_swept[1];
-		//		}
+				Vector<Kernel> nextdir_at_join;
+				if (next_swept.size() == 3) {
+					nextdir_at_join = next_swept[0] - next_swept[2];
+				}
+				else {
+					nextdir_at_join = next_swept[2] - next_swept[1];
+				}
 
-		//		//std::cout << prevdir_at_join << "  ||  " << nextdir_at_join << std::endl;
-		//		//std::cout << " -> det = " << CGAL::determinant(prevdir_at_join, nextdir_at_join) << std::endl;
-		//		merge_across = safe_test::aligned_vectors(prevdir_at_join, nextdir_at_join);
-		//		//std::cout << " merge_across = " << merge_across << std::endl;
-		//	}
-		//	else {
-		//		merge_across = false;
-		//	}
+				//std::cout << prevdir_at_join << "  ||  " << nextdir_at_join << std::endl;
+				//std::cout << " -> det = " << CGAL::determinant(prevdir_at_join, nextdir_at_join) << std::endl;
+				merge_across = safe_test::aligned_vectors(prevdir_at_join, nextdir_at_join);
+				//std::cout << " merge_across = " << merge_across << std::endl;
+			}
+			else {
+				merge_across = false;
+			}
 
-		//	int reduc = prev_partial ? -prev_move->increase_on_move() : prev_move->decrease_on_contract();
-		//	reduc += next_partial ? -next_move->increase_on_move() : next_move->decrease_on_contract();
-		//	if (remove_self) reduc++;
-		//	if (merge_across) reduc++;
+			int reduc = prev_partial ? -prev_move->increase_on_move() : prev_move->decrease_on_contract();
+			reduc += next_partial ? -next_move->increase_on_move() : next_move->decrease_on_contract();
+			if (remove_self) reduc++;
+			if (merge_across) reduc++;
 
-		//	executable = reduc > 0;
-		//}
+			executable = reduc > 0;
+		}
 
 		bool is_executable() const {
 			return executable;
@@ -912,11 +919,16 @@ namespace cartocrow::simplification::em {
 		using Graph_path_data = PathData<UseSelfEdgeData, VertexData, ActualEdgeData, UseSelfPathData, ActualPathData, K, GraphTraits>::Graph_path_data;
 
 		using Kernel = K;
-		using Edge_handle = Graph_2_edge<VertexData, Graph_edge_data, Graph_path_data, Graph_segment_curve_traits_2<K>, GraphTraits>*; // needed to avoid co-dependent templates for dedicated graphs
+		using Vertex_handle = Graph_2_vertex<Graph_segment_curve_traits_2<Kernel>, GraphTraits, VertexData, Graph_edge_data, Graph_path_data>*; // needed to avoid co-dependent templates for dedicated graphs
+		using Edge_handle = Graph_2_edge<Graph_segment_curve_traits_2<Kernel>, GraphTraits, VertexData, Graph_edge_data, Graph_path_data>*; // needed to avoid co-dependent templates for dedicated graphs
 
-		SingleMove<Edge_handle> left, right;
-		ComboMove<Edge_handle> combo;
-		std::vector<BaseMove<Edge_handle>*> blocking;
+		using Move = BaseMove<K, Edge_handle>;
+		using Single = SingleMove<K, Edge_handle, Vertex_handle>;
+		using Combo = ComboMove<K, Edge_handle, Vertex_handle>;
+
+		Single left, right;
+		Combo combo;
+		std::vector<Move*> blocking;
 	};
 
 
@@ -926,9 +938,12 @@ namespace cartocrow::simplification::em {
 		using Graph_path_data = std::conditional<UseSelfPathData, PathData, ActualPathData>::type;
 
 		using Kernel = K;
-		using Edge_handle = Graph_2_edge<VertexData, Graph_edge_data, Graph_path_data, Graph_segment_curve_traits_2<K>, GraphTraits>*; // needed to avoid co-dependent templates for dedicated graphs
+		using Vertex_handle = Graph_2_vertex<Graph_segment_curve_traits_2<Kernel>, GraphTraits, VertexData, Graph_edge_data, Graph_path_data>*; // needed to avoid co-dependent templates for dedicated graphs
+		using Edge_handle = Graph_2_edge<Graph_segment_curve_traits_2<Kernel>, GraphTraits, VertexData, Graph_edge_data, Graph_path_data>*; // needed to avoid co-dependent templates for dedicated graphs
 
-		using Single = SingleMove<Edge_handle>;
+		using Move = BaseMove<K, Edge_handle>;
+		using Single = SingleMove<K, Edge_handle, Vertex_handle>;
+		using Combo = ComboMove<K, Edge_handle, Vertex_handle>;
 
 		std::vector<Single*> left_waiting;
 		std::vector<Single*> right_waiting;
@@ -972,6 +987,7 @@ namespace cartocrow::simplification::em {
 		GraphType<typename DT::Graph> &&
 		DT::Graph::Graph_traits::oriented &&
 		DT::Graph::Graph_traits::decomposed &&
+		DT::Graph::Graph_traits::sorted &&
 		std::is_default_constructible<typename DT::Edge_data>::value &&
 		std::is_default_constructible<typename DT::Path_data>::value &&
 		requires(DT data, typename DT::Graph graph, typename DT::Graph::Edge_handle e, typename DT::Graph::Path_handle p) {
@@ -989,12 +1005,15 @@ namespace cartocrow::simplification::em {
 	template<class ST>
 	concept ScoreTraits =
 		KernelType<typename ST::Kernel> &&
-		requires(ST score, SingleMove<typename ST::Kernel>& single, ComboMove<typename ST::Kernel>& combo) {
+		requires(ST score, typename ST::Single & single, typename ST::Combo & combo) {
 
 		typename ST::Kernel;
+		typename ST::Graph;
+		typename ST::Single;
+		typename ST::Combo;
 
-		{ score.compute_cost(single) };
-		{ score.compute_cost(combo) };
+		{ score.compute_cost(single) } -> std::same_as<Number<typename ST::Kernel>>;
+		{ score.compute_cost(combo) } -> std::same_as<Number<typename ST::Kernel>>;
 	};
 
 	template<class DT, class ST>
@@ -1006,9 +1025,9 @@ namespace cartocrow::simplification::em {
 	class DataTraits_Dedicated {
 	public:
 		using Kernel = K;
-		using Edge_data = EdgeData<true, std::monostate, std::monostate, true, std::monostate, Kernel, DecomposedGraph<Historic>>;
-		using Path_data = PathData<true, std::monostate, std::monostate, true, std::monostate, Kernel, DecomposedGraph<Historic>>;
-		using Graph = Straight_graph_2<std::monostate, Edge_data, Path_data, Kernel, DecomposedGraph<Historic>>;
+		using Edge_data = EdgeData<true, std::monostate, std::monostate, true, std::monostate, Kernel, CustomGraphTraits<Historic, true, true, true>>;
+		using Path_data = PathData<true, std::monostate, std::monostate, true, std::monostate, Kernel, CustomGraphTraits<Historic, true, true, true>>;
+		using Graph = Straight_graph_2<Kernel, CustomGraphTraits<Historic, true, true, true>, std::monostate, Edge_data, Path_data>;
 
 		static void initialize(Graph& graph) {
 			// skip
@@ -1021,6 +1040,8 @@ namespace cartocrow::simplification::em {
 			return p->data();
 		}
 	};
+
+
 
 	template<GraphType G>
 	class DataTraits_Generic {
@@ -1053,10 +1074,10 @@ namespace cartocrow::simplification::em {
 		Graph_path_map<Graph, std::shared_ptr<Path_data>>* m_path_data = nullptr;
 	};
 
-	template<KernelType Kernel>
+	template<typename Elt>
 	struct MoveQueueTraits {
 
-		using Element_handle = BaseMove<Kernel>*;
+		using Element_handle = Elt;
 
 		static void setIndex(Element_handle m, int id) {
 			m->queue_index = id;
@@ -1083,7 +1104,7 @@ namespace cartocrow::simplification::em {
 
 	template <DataTraits DT, ScoreTraits ST>
 		requires Setup<DT, ST>
-	class EdgeMove {
+	class EdgeMoves {
 	public:
 		using Data_traits = DT;
 		using Score_traits = ST;
@@ -1097,10 +1118,13 @@ namespace cartocrow::simplification::em {
 		using Kernel = Graph::Kernel;
 
 	private:
-		using Move = BaseMove<Kernel>;
-		using Single = SingleMove<Kernel>;
-		using Combo = ComboMove<Kernel>;
-		using Queue = cartocrow::IndexedPriorityQueue<MoveQueueTraits<Kernel>>;
+		using Move = Edge_data::Move;
+		using Single = Edge_data::Single;
+		using Combo = Edge_data::Combo;
+		//using Move = BaseMove<Kernel, Edge_handle>;
+		//using Single = SingleMove<Kernel, Edge_handle, Vertex_handle>;
+		//using Combo = ComboMove<Kernel, Edge_handle, Vertex_handle>;
+		using Queue = cartocrow::IndexedPriorityQueue<MoveQueueTraits<Move*>>;
 
 		using PairedSingles = std::pair<Single*, Single*>;
 		using Operation = std::variant<Combo*, PairedSingles, Single*>;
@@ -1113,7 +1137,7 @@ namespace cartocrow::simplification::em {
 		VertexTree* pqt = nullptr;
 		Data_traits data_traits;
 		Score_traits score_traits;
-		Queue queue = Queue(data_traits);
+		Queue queue;
 		Graph_edge_set<Graph> edgeset = Graph_edge_set<Graph>(graph);
 
 		bool validate_state() {
@@ -1319,39 +1343,654 @@ namespace cartocrow::simplification::em {
 			}
 		}
 
-		void update_singles(Edge_handle e);
-		void update_combo(Edge_handle e);
-		bool test_topology(Single& single);
-		bool test_topology(Combo& combo);
-		Single* find_compensate_move(Single& contract, Number<Kernel> area);
+		void update_singles(Edge_handle e) {
+			assert(graph.edge(e->graph_index()) == e);
 
-		std::optional<Operation> findNextStep();
-		void start_move(Single& move);
-		void contract(Single& move);
-		void move(Single& move, const Number<Kernel> area);
-		void move(Single& move, const Point<Kernel> source_dest, const Point<Kernel> target_dest);
-		void performStep(Single& contract, Single& compensate);
-		void performStep(Combo& combo);
-		void performStep(Single& contact);
+			Edge_data& data = data_traits.data(e);
+			update_single<true>(e, data.left);
+			update_single<false>(e, data.right);
+		}
 
-		void determineCheckout(Single& move, const bool contract);
-		void checkOut();
-		void postProcess();
+		void update_combo(Edge_handle e) {
+			Edge_data& data = data_traits.data(e);
+
+			data.combo.edge = e;
+			data.combo.blocked_by_degzero = false;
+			for (Edge_handle b : data.combo.blocked_by) {
+				utils::listRemove<Move>(&data.combo, data_traits.data(b).blocking);
+			}
+			data.combo.blocked_by.clear();
+
+			data.combo.update(data_traits);
+
+			if (data.combo.is_executable()) {
+				data.combo.cost = score_traits.compute_cost(data.combo);
+
+				if (queue.contains(&data.combo)) {
+					queue.update(&data.combo);
+				}
+				else {
+					queue.push(&data.combo);
+				}
+			}
+			else {
+				queue.remove(&data.combo);
+			}
+		}
+
+		bool test_topology(Single& single) {
+			// test if its blocked
+			Rectangle<Kernel> rect = utils::boxOf(single.swept);
+
+			single.blocked_by_degzero = false;
+			pqt->findContained(rect, [&single](Vertex_handle b) {
+				if (!single.swept.has_on_unbounded_side(b->point())) {
+					single.blocked_by_degzero = true;
+				}
+				});
+
+			if (single.blocked_by_degzero)
+				return false;
+
+			sqt->findOverlapped(rect, [this, &single](Edge_handle b) {
+				if (single.is_blocked_by(b)) {
+					data_traits.data(b).blocking.push_back(&single);
+					single.blocked_by.push_back(b);
+				}
+				});
+
+			return single.blocked_by.empty();
+		}
+
+		bool test_topology(Combo& combo) {
+			// test if its blocked
+			Rectangle<Kernel> rect = utils::boxOf(utils::boxOf(combo.prev_swept), utils::boxOf(combo.next_swept));
+
+			combo.blocked_by_degzero = false;
+			pqt->findContained(rect, [&combo](Vertex_handle b) {
+				if (!combo.prev_swept.has_on_unbounded_side(b->point())
+					|| !combo.next_swept.has_on_unbounded_side(b->point())) {
+					combo.blocked_by_degzero = true;
+				}
+				});
+
+			if (combo.blocked_by_degzero)
+				return false;
+
+			sqt->findOverlapped(rect, [this, &combo](Edge_handle b) {
+				if (combo.is_blocked_by(b)) {
+					data_traits.data(b).blocking.push_back(&combo);
+					combo.blocked_by.push_back(b);
+				}
+				});
+
+			return combo.blocked_by.empty();
+		}
+
+		Single* find_compensate_move(Single& contract, Number<Kernel> area) {
+			// find compensating move		
+
+			using namespace detail;
+
+			Edge_handle walkBck = safe_prev(contract.edge);
+			if (walkBck != nullptr) {
+				walkBck = safe_prev(walkBck);
+			}
+			Edge_handle walkFwd = safe_next(contract.edge);
+			if (walkFwd != nullptr) {
+				walkFwd = safe_next(walkFwd);
+			}
+
+			const int reduc = contract.decrease_on_contract();
+
+			// TODO: partial blocked...?
+			while (walkBck != nullptr || walkFwd != nullptr) {
+				if (walkBck != nullptr) {
+					// take a step back and test
+					Single& candidate = contract.left ? data_traits.data(walkBck).right : data_traits.data(walkBck).left;
+					if (candidate.can_compensate_for(contract, reduc, area)) {
+
+						if (test_topology(candidate)) {
+							return &candidate;
+						}
+						else {
+							queue.remove(&candidate);
+						}
+					}
+
+					walkBck = safe_prev(walkBck);
+
+					if (walkBck == walkFwd) {
+						// cycled around, stop
+						break;
+					}
+				}
+
+				if (walkFwd != nullptr) {
+					// take a step forward and test
+					Single& candidate = contract.left ? data_traits.data(walkFwd).right : data_traits.data(walkFwd).left;
+					if (candidate.can_compensate_for(contract, reduc, area)) {
+
+						if (test_topology(candidate)) {
+							return &candidate;
+						}
+						else {
+							queue.remove(&candidate);
+						}
+					}
+					walkFwd = safe_next(walkFwd);
+
+					if (walkBck == walkFwd) {
+						// cycled around, stop
+						break;
+					}
+				}
+
+			}
+			return nullptr;
+		}
+
+		std::optional<Operation> findNextStep() {
+
+			assert(graph.can_perform_operation());
+			while (!queue.empty()) {
+				Move* m = queue.peek();
+
+				if (m->is_single()) {
+
+					Single* sm = static_cast<Single*>(m);
+					if (test_topology(*sm)) {
+
+						Number<Kernel> area = sm->swept_area();
+
+						// TODO: parametrize?
+						if (area < M_EPSILON) { // TODO: can we avoid this check for exact mode?
+							// tiny move, no compensation used
+							return Operation(sm);
+						}
+						else {
+							Single* compensate = find_compensate_move(*sm, area);
+							if (compensate != nullptr) {
+								return Operation(PairedSingles(sm, compensate));
+							}
+							else {
+								data_traits.data(sm->edge->path()).add_waiting(sm);
+							}
+						}
+					}
+					// if it arrived here: not a valid operation, pop it
+					queue.pop();
+				}
+				else {
+
+					Combo* combo = static_cast<Combo*>(m);
+
+					if (test_topology(*combo)) {
+						return Operation(combo);
+					}
+					else {
+						// not a valid operation, pop it
+						queue.pop();
+					}
+				}
+			}
+
+			// no move exists
+			return std::nullopt;
+		}
+
+		void start_move(Single& move) {
+			using namespace detail;
+
+			switch (move.src_type) {
+			case DEG_TWO_SUPPORT:
+			case DEG_TWO_NO_SUPPORT: {
+				// skip
+				break;
+			}
+			case DEG_THREE_SMOOTH: {
+				// be sure to notice that the other edge will change
+				//edgeset.add(move.edge->prev(!move.left));
+				assert(edgeset.contains(move.edge->prev(!move.left)));
+				break;
+			}
+			case DEG_THREE_SUPPORT: {
+				Edge_handle other_prev = move.edge->prev(!move.left);
+				bool add_inc = other_prev->source() == move.edge->source();
+				Vertex_handle v = graph.subdivide_edge(other_prev, move.edge->source()->point(), !add_inc);
+				edgeset.add(add_inc ? v->incoming() : v->outgoing());
+				// NB: prev-edge on same face will be handled later
+				break;
+			}
+			case DEG_THREE_ALIGNED:
+			case DEG_THREE_NO_SUPPORT: {
+				graph.subdivide_edge(move.edge, move.edge->source()->point(), false);
+				// newedge is the prev edge, will be added later to edgeset
+				edgeset.add(move.edge->prev());
+				break;
+			}
+			default:
+				assert(false); // unsupported vertex-moving type
+			}
+
+			switch (move.tar_type) {
+			case DEG_TWO_SUPPORT:
+			case DEG_TWO_NO_SUPPORT: {
+				// skip
+				break;
+			}
+			case DEG_THREE_SMOOTH: {
+				// be sure to notice that the other edge will change
+				//edgeset.add(move.edge->next(move.left));
+				assert(edgeset.contains(move.edge->next(move.left)));
+				break;
+			}
+			case DEG_THREE_SUPPORT: {
+				Edge_handle other_next = move.edge->next(move.left);
+				bool add_inc = other_next->source() == move.edge->target();
+				Vertex_handle v = graph.subdivide_edge(other_next, move.edge->target()->point(), !add_inc);
+				edgeset.add(add_inc ? v->incoming() : v->outgoing());
+				// NB: next-edge on same face will be handled later
+				break;
+			}
+			case DEG_THREE_ALIGNED:
+			case DEG_THREE_NO_SUPPORT: {
+				graph.subdivide_edge(move.edge, move.edge->target()->point(), true);
+				// newedge is the next edge, will be added later to edgeset
+				edgeset.add(move.edge->next());
+				break;
+			}
+			default:
+				assert(false); // unsupported vertex-moving type
+			}
+		}
+
+		void contract_move(Single& move) {
+			EDGEMOVE_OUTPUT("Contracting " << *move.edge << (move.left ? " left" : " right") << " for area " << move.swept_area());
+
+			start_move(move);
+
+			Edge_handle prev = move.edge->prev(move.left);
+			Edge_handle next = move.edge->next(!move.left);
+
+			if (move.remove_self) {
+				EDGEMOVE_OUTPUT("  remove self");
+				Vertex_handle v;
+				if (move.edge->source()->degree() != 2) {
+					// target must be degree-2
+					v = move.edge->source();
+					graph.merge_with_next(move.edge);
+				}
+				else {
+					// source is degree-2
+					v = move.edge->target();
+					graph.merge_with_prev(move.edge);
+				}
+				graph.move_vertex(v, move.source_destination());
+
+				assert(!move.remove_previous || !move.remove_next);
+
+				if (move.remove_previous) {
+					if (v->degree() == 2) {
+						EDGEMOVE_OUTPUT("  remove prev");
+						graph.merge_with_next(prev);
+
+						if (move.merge_previous) {
+							EDGEMOVE_OUTPUT("  merge prev");
+							graph.merge_with_next(next->prev());
+						}
+					}
+					else {
+						EDGEMOVE_OUTPUT("  remove prev, deg != 2");
+						Vertex_handle pv = prev->other(v);
+						assert(!move.merge_previous);
+						assert(pv->degree() == 2);
+						Edge_handle pe = graph.merge_vertex(pv, pv->outgoing() == prev); // make sure to erase prev. NB: combined with the move, the other edge at pv does not change
+						graph.move_vertex(v, move.source_destination());
+						//edgeset.add(pe);
+					}
+					//edgeset.add(next);
+				}
+				else if (move.remove_next) {
+					if (v->degree() == 2) {
+						EDGEMOVE_OUTPUT("  remove next");
+						graph.merge_with_prev(next);
+
+						if (move.merge_next) {
+							EDGEMOVE_OUTPUT("  merge next");
+							graph.merge_with_prev(prev->next());
+						}
+					}
+					else {
+						EDGEMOVE_OUTPUT("  remove next, deg != 2");
+						Vertex_handle nv = next->other(v);
+						assert(!move.merge_next);
+						assert(nv->degree() == 2);
+						Edge_handle ne = graph.merge_vertex(nv, nv->outgoing() == next); // make sure to erase next. NB: combined with the move, the other edge at nv does not change
+						graph.move_vertex(v, move.target_destination());
+						//edgeset.add(ne);
+					}
+					//edgeset.add(prev);
+				}
+				else {
+					//edgeset.addAll(v->incident_edges());
+				}
+			}
+			else {
+				//edgeset.add(move.edge);
+
+				if (move.remove_previous) {
+					Vertex_handle v = move.edge->source();
+					if (v->degree() == 2) {
+						EDGEMOVE_OUTPUT("  remove prev");
+						graph.merge_with_next(prev);
+						if (move.merge_previous) {
+							EDGEMOVE_OUTPUT("  merge prev");
+							graph.merge_with_next(move.edge->prev());
+						}
+					}
+					else {
+						EDGEMOVE_OUTPUT("  remove prev, deg != 2");
+						Vertex_handle pv = prev->other(v);
+						assert(!move.merge_previous);
+						assert(pv->degree() == 2);
+						Edge_handle pe = graph.merge_vertex(pv, pv->outgoing() == prev); // make sure to erase prev. NB: combined with the move, the other edge at pv does not change
+						graph.move_vertex(v, move.source_destination());
+						//edgeset.add(pe);
+					}
+				}
+				else {
+					graph.move_vertex(move.edge->source(), move.source_destination());
+					//edgeset.add(prev);
+				}
+
+				if (move.remove_next) {
+					Vertex_handle v = move.edge->target();
+					if (v->degree() == 2) {
+						EDGEMOVE_OUTPUT("  remove next");
+						graph.merge_with_prev(next);
+						if (move.merge_next) {
+							EDGEMOVE_OUTPUT("  merge next");
+							graph.merge_with_prev(move.edge->next());
+						}
+					}
+					else {
+						EDGEMOVE_OUTPUT("  remove next, deg != 2");
+						Vertex_handle nv = next->other(v);
+						assert(!move.merge_next);
+						assert(nv->degree() == 2);
+						Edge_handle ne = graph.merge_vertex(nv, nv->outgoing() == next); // make sure to erase next. NB: combined with the move, the other edge at nv does not change
+						graph.move_vertex(v, move.target_destination());
+						//edgeset.add(ne);
+					}
+				}
+				else {
+					graph.move_vertex(move.edge->target(), move.target_destination());
+					//edgeset.add(next);
+				}
+			}
+		}
+
+		void move(Single& move, const Number<Kernel> area) {
+			assert(area > 0);
+			auto [s, t] = move.end_positions_for(area).value();
+			this->move(move, s, t);
+		}
+
+		void move(Single& move, const Point<Kernel> source_dest, const Point<Kernel> target_dest) {
+			EDGEMOVE_OUTPUT("Moving " << *move.edge << (move.left ? " left" : " right"));
+
+			start_move(move);
+
+			graph.move_vertex(move.edge->source(), source_dest);
+			graph.move_vertex(move.edge->target(), target_dest);
+			//edgeset.add(prev);
+			//edgeset.add(move.edge);
+			//edgeset.add(next);
+		}
+
+		void performStep(Single& contract, Single& compensate) {
+			assert(graph.can_perform_operation());
+
+			EDGEMOVE_OUTPUT("Paired move");
+
+			Number<Kernel> area = contract.swept_area();
+			const bool contract_compensate = safe_test::leq(compensate.swept_area(), area);
+
+			determineCheckout(contract, true);
+			determineCheckout(compensate, contract_compensate);
+			checkOut();
+
+			graph.start_operation_group();
+			this->contract_move(contract);
+			if (contract_compensate) {
+				this->contract_move(compensate);
+			}
+			else {
+				this->move(compensate, area);
+			}
+			graph.end_operation_group();
+
+			postProcess();
+		}
+
+		void performStep(Combo& combo) {
+			assert(graph.can_perform_operation());
+
+			EDGEMOVE_OUTPUT("Combo move " << *combo.edge << " for area " << combo.swept_area());
+
+			determineCheckout(*combo.prev_move, !combo.prev_partial);
+			determineCheckout(*combo.next_move, !combo.next_partial);
+			checkOut();
+
+			// perform
+
+			graph.start_operation_group();
+			if (combo.remove_self) {
+				// degeneracy handling
+				combo.prev_move->remove_next = false;
+				combo.next_move->remove_previous = false;
+			}
+			assert(combo.prev_partial || combo.next_partial || !combo.prev_move->remove_next || !combo.next_move->remove_previous); // cannot contract both ends and both remove the common edge?
+
+			if (combo.prev_partial) {
+				move(*combo.prev_move, combo.prev_source_destination(), combo.prev_target_destination());
+			}
+			else {
+				contract_move(*combo.prev_move);
+			}
+			if (combo.next_partial) {
+				move(*combo.next_move, combo.next_source_destination(), combo.next_target_destination());
+			}
+			else {
+				contract_move(*combo.next_move);
+			}
+			assert(graph.edge(combo.edge->graph_index()) == combo.edge); // if violated, something goes wrong with degeneracy handling above?
+
+			if (combo.remove_self) {
+				EDGEMOVE_OUTPUT("  combo: remove self");
+				// NB: the two points should already be on top of eachother by the two moves
+				Vertex_handle src = combo.edge->source();
+				Vertex_handle tar = combo.edge->target();
+				edgeset.remove(combo.edge);
+				graph.merge_vertex(src, true); // removes combo.edge
+				if (combo.merge_across) {
+					EDGEMOVE_OUTPUT("  combo: merge across");
+					edgeset.remove(tar->outgoing());
+					graph.merge_vertex(tar, true); // removes tar.outgoing
+				}
+			}
+			graph.end_operation_group();
+
+			postProcess();
+		}
+
+		void performStep(Single& contract) {
+			assert(graph.can_perform_operation());
+
+			EDGEMOVE_OUTPUT("Tiny move");
+
+			determineCheckout(contract, true);
+			checkOut();
+
+			graph.start_operation_group();
+			contract_move(contract);
+			graph.end_operation_group();
+
+			postProcess();
+		}
+
+		void determineCheckout(Single& move, const bool contract) {
+			// TODO: refine what actually changes around high-degree vertices? (is that possible...?)
+			edgeset.addAll(move.edge->source()->incident_edges());
+			edgeset.addAll(move.edge->target()->incident_edges());
+			if (contract) {
+				if (move.merge_previous) {
+					edgeset.add(move.edge->prev()->prev());
+				}
+				else if (move.remove_previous && move.edge->source()->degree() != 2) {
+					// vertex of deg 2 will be replaced by vertex of degree != 2
+					Edge_handle pe = move.edge->prev(move.left);
+					edgeset.add(pe->source() == move.edge->source() ? pe->next() : pe->prev());
+				}
+
+				if (move.merge_next) {
+					edgeset.add(move.edge->next()->next());
+				}
+				else if (move.remove_next && move.edge->target()->degree() != 2) {
+					// vertex of deg 2 will be replaced by vertex of degree != 2
+					Edge_handle ne = move.edge->next(!move.left);
+					edgeset.add(ne->source() == move.edge->target() ? ne->next() : ne->prev());
+				}
+			}
+		}
+
+		void checkOut() {
+			//std::cout << "checking out..." << std::endl;
+			for (Edge_handle e : edgeset) {
+				//std::cout << "  " << *e << std::endl;
+				sqt->remove(e);
+
+				Edge_data& edata = data_traits.data(e);
+
+				if (edata.left.movable()) {
+					queue.remove(&edata.left);
+					if (edata.left.waiting_index >= 0) {
+						data_traits.data(e->path()).remove_waiting(&edata.left);
+					}
+
+					for (Edge_handle b : edata.left.blocked_by) {
+						utils::listRemove<Move>(&edata.left, data_traits.data(b).blocking);
+					}
+					edata.left.blocked_by.clear();
+				}
+				assert(!queue.contains(&edata.left));
+
+				if (edata.right.movable()) {
+					queue.remove(&edata.right);
+					if (edata.right.waiting_index >= 0) {
+						data_traits.data(e->path()).remove_waiting(&edata.right);
+					}
+
+					for (Edge_handle b : edata.right.blocked_by) {
+						utils::listRemove<Move>(&edata.right, data_traits.data(b).blocking);
+					}
+					edata.right.blocked_by.clear();
+				}
+				assert(!queue.contains(&edata.right));
+
+				if (edata.combo.is_executable()) {
+					queue.remove(&edata.combo);
+
+					for (Edge_handle b : edata.combo.blocked_by) {
+						utils::listRemove<Move>(&edata.combo, data_traits.data(b).blocking);
+					}
+					edata.combo.blocked_by.clear();
+				}
+				assert(!queue.contains(&edata.combo));
+
+				for (Move* move : edata.blocking) {
+					assert(!queue.contains(move));
+
+					utils::listRemove(e, move->blocked_by);
+
+					if (!move->is_blocked() && !edgeset.contains(move->edge)) {
+
+						if (move->is_single()) {
+							Single* single = static_cast<Single*>(move);
+							assert(single->waiting_index < 0);
+							// NB: single move can also be blocked because it was checked as a compensating move, but not be actually contractable itself
+							if (single->contractable())
+								queue.push(move);
+
+							// but it's movable in any case (otherwise, it would not have been blocked)
+							// so it may be movable now, pop waiting from the other side
+							auto& pdata = data_traits.data(single->edge->path());
+							std::vector<Single*>& waiting = single->left ? pdata.right_waiting : pdata.left_waiting;
+							for (Single* other : waiting) {
+								if (!edgeset.contains(other->edge)) {
+									queue.push(other);
+								}
+								other->waiting_index = -1;
+							}
+							waiting.clear();
+
+						}
+						else {
+							// Combo move: would only have been blocked if it was indeed executable
+							queue.push(move);
+						}
+					}
+				}
+				edata.blocking.clear();
+
+			}
+			//edgeset.removeAll();
+		}
+
+		void postProcess() {
+			size_t changed = edgeset.size();
+
+			for (size_t i = 0; i < changed; ++i) {
+
+				Edge_handle e = edgeset[i];
+				assert(graph.edge(e->graph_index()) == e);
+				sqt->insert(e);
+				edgeset.addAll(e->source()->incident_edges());
+				edgeset.addAll(e->target()->incident_edges());
+			}
+
+			size_t movechanged = edgeset.size();
+			for (size_t i = 0; i < movechanged; ++i) {
+				Edge_handle e = edgeset[i];
+				update_singles(e);
+				edgeset.addAll(e->source()->incident_edges());
+				edgeset.addAll(e->target()->incident_edges());
+			}
+
+			for (Edge_handle e : edgeset) {
+				update_combo(e);
+			}
+
+			edgeset.removeAll();
+
+			EDGEMOVE_OUTPUT("--- reached " << graph.number_of_edges() << " edges -------------------------");
+		}
 
 	public:
-		EdgeMove(Graph& g) requires std::is_default_constructible<Data_traits>::value&& std::is_default_constructible<Score_traits>::value : graph(g) {
+		EdgeMoves(Graph& g) requires std::is_default_constructible<Data_traits>::value&& std::is_default_constructible<Score_traits>::value : graph(g) {
 		}
 
-		EdgeMove(Graph& g, Score_traits score) requires std::is_default_constructible<Data_traits>::value : graph(g), score_traits(score) {
+		EdgeMoves(Graph& g, Score_traits score) requires std::is_default_constructible<Data_traits>::value : graph(g), score_traits(score) {
 		}
 
-		EdgeMove(Graph& g, Data_traits data) requires std::is_default_constructible<Score_traits>::value : graph(g), data_traits(data) {
+		EdgeMoves(Graph& g, Data_traits data) requires std::is_default_constructible<Score_traits>::value : graph(g), data_traits(data) {
 		}
 
-		EdgeMove(Graph& g, Data_traits data, Score_traits score) : graph(g), data_traits(data), score_traits(score) {
+		EdgeMoves(Graph& g, Data_traits data, Score_traits score) : graph(g), data_traits(data), score_traits(score) {
 		}
 
-		~EdgeMove() {
+		~EdgeMoves() {
 			delete sqt;
 			delete pqt;
 		}
@@ -1469,122 +2108,27 @@ namespace cartocrow::simplification::em {
 			return true;
 		}
 	};
+
+	template<DataTraits DT>
+	class SweptAreaScore {
+	public:
+		using Graph = DT::Graph;
+		using Edge_handle = Graph::Vertex_handle;
+		using Kernel = Graph::Kernel;
+
+		using Single = DT::Edge_data::Single;
+		using Combo = DT::Edge_data::Combo;
+
+		static void initialize(Graph& graph, DT& data) {
+			// skip
+		}
+
+		static Number<Kernel> compute_cost(Single& single) {
+			return CGAL::abs(single.swept.area());
+		}
+
+		static Number<Kernel> compute_cost(Combo& combo) {
+			return CGAL::abs(combo.prev_swept.area());
+		}
+	};
 }
-
-namespace cartocrow::simplification {
-
-	namespace detail {
-
-		template<class G> class EdgeSet;
-
-		template<class G> struct BaseMove;
-		template<class G> struct SingleMove;
-		template<class G> struct ComboMove;
-
-		template <class K, bool H> struct EMData;
-		template <class K, bool H> struct EMPathData;
-
-		template<class K, bool H>
-		using EMGraphTraits = CustomGraphTraits<H, true, true, true>;
-
-		template <class EMT>
-		concept EMTraits = requires(typename EMT::Graph::Edge_handle e, typename EMT::Graph::Path_handle p, SingleMove<typename EMT::Graph>&sm, ComboMove<typename EMT::Graph>&cm) {
-
-			typename EMT::Graph;
-
-			{
-				EMT::data(e)
-			} -> std::same_as<EMData<typename EMT::Kernel, EMT::Graph::Graph_traits::historic>&>;
-
-			{
-				EMT::data(p)
-			} -> std::same_as<EMPathData<typename EMT::Kernel, EMT::Graph::Graph_traits::historic>&>;
-
-			{ EMT::determineSingleCost(sm) } -> std::same_as< Number<typename EMT::Kernel>>;
-			{ EMT::determineComboCost(cm) } -> std::same_as< Number<typename EMT::Kernel>>;
-		};
-
-		template<class G>
-		struct MoveQueueTraits;
-	}
-
-	template<typename K, bool H>
-	using EdgeMovesGraph = Straight_graph_2<K, detail::EMGraphTraits<K, H>, std::monostate, detail::EMData<K, H>, detail::EMPathData<K, H>>;
-
-	template <detail::EMTraits EMT> class EdgeMoves {
-	public:
-		using Graph = EMT::Graph;
-		using Vertex_handle = Graph::Vertex_handle;
-		using Edge_handle = Graph::Edge_handle;
-		using Kernel = Graph::Kernel;
-		using VertexTree = VertexQuadTree<Graph>;
-		using EdgeTree = EdgeQuadTree<Graph>;
-
-	private:
-		using Data = detail::EMData<Kernel, Graph::Graph_traits::historic>;
-		using Move = detail::BaseMove<Graph>;
-		using Single = detail::SingleMove<Graph>;
-		using Combo = detail::ComboMove<Graph>;
-		using Queue = cartocrow::IndexedPriorityQueue<detail::MoveQueueTraits<Graph>>;
-		
-		using PairedSingles = std::pair<Single*, Single*>;
-		using Operation = std::variant<Combo*, PairedSingles, Single*>;
-
-		Graph& graph;
-		EdgeTree& sqt;
-		VertexTree& pqt;
-		Queue queue;
-		Graph_edge_set<Graph> edgeset;
-
-		bool validate_state();
-
-		template<bool LEFT>
-		void update_single(Edge_handle e, Single& single);
-		void update_singles(Edge_handle e);
-		void update_combo(Edge_handle e);
-		bool test_topology(Single& single);
-		bool test_topology(Combo& combo);
-		Single* find_compensate_move(Single& contract, Number<Kernel> area);
-
-		std::optional<Operation> findNextStep();
-		void start_move(Single& move);
-		void contract(Single& move);
-		void move(Single& move, const Number<Kernel> area);
-		void move(Single& move, const Point<Kernel> source_dest, const Point<Kernel> target_dest);
-		void performStep(Single& contract, Single& compensate);
-		void performStep(Combo& combo);
-		void performStep(Single& contact);
-
-		void determineCheckout(Single& move, const bool contract);
-		void checkOut();
-		void postProcess();
-
-	public:
-		EdgeMoves(Graph& g, EdgeTree& sqt, VertexTree& pqt);
-
-		void initialize(bool initSQT, bool initPQT);
-		bool run(std::optional<std::function<bool(int, Number<Kernel>)>> stop = std::nullopt);
-		bool step();
-	};
-
-
-	template <typename G> struct BuchinEtAlTraits {
-		using Graph = G;
-		using Kernel = Graph::Kernel;
-
-		static detail::EMData<Kernel, Graph::Graph_traits::historic>& data(typename Graph::Edge_handle e) {
-			return e->data();
-		}
-		static detail::EMPathData<Kernel, Graph::Graph_traits::historic>& data(typename Graph::Path_handle p) {
-			return p->data();
-		}
-
-		static Number<Kernel> determineSingleCost(detail::SingleMove<Graph>& sm);
-		static Number<Kernel> determineComboCost(detail::ComboMove<Graph>& cm);
-	};
-
-	template <typename G> using BuchinEtAl = EdgeMoves<BuchinEtAlTraits<G>>;
-
-} // namespace cartocrow::simplification
-
-#include "edge_moves.hpp"

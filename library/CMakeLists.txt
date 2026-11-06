@@ -2,7 +2,6 @@ set(HEADERS
 	common.h
 	edge_collapse.h
 	edge_moves.h
-	edge_moves.hpp
 	orientation_restriction.h
 	orientation_restriction.hpp
 	path_vertex_removal.h	

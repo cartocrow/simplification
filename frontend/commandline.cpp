@@ -124,13 +124,15 @@ void runKSBB(const CommandLineArguments& cla) {
 template<bool ExactMode>
 void runBMRS(const CommandLineArguments& cla) {
 
+	using namespace cartocrow::simplification::em;
+
 	cout << "Running BMRS (ExactMode = " << ExactMode << ")" << endl;
 
 	using Kernel = std::conditional<ExactMode, Exact, Inexact>::type;
-	using Graph = EdgeMovesGraph<Kernel, false>;
-	using PQT = VertexQuadTree<Graph>;
-	using SQT = EdgeQuadTree<Graph>;
-	using Alg = BuchinEtAl<Graph>;
+	using DT = DataTraits_Dedicated<Kernel, true>;
+	using Graph = DT::Graph;
+	using ST = SweptAreaScore<DT>;
+	using Alg = EdgeMoves<DT, ST>;
 
 	filesystem::path input = cla.get_string("-input");
 	int target = cla.get_integer("-target", 1);
@@ -144,30 +146,25 @@ void runBMRS(const CommandLineArguments& cla) {
 	Stopwatch& init = pool.get("init");
 	Stopwatch& run = pool.get("run");
 
-	Graph graph;
 	cout << "Loading " << input << endl;
 	load.start();
-	auto res = readIpeFile<Graph>(graph, input, depth, 0.0000001);
-	if (!res) {
+	Graph* graph = readIpeFile<Graph>(input, depth, 0.0000001);
+	if (!graph) {
 		return;
 	}
-	PQT pqt = *res;
-	graph.initialize();
+	graph->initialize();
 	load.stop();
-	cout << "  Done, " << graph.number_of_edges() << " edges" << endl;
+	cout << "  Done, " << graph->number_of_edges() << " edges" << endl;
 
 	constexpr double deg_to_rad = numbers::pi / 180.0;
 
 	if (cla.has_argument("-restrict", 2)) {
 		int orientations = cla.get_integer("-restrict", 1);
 		double angle = cla.get_double("-restrict", 2) * deg_to_rad;
-		restrict_orientations(graph, orientations, angle);
+		restrict_orientations(*graph, orientations, angle);
 	}
 
-	Rectangle box = pqt.root_box();
-	pqt.clear();
-	SQT sqt(box, depth, fuzz);
-	Alg alg(graph, sqt, pqt);
+	Alg alg(*graph);
 	cout << "Initializing" << endl;
 	init.start();
 	alg.initialize(false, true);
@@ -177,9 +174,9 @@ void runBMRS(const CommandLineArguments& cla) {
 	alg.run([&target](int complexity, Number<Kernel> cost) {
 		return complexity <= target; });
 	run.stop();
-	cout << "Done, " << graph.number_of_edges() << " edges" << endl;
+	cout << "Done, " << graph->number_of_edges() << " edges" << endl;
 
-	writeIpeFile(graph, output);
+	writeIpeFile(*graph, output);
 
 	pool.printAll();
 }
