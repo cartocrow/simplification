@@ -676,12 +676,12 @@ namespace cartocrow::simplification::em {
 			}
 
 			if (left_at_source) {
-				prev_move = &data_traits.data(prev).left;
-				next_move = &data_traits.data(next).right;
+				prev_move = data_traits.data(prev).left;
+				next_move = data_traits.data(next).right;
 			}
 			else {
-				prev_move = &data_traits.data(prev).right;
-				next_move = &data_traits.data(next).left;
+				prev_move = data_traits.data(prev).right;
+				next_move = data_traits.data(next).left;
 			}
 
 			if (!prev_move->movable() || !next_move->movable()) {
@@ -926,9 +926,17 @@ namespace cartocrow::simplification::em {
 		using Single = SingleMove<K, Edge_handle, Vertex_handle>;
 		using Combo = ComboMove<K, Edge_handle, Vertex_handle>;
 
-		Single left, right;
-		Combo combo;
+		// NB pointers instead of value types, s.t. we can store pointers to these while the edgedata may be relocated
+		Single* left = new Single(); 
+		Single* right = new Single(); 
+		Combo* combo = new Combo();
 		std::vector<Move*> blocking;
+
+		~EdgeData() {
+			delete left;
+			delete right;
+			delete combo;
+		}
 	};
 
 
@@ -1347,34 +1355,35 @@ namespace cartocrow::simplification::em {
 			assert(graph.edge(e->graph_index()) == e);
 
 			Edge_data& data = data_traits.data(e);
-			update_single<true>(e, data.left);
-			update_single<false>(e, data.right);
+			update_single<true>(e, *data.left);
+			update_single<false>(e, *data.right);
 		}
 
 		void update_combo(Edge_handle e) {
 			Edge_data& data = data_traits.data(e);
+			Combo& combo = *data.combo;
 
-			data.combo.edge = e;
-			data.combo.blocked_by_degzero = false;
-			for (Edge_handle b : data.combo.blocked_by) {
-				utils::listRemove<Move>(&data.combo, data_traits.data(b).blocking);
+			combo.edge = e;
+			combo.blocked_by_degzero = false;
+			for (Edge_handle b : combo.blocked_by) {
+				utils::listRemove<Move>(&combo, data_traits.data(b).blocking);
 			}
-			data.combo.blocked_by.clear();
+			combo.blocked_by.clear();
 
-			data.combo.update(data_traits);
+			combo.update(data_traits);
 
-			if (data.combo.is_executable()) {
-				data.combo.cost = score_traits.compute_cost(data.combo);
+			if (combo.is_executable()) {
+				combo.cost = score_traits.compute_cost(combo);
 
-				if (queue.contains(&data.combo)) {
-					queue.update(&data.combo);
+				if (queue.contains(&combo)) {
+					queue.update(&combo);
 				}
 				else {
-					queue.push(&data.combo);
+					queue.push(&combo);
 				}
 			}
 			else {
-				queue.remove(&data.combo);
+				queue.remove(&combo);
 			}
 		}
 
@@ -1447,14 +1456,14 @@ namespace cartocrow::simplification::em {
 			while (walkBck != nullptr || walkFwd != nullptr) {
 				if (walkBck != nullptr) {
 					// take a step back and test
-					Single& candidate = contract.left ? data_traits.data(walkBck).right : data_traits.data(walkBck).left;
-					if (candidate.can_compensate_for(contract, reduc, area)) {
+					Single* candidate = contract.left ? data_traits.data(walkBck).right : data_traits.data(walkBck).left;
+					if (candidate->can_compensate_for(contract, reduc, area)) {
 
-						if (test_topology(candidate)) {
-							return &candidate;
+						if (test_topology(*candidate)) {
+							return candidate;
 						}
 						else {
-							queue.remove(&candidate);
+							queue.remove(candidate);
 						}
 					}
 
@@ -1468,14 +1477,14 @@ namespace cartocrow::simplification::em {
 
 				if (walkFwd != nullptr) {
 					// take a step forward and test
-					Single& candidate = contract.left ? data_traits.data(walkFwd).right : data_traits.data(walkFwd).left;
-					if (candidate.can_compensate_for(contract, reduc, area)) {
+					Single* candidate = contract.left ? data_traits.data(walkFwd).right : data_traits.data(walkFwd).left;
+					if (candidate->can_compensate_for(contract, reduc, area)) {
 
-						if (test_topology(candidate)) {
-							return &candidate;
+						if (test_topology(*candidate)) {
+							return candidate;
 						}
 						else {
-							queue.remove(&candidate);
+							queue.remove(candidate);
 						}
 					}
 					walkFwd = safe_next(walkFwd);
@@ -1873,41 +1882,41 @@ namespace cartocrow::simplification::em {
 
 				Edge_data& edata = data_traits.data(e);
 
-				if (edata.left.movable()) {
-					queue.remove(&edata.left);
-					if (edata.left.waiting_index >= 0) {
-						data_traits.data(e->path()).remove_waiting(&edata.left);
+				if (edata.left->movable()) {
+					queue.remove(edata.left);
+					if (edata.left->waiting_index >= 0) {
+						data_traits.data(e->path()).remove_waiting(edata.left);
 					}
 
-					for (Edge_handle b : edata.left.blocked_by) {
-						utils::listRemove<Move>(&edata.left, data_traits.data(b).blocking);
+					for (Edge_handle b : edata.left->blocked_by) {
+						utils::listRemove<Move>(edata.left, data_traits.data(b).blocking);
 					}
-					edata.left.blocked_by.clear();
+					edata.left->blocked_by.clear();
 				}
-				assert(!queue.contains(&edata.left));
+				assert(!queue.contains(edata.left));
 
-				if (edata.right.movable()) {
-					queue.remove(&edata.right);
-					if (edata.right.waiting_index >= 0) {
-						data_traits.data(e->path()).remove_waiting(&edata.right);
+				if (edata.right->movable()) {
+					queue.remove(edata.right);
+					if (edata.right->waiting_index >= 0) {
+						data_traits.data(e->path()).remove_waiting(edata.right);
 					}
 
-					for (Edge_handle b : edata.right.blocked_by) {
-						utils::listRemove<Move>(&edata.right, data_traits.data(b).blocking);
+					for (Edge_handle b : edata.right->blocked_by) {
+						utils::listRemove<Move>(edata.right, data_traits.data(b).blocking);
 					}
-					edata.right.blocked_by.clear();
+					edata.right->blocked_by.clear();
 				}
-				assert(!queue.contains(&edata.right));
+				assert(!queue.contains(edata.right));
 
-				if (edata.combo.is_executable()) {
-					queue.remove(&edata.combo);
+				if (edata.combo->is_executable()) {
+					queue.remove(edata.combo);
 
-					for (Edge_handle b : edata.combo.blocked_by) {
-						utils::listRemove<Move>(&edata.combo, data_traits.data(b).blocking);
+					for (Edge_handle b : edata.combo->blocked_by) {
+						utils::listRemove<Move>(edata.combo, data_traits.data(b).blocking);
 					}
-					edata.combo.blocked_by.clear();
+					edata.combo->blocked_by.clear();
 				}
-				assert(!queue.contains(&edata.combo));
+				assert(!queue.contains(edata.combo));
 
 				for (Move* move : edata.blocking) {
 					assert(!queue.contains(move));
