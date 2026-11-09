@@ -4,7 +4,7 @@
 
 namespace cartocrow::simplification::em {
 
-	//#define EDGEMOVE_OUTPUT(line) std::cout << line << std::endl
+//#define EDGEMOVE_OUTPUT(line) std::cout << line << std::endl
 #define EDGEMOVE_OUTPUT(line) //
 
 	template<typename Edge_handle>
@@ -272,7 +272,7 @@ namespace cartocrow::simplification::em {
 					return false;
 				}
 				else {
-					Combo* combo = data_traits.data(next).combo;
+					Combo* combo = data_traits.data(prev).combo;
 					if (combo->next_move == this) {
 						// leave to ComboMove
 						return false;
@@ -482,21 +482,19 @@ namespace cartocrow::simplification::em {
 				return;
 			}
 
-			Number<Kernel> min_dist_squared = -1;
+			Number<Kernel> min_dist_squared;
 			if (prev_dist_squared >= 0) {
-				if (min_dist_squared < 0) {
-					min_dist_squared = prev_dist_squared;
-				}
-				else {
-					CGAL::min(min_dist_squared, prev_dist_squared);
-				}
+				min_dist_squared = prev_dist_squared;
+			}
+			else {
+				min_dist_squared = -1;
 			}
 			if (next_dist_squared >= 0) {
 				if (min_dist_squared < 0) {
 					min_dist_squared = next_dist_squared;
 				}
 				else {
-					CGAL::min(min_dist_squared, next_dist_squared);
+					min_dist_squared = CGAL::min(min_dist_squared, next_dist_squared);
 				}
 			}
 			if (edge_dist_squared >= 0) {
@@ -504,7 +502,7 @@ namespace cartocrow::simplification::em {
 					min_dist_squared = edge_dist_squared;
 				}
 				else {
-					CGAL::min(min_dist_squared, edge_dist_squared);
+					min_dist_squared = CGAL::min(min_dist_squared, edge_dist_squared);
 				}
 			}
 
