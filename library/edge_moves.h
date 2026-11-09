@@ -74,13 +74,20 @@ namespace cartocrow::simplification::em {
 	};
 
 	template<class K, typename EdgeHandle, typename VertexHandle>
+	struct ComboMove;
+
+	template<class K, typename EdgeHandle, typename VertexHandle>
 	struct SingleMove : public BaseMove<K, EdgeHandle> {
 
 		using Kernel = K;
 		using Edge_handle = EdgeHandle;
 		using Vertex_handle = VertexHandle;
 
-		bool left;
+		using Combo = ComboMove<K, EdgeHandle, VertexHandle>;
+
+		SingleMove(const bool left) : left(left) {}
+
+		const bool left;
 		enum VertexType src_type, tar_type;
 		bool remove_self, remove_previous, remove_next;
 		bool merge_previous, merge_next;
@@ -94,6 +101,29 @@ namespace cartocrow::simplification::em {
 
 		bool is_blocked_by(Edge_handle candidate) const {
 			return is_blocked_by(candidate, swept, true);
+		}
+
+		int supported_count() {
+			int support = 0;
+			switch (src_type) {
+			case DEG_TWO_SUPPORT:
+			case DEG_THREE_SUPPORT:
+			case DEG_THREE_ALIGNED:
+				support++;
+				break;
+			default:
+				break;
+			}
+			switch (tar_type) {
+			case DEG_TWO_SUPPORT:
+			case DEG_THREE_SUPPORT:
+			case DEG_THREE_ALIGNED:
+				support++;
+				break;
+			default:
+				break;
+			}
+			return support;
 		}
 
 		bool is_blocked_by(Edge_handle candidate, const Polygon<Kernel>& swept_polygon, const bool contract) const {
@@ -172,7 +202,8 @@ namespace cartocrow::simplification::em {
 			return false;
 		}
 
-		bool can_compensate_for(const SingleMove& contract, const int reduc, const Number<Kernel> area) const {
+		template<class DT>
+		bool can_compensate_for(const SingleMove& contract, const int reduc, const Number<Kernel> area, DT& data_traits) const {
 			if (this->is_blocked()) {
 				return false;
 			}
@@ -220,12 +251,14 @@ namespace cartocrow::simplification::em {
 					return false;
 				}
 				else {
-					// make sure its not convex-reflex sequence
-					bool left_at_source = CGAL::left_turn(this->edge->source()->point(), next->source()->point(), next->target()->point());
-					bool right_at_target = CGAL::right_turn(next->source()->point(), next->target()->point(), contract.edge->target()->point());
+					Combo* combo = data_traits.data(next).combo;
+					if (combo->prev_move == this) {
+						// leave to ComboMove
+						return false;
+					}
 
-					if (left_at_source == right_at_target) {
-						// different turns, disallow, and leave to ComboMove
+					if (area == swept && remove_next) {
+						// this move is to remove the shared edge if compensating but the contracting move will lengthen this shared edge
 						return false;
 					}
 				}
@@ -239,12 +272,14 @@ namespace cartocrow::simplification::em {
 					return false;
 				}
 				else {
-					// make sure its not convex-reflex sequence
-					bool left_at_source = CGAL::left_turn(contract.edge->source()->point(), prev->source()->point(), prev->target()->point());
-					bool right_at_target = CGAL::right_turn(prev->source()->point(), prev->target()->point(), this->edge->target()->point());
+					Combo* combo = data_traits.data(next).combo;
+					if (combo->next_move == this) {
+						// leave to ComboMove
+						return false;
+					}
 
-					if (left_at_source == right_at_target) {
-						// different turns, disallow, and leave to CombinedMove
+					if (area == swept && remove_previous) {
+						// this move is to remove the shared edge if compensating but the contracting move will lengthen this shared edge
 						return false;
 					}
 				}
@@ -300,7 +335,8 @@ namespace cartocrow::simplification::em {
 			return dec - increase_on_move();
 		}
 
-		void update() {
+		template<class ST>
+		void update(ST& score_traits) {
 			swept.clear();
 
 			Vertex_handle a = nullptr, d = nullptr;
@@ -439,29 +475,37 @@ namespace cartocrow::simplification::em {
 			}
 
 			// which is the limiting factor? and which edges then get removed?
-			if (prev_dist_squared < 0 && next_dist_squared < 0) {
+			if (prev_dist_squared < 0 && next_dist_squared < 0 && (!score_traits.allow_finite_unsupported() || edge_dist_squared < 0)) {
 				// no support at all
-				// TODO: refine, to allow converging unsupported moves?
 				src_type = UNMOVABLE;
 				tar_type = UNMOVABLE;
 				return;
 			}
 
-			assert(prev_dist_squared >= 0 || next_dist_squared >= 0); // NB: if TODO above is resolved, this may fail
-
-			Number<Kernel> min_dist_squared;
-			if (prev_dist_squared < 0) {
-				min_dist_squared = next_dist_squared;
+			Number<Kernel> min_dist_squared = -1;
+			if (prev_dist_squared >= 0) {
+				if (min_dist_squared < 0) {
+					min_dist_squared = prev_dist_squared;
+				}
+				else {
+					CGAL::min(min_dist_squared, prev_dist_squared);
+				}
 			}
-			else if (next_dist_squared < 0) {
-				min_dist_squared = prev_dist_squared;
+			if (next_dist_squared >= 0) {
+				if (min_dist_squared < 0) {
+					min_dist_squared = next_dist_squared;
+				}
+				else {
+					CGAL::min(min_dist_squared, next_dist_squared);
+				}
 			}
-			else {
-				min_dist_squared = CGAL::min(prev_dist_squared, next_dist_squared);
-			}
-
 			if (edge_dist_squared >= 0) {
-				min_dist_squared = CGAL::min(min_dist_squared, edge_dist_squared);
+				if (min_dist_squared < 0) {
+					min_dist_squared = edge_dist_squared;
+				}
+				else {
+					CGAL::min(min_dist_squared, edge_dist_squared);
+				}
 			}
 
 			remove_self = safe_test::close(edge_dist_squared, min_dist_squared);
@@ -671,6 +715,8 @@ namespace cartocrow::simplification::em {
 
 			if (left_at_source != right_at_target) {
 				// same turn
+				prev_move = nullptr;
+				next_move = nullptr;
 				executable = false;
 				return;
 			}
@@ -927,8 +973,8 @@ namespace cartocrow::simplification::em {
 		using Combo = ComboMove<K, Edge_handle, Vertex_handle>;
 
 		// NB pointers instead of value types, s.t. we can store pointers to these while the edgedata may be relocated
-		Single* left = new Single(); 
-		Single* right = new Single(); 
+		Single* left = new Single(true);
+		Single* right = new Single(false);
 		Combo* combo = new Combo();
 		std::vector<Move*> blocking;
 
@@ -1020,6 +1066,8 @@ namespace cartocrow::simplification::em {
 		typename ST::Single;
 		typename ST::Combo;
 
+		{ score.allow_finite_unsupported() } -> std::same_as<bool>;
+		{ score.tiny_move() } -> std::same_as<Number<typename ST::Kernel>>;
 		{ score.compute_cost(single) } -> std::same_as<Number<typename ST::Kernel>>;
 		{ score.compute_cost(combo) } -> std::same_as<Number<typename ST::Kernel>>;
 	};
@@ -1312,19 +1360,17 @@ namespace cartocrow::simplification::em {
 		void update_single(Edge_handle e, Single& single) {
 			single.edge = e;
 			single.blocked_by_degzero = false;
-			for (void* bvoid : single.blocked_by) {
-				Edge_handle b = static_cast<Edge_handle>(bvoid);
+			for (Edge_handle b : single.blocked_by) {
 				utils::listRemove<Move>(&single, data_traits.data(b).blocking);
 			}
 			single.blocked_by.clear();
-			single.left = LEFT;
 
 			if (single.waiting_index >= 0) {
 				data_traits.data(e->path()).remove_waiting(&single);
 				single.waiting_index = -1;
 			}
 
-			single.update();
+			single.update(score_traits);
 
 			if (single.movable()) {
 
@@ -1457,7 +1503,7 @@ namespace cartocrow::simplification::em {
 				if (walkBck != nullptr) {
 					// take a step back and test
 					Single* candidate = contract.left ? data_traits.data(walkBck).right : data_traits.data(walkBck).left;
-					if (candidate->can_compensate_for(contract, reduc, area)) {
+					if (candidate->can_compensate_for(contract, reduc, area, data_traits)) {
 
 						if (test_topology(*candidate)) {
 							return candidate;
@@ -1478,7 +1524,7 @@ namespace cartocrow::simplification::em {
 				if (walkFwd != nullptr) {
 					// take a step forward and test
 					Single* candidate = contract.left ? data_traits.data(walkFwd).right : data_traits.data(walkFwd).left;
-					if (candidate->can_compensate_for(contract, reduc, area)) {
+					if (candidate->can_compensate_for(contract, reduc, area, data_traits)) {
 
 						if (test_topology(*candidate)) {
 							return candidate;
@@ -1512,8 +1558,7 @@ namespace cartocrow::simplification::em {
 
 						Number<Kernel> area = sm->swept_area();
 
-						// TODO: parametrize?
-						if (area < M_EPSILON) { // TODO: can we avoid this check for exact mode?
+						if (area < score_traits.tiny_move()) { // TODO: can we avoid this check for exact mode?
 							// tiny move, no compensation used
 							return Operation(sm);
 						}
@@ -2118,7 +2163,7 @@ namespace cartocrow::simplification::em {
 		}
 	};
 
-	template<DataTraits DT>
+	template<DataTraits DT, bool AllowFiniteNoSupport>
 	class SweptAreaScore {
 	public:
 		using Graph = DT::Graph;
@@ -2130,6 +2175,14 @@ namespace cartocrow::simplification::em {
 
 		static void initialize(Graph& graph, DT& data) {
 			// skip
+		}
+
+		constexpr static bool allow_finite_unsupported() {
+			return AllowFiniteNoSupport;
+		}
+
+		static Number<Kernel> tiny_move() {
+			return M_EPSILON;
 		}
 
 		static Number<Kernel> compute_cost(Single& single) {

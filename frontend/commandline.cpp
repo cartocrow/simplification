@@ -131,7 +131,7 @@ void runBMRS(const CommandLineArguments& cla) {
 	using Kernel = std::conditional<ExactMode, Exact, Inexact>::type;
 	using DT = DataTraits_Dedicated<Kernel, true>;
 	using Graph = DT::Graph;
-	using ST = SweptAreaScore<DT>;
+	using ST = SweptAreaScore<DT, false>;
 	using Alg = EdgeMoves<DT, ST>;
 
 	filesystem::path input = cla.get_string("-input");

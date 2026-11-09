@@ -26,11 +26,11 @@ struct BMRSSimplifier::State {
 	virtual std::shared_ptr<OutputGraph> simplifiedToOutputGraph() = 0;
 };
 
-template <class Kernel>
+template <class Kernel, bool AllowFiniteNoSupport>
 struct BMRSState : BMRSSimplifier::State {
 	using DT = DataTraits_Dedicated<Kernel, true>;
 	using Graph = DT::Graph;
-	using ST = SweptAreaScore<DT>;
+	using ST = SweptAreaScore<DT, AllowFiniteNoSupport>;
 	using Alg = EdgeMoves<DT, ST>;
 
 	std::shared_ptr<Graph> m_graph = nullptr;
@@ -102,7 +102,8 @@ struct BMRSState : BMRSSimplifier::State {
 };
 
 BMRSSimplifier::BMRSSimplifier(PersistentSettings& settings) : Simplifier("Buchin et al.", settings, { 40, 40, 100 }), m_color(80, 80, 220) {
-	m_exact = settings.getInteger("bmrs_exact", 0);
+	m_exact = settings.getBoolean("bmrs_exact", false);
+	m_allowfinitenosupport = settings.getBoolean("allowfinitenosupport", false);
 }
 
 QWidget* BMRSSimplifier::constructWidget() {
@@ -113,10 +114,17 @@ QWidget* BMRSSimplifier::constructWidget() {
 	auto* checkExact = new QCheckBox("Exact computation");
 	checkExact->setChecked(m_exact);
 	layout->addWidget(checkExact);
-
 	result->connect(checkExact, &QCheckBox::stateChanged, [this](bool checked) {
 		m_settings.setBoolean("bmrs_exact", checked);
 		m_exact = checked;
+		});
+
+	auto* checkAllow = new QCheckBox("Allow finite no support");
+	checkAllow->setChecked(m_allowfinitenosupport);
+	layout->addWidget(checkAllow);
+	result->connect(checkAllow, &QCheckBox::stateChanged, [this](bool checked) {
+		m_settings.setBoolean("bmrs_allowfinitenosupport", checked);
+		m_allowfinitenosupport = checked;
 		});
 
 	return result;
@@ -126,9 +134,19 @@ void BMRSSimplifier::initialize(std::shared_ptr<InputGraph> graph, const int dep
 	clear();
 
 	if (m_exact) {
-		m_state = std::make_unique<BMRSState<Exact>>();
+		if (m_allowfinitenosupport) {
+			m_state = std::make_unique<BMRSState<Exact, true>>();
+		}
+		else {
+			m_state = std::make_unique<BMRSState<Exact, false>>();
+		}
 	} else {
-		m_state = std::make_unique<BMRSState<Inexact>>();
+		if (m_allowfinitenosupport) {
+			m_state = std::make_unique<BMRSState<Inexact, true>>();
+		}
+		else {
+			m_state = std::make_unique<BMRSState<Inexact, false>>();
+		}
 	}
 	m_state->initialize(graph, depth);
 }
