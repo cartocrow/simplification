@@ -34,7 +34,8 @@ namespace cartocrow {
 		return true;
 	}
 
-	InputGraph* constructGraphAndRegisterBoundaries(RegionSet<Exact>& rs, const int depth) {
+	InputGraph* constructGraphAndRegisterBoundaries(RegionSet<Exact>& rs, const int depth,
+	                                                std::optional<std::function<void(int, int)>> progress) {
 
 		using Vertex_handle = InputGraph::Vertex_handle;
 		using Edge_handle = InputGraph::Edge_handle;
@@ -55,6 +56,14 @@ namespace cartocrow {
 
 		Rectangle<Exact> box = simplification::utils::boxOf<Exact>(points);
 
+		const int total = 2 * static_cast<int>(points.size());
+		int processed = 0;
+		auto report = [&]() {
+			if (progress.has_value() && ++processed % 1000 == 0) {
+				(*progress)(processed, total);
+			}
+		};
+
 		// construct the graph
 		VertexQuadTree<InputGraph> pqt(box, depth);
 
@@ -72,6 +81,7 @@ namespace cartocrow {
 				Vertex_handle prev = nullptr;
 				Vertex_handle first = nullptr;
 				for (Point<Exact> p : poly.vertices()) {
+					report();
 					Vertex_handle curr = findVtx(p);
 
 					if (prev == nullptr) {
@@ -103,6 +113,7 @@ namespace cartocrow {
 				Vertex_handle prev = nullptr;
 				Vertex_handle first = nullptr;
 				for (Point<Exact> p : poly.vertices()) {
+					report();
 					Vertex_handle curr = findVtx(p);
 
 					if (prev == nullptr) {

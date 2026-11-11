@@ -2,6 +2,9 @@
 
 #include <cartocrow/core/core.h>
 
+#include <functional>
+#include <optional>
+
 #include "plain_graphs.h"
 
 namespace cartocrow {
@@ -46,6 +49,9 @@ namespace cartocrow {
 	template <class K>
 	using RegionSet = std::vector<Region<K>>;
 
-	InputGraph* constructGraphAndRegisterBoundaries(RegionSet<Exact>& rs, const int depth);
+	/// If progress is set, it is called with the number of points that are processed and the total number of points;
+	/// every point is processed twice, once to build the graph and once to register the boundaries.
+	InputGraph* constructGraphAndRegisterBoundaries(RegionSet<Exact>& rs, const int depth,
+	                                                std::optional<std::function<void(int, int)>> progress = std::nullopt);
 
 }
