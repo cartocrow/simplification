@@ -6,6 +6,7 @@ set(HEADERS
 	orientation_restriction.hpp
 	path_vertex_removal.h	
 	precision_safe_tests.h
+	smoothing.h
 	utils.h
 	vertex_removal.h	
 )
