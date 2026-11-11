@@ -4,8 +4,7 @@
 
 namespace cartocrow::simplification::em {
 
-//#define EDGEMOVE_OUTPUT(line) std::cout << line << std::endl
-#define EDGEMOVE_OUTPUT(line) //
+	inline Debug<-1> debug; // disabled debugging output
 
 	template<typename Edge_handle>
 	inline Edge_handle safe_next(Edge_handle e) {
@@ -1658,7 +1657,7 @@ namespace cartocrow::simplification::em {
 		}
 
 		void contract_move(Single& move) {
-			EDGEMOVE_OUTPUT("Contracting " << *move.edge << (move.left ? " left" : " right") << " for area " << move.swept_area());
+			debug[1] << "Contracting " << *move.edge << (move.left ? " left" : " right") << " for area " << move.swept_area() << std::endl;
 
 			start_move(move);
 
@@ -1666,7 +1665,7 @@ namespace cartocrow::simplification::em {
 			Edge_handle next = move.edge->next(!move.left);
 
 			if (move.remove_self) {
-				EDGEMOVE_OUTPUT("  remove self");
+				debug[2] << "  remove self" << std::endl;
 				Vertex_handle v;
 				if (move.edge->source()->degree() != 2) {
 					// target must be degree-2
@@ -1684,16 +1683,16 @@ namespace cartocrow::simplification::em {
 
 				if (move.remove_previous) {
 					if (v->degree() == 2) {
-						EDGEMOVE_OUTPUT("  remove prev");
+						debug[2] << "  remove prev" << std::endl;
 						graph.merge_with_next(prev);
 
 						if (move.merge_previous) {
-							EDGEMOVE_OUTPUT("  merge prev");
+							debug[2] << "  merge prev" << std::endl;
 							graph.merge_with_next(next->prev());
 						}
 					}
 					else {
-						EDGEMOVE_OUTPUT("  remove prev, deg != 2");
+						debug[2] << "  remove prev, deg != 2" << std::endl;
 						Vertex_handle pv = prev->other(v);
 						assert(!move.merge_previous);
 						assert(pv->degree() == 2);
@@ -1705,16 +1704,16 @@ namespace cartocrow::simplification::em {
 				}
 				else if (move.remove_next) {
 					if (v->degree() == 2) {
-						EDGEMOVE_OUTPUT("  remove next");
+						debug[2] << "  remove next" << std::endl;
 						graph.merge_with_prev(next);
 
 						if (move.merge_next) {
-							EDGEMOVE_OUTPUT("  merge next");
+							debug[2] << "  merge next" << std::endl;
 							graph.merge_with_prev(prev->next());
 						}
 					}
 					else {
-						EDGEMOVE_OUTPUT("  remove next, deg != 2");
+						debug[2] << "  remove next, deg != 2" << std::endl;
 						Vertex_handle nv = next->other(v);
 						assert(!move.merge_next);
 						assert(nv->degree() == 2);
@@ -1734,15 +1733,15 @@ namespace cartocrow::simplification::em {
 				if (move.remove_previous) {
 					Vertex_handle v = move.edge->source();
 					if (v->degree() == 2) {
-						EDGEMOVE_OUTPUT("  remove prev");
+						debug[2] << "  remove prev" << std::endl;
 						graph.merge_with_next(prev);
 						if (move.merge_previous) {
-							EDGEMOVE_OUTPUT("  merge prev");
+							debug[2] << "  merge prev" << std::endl;
 							graph.merge_with_next(move.edge->prev());
 						}
 					}
 					else {
-						EDGEMOVE_OUTPUT("  remove prev, deg != 2");
+						debug[2] << "  remove prev, deg != 2" << std::endl;
 						Vertex_handle pv = prev->other(v);
 						assert(!move.merge_previous);
 						assert(pv->degree() == 2);
@@ -1759,15 +1758,15 @@ namespace cartocrow::simplification::em {
 				if (move.remove_next) {
 					Vertex_handle v = move.edge->target();
 					if (v->degree() == 2) {
-						EDGEMOVE_OUTPUT("  remove next");
+						debug[2] << "  remove next" << std::endl;
 						graph.merge_with_prev(next);
 						if (move.merge_next) {
-							EDGEMOVE_OUTPUT("  merge next");
+							debug[2] << "  merge next" << std::endl;
 							graph.merge_with_prev(move.edge->next());
 						}
 					}
 					else {
-						EDGEMOVE_OUTPUT("  remove next, deg != 2");
+						debug[2] << "  remove next, deg != 2" << std::endl;
 						Vertex_handle nv = next->other(v);
 						assert(!move.merge_next);
 						assert(nv->degree() == 2);
@@ -1790,7 +1789,7 @@ namespace cartocrow::simplification::em {
 		}
 
 		void move(Single& move, const Point<Kernel> source_dest, const Point<Kernel> target_dest) {
-			EDGEMOVE_OUTPUT("Moving " << *move.edge << (move.left ? " left" : " right"));
+			debug[1] << "Moving " << *move.edge << (move.left ? " left" : " right") << std::endl;
 
 			start_move(move);
 
@@ -1804,7 +1803,7 @@ namespace cartocrow::simplification::em {
 		void performStep(Single& contract, Single& compensate) {
 			assert(graph.can_perform_operation());
 
-			EDGEMOVE_OUTPUT("Paired move");
+			debug[1] << "Paired move" << std::endl;
 
 			Number<Kernel> area = contract.swept_area();
 			const bool contract_compensate = safe_test::leq(compensate.swept_area(), area);
@@ -1829,7 +1828,7 @@ namespace cartocrow::simplification::em {
 		void performStep(Combo& combo) {
 			assert(graph.can_perform_operation());
 
-			EDGEMOVE_OUTPUT("Combo move " << *combo.edge << " for area " << combo.swept_area());
+			debug[1] << "Combo move " << *combo.edge << " for area " << combo.swept_area() << std::endl;
 
 			determineCheckout(*combo.prev_move, !combo.prev_partial);
 			determineCheckout(*combo.next_move, !combo.next_partial);
@@ -1860,14 +1859,14 @@ namespace cartocrow::simplification::em {
 			assert(graph.edge(combo.edge->graph_index()) == combo.edge); // if violated, something goes wrong with degeneracy handling above?
 
 			if (combo.remove_self) {
-				EDGEMOVE_OUTPUT("  combo: remove self");
+				debug[2] << "  combo: remove self" << std::endl;
 				// NB: the two points should already be on top of eachother by the two moves
 				Vertex_handle src = combo.edge->source();
 				Vertex_handle tar = combo.edge->target();
 				edgeset.remove(combo.edge);
 				graph.merge_vertex(src, true); // removes combo.edge
 				if (combo.merge_across) {
-					EDGEMOVE_OUTPUT("  combo: merge across");
+					debug[2] << "  combo: merge across" << std::endl;
 					edgeset.remove(tar->outgoing());
 					graph.merge_vertex(tar, true); // removes tar.outgoing
 				}
@@ -1880,7 +1879,7 @@ namespace cartocrow::simplification::em {
 		void performStep(Single& contract) {
 			assert(graph.can_perform_operation());
 
-			EDGEMOVE_OUTPUT("Tiny move");
+			debug[1] << "Tiny move" << std::endl;
 
 			determineCheckout(contract, true);
 			checkOut();
@@ -2026,7 +2025,7 @@ namespace cartocrow::simplification::em {
 
 			edgeset.removeAll();
 
-			EDGEMOVE_OUTPUT("--- reached " << graph.number_of_edges() << " edges -------------------------");
+			debug[0] << "--- reached " << graph.number_of_edges() << " edges -------------------------" << std::endl;
 		}
 
 	public:

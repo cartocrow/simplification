@@ -145,4 +145,36 @@ namespace cartocrow::simplification {
 
 	template<GraphType Graph>
 	using EdgeQuadTree = cartocrow::QuadTree<EdgeQuadTreeTraits<Graph>>;
+
+
+	template<int detaillevel>
+	struct Debug {
+		bool enabled = false;
+
+		template<typename T>
+		Debug& operator<<(T&& v) {
+			if constexpr (detaillevel >= 0) {
+				if (enabled) {
+					std::cout << std::forward<T>(v);
+				}
+			}
+			return *this;
+		}
+
+		Debug& operator<<(std::ostream& (*m)(std::ostream&)) {
+			if constexpr (detaillevel >= 0) {
+				if (enabled) {
+					std::cout << m;
+				}
+			}
+			return *this;
+		}
+
+		Debug& operator[](int level) {
+			if constexpr (detaillevel >= 0) {
+				enabled = level <= detaillevel;
+			}
+			return *this;
+		}
+	};
 }
