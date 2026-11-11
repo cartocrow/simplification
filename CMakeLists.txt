@@ -10,13 +10,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(CartoCrow REQUIRED)
 
-set(CMAKE_AUTOMOC ON)
+if(NOT EMSCRIPTEN)
+    # Let CMake automatically handle Qt's "Meta-Object Compiler" preprocessor
+    set(CMAKE_AUTOMOC ON)
+endif()
 
 # All source files should use include paths relative to the source root
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 add_subdirectory(library)
-add_subdirectory(frontend)
-add_subdirectory(test)
+if(EMSCRIPTEN)
+    add_subdirectory(wasm_frontend)
+else()
+    add_subdirectory(frontend)
+    add_subdirectory(test)
+endif()
 
 
