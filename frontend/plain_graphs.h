@@ -8,11 +8,11 @@ using namespace cartocrow;
 
 using MyGraphTraits = CustomGraphTraits<false, true, true, true>;
 
-extern template Graph_2<Graph_segment_curve_traits_2<Exact>, MyGraphTraits>;
+extern template class cartocrow::Graph_2<Graph_segment_curve_traits_2<Exact>, MyGraphTraits>;
 using InputGraph = Straight_graph_2<Exact, MyGraphTraits>;
 
-extern template Graph_2<Graph_segment_curve_traits_2<Inexact>, MyGraphTraits>;
+extern template class cartocrow::Graph_2<Graph_segment_curve_traits_2<Inexact>, MyGraphTraits>;
 using OutputGraph = Straight_graph_2<Inexact, MyGraphTraits>;
 
-extern template GraphPainting<InputGraph>;
-extern template GraphPainting<OutputGraph>;
+extern template class cartocrow::GraphPainting<InputGraph>;
+extern template class cartocrow::GraphPainting<OutputGraph>;
